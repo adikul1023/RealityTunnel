@@ -97,8 +97,8 @@ public partial class MainWindow : Window
         Dispatcher.UIThread.Post(() =>
         {
             StatusLabel.Text        = status;
-            Orb.Fill                = SolidColorBrush.Parse(orbColor);
-            OrbGlow.Fill            = SolidColorBrush.Parse(glowColor);
+            Orb.Fill                = new SolidColorBrush(Avalonia.Media.Color.Parse(orbColor));
+            OrbGlow.Fill            = new SolidColorBrush(Avalonia.Media.Color.Parse(glowColor));
             ConnectBtn.IsEnabled    = !_vpn.IsRunning() && !_connecting;
             DisconnectBtn.IsEnabled = _vpn.IsRunning() || _connecting;
         });
