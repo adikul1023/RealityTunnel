@@ -43,6 +43,10 @@ Output: `bin\x64\Release\net8.0-windows10.0.19041.0\win-x64\publish\`
 
 ### 3. Add sing-box
 
+Download `sing-box.exe` from the official releases page — make sure to grab a build that includes the `with_gvisor` tag (e.g. `sing-box-1.x.x-windows-amd64.zip`):
+
+> **https://github.com/SagerNet/sing-box/releases**
+
 Copy `sing-box.exe` into the publish folder alongside `RealityTunnel.exe`.
 
 ### 4. Run
