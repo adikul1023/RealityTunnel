@@ -1,4 +1,4 @@
-# OverREALITY
+# RealityTunnel
 
 A compact WinUI 3 VPN client for Windows that tunnels all traffic through a VLESS + REALITY server via [sing-box](https://github.com/SagerNet/sing-box).
 
@@ -19,8 +19,8 @@ A compact WinUI 3 VPN client for Windows that tunnels all traffic through a VLES
 ### 1. Clone & configure secrets
 
 ```powershell
-git clone https://github.com/YOUR_USERNAME/OverREALITY.git
-cd OverREALITY
+git clone https://github.com/adikul1023/RealityTunnel.git
+cd RealityTunnel
 Copy-Item .env.example .env
 ```
 
@@ -36,7 +36,7 @@ VPN_SHORT_ID=               # leave blank if not used
 ### 2. Build
 
 ```powershell
-dotnet publish OverREALITY.sln -c Release -r win-x64 --self-contained true
+dotnet publish RealityTunnel.sln -c Release -r win-x64 --self-contained true
 ```
 
 Output: `bin\x64\Release\net8.0-windows10.0.19041.0\win-x64\publish\`
@@ -72,4 +72,4 @@ On disconnect all routes are removed and sing-box is terminated.
 | `config.template.json` | sing-box config with `{{PLACEHOLDER}}` variables |
 | `XrayController.cs` | Manages sing-box process + TUN routing |
 | `TrayIcon.cs` | System tray (pure Win32, no WinForms) |
-| `AppSettings.cs` | Persists server IP to `%LocalAppData%\OverREALITY\` |
+| `AppSettings.cs` | Persists server IP to `%LocalAppData%\RealityTunnel\` |
