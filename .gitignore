@@ -43,3 +43,6 @@ packages/
 
 ## Secrets — never commit real credentials
 .env
+
+## Release zips — uploaded to GitHub Releases, not committed
+*.zip

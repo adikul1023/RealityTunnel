@@ -22,6 +22,18 @@
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.1" />
   </ItemGroup>
 
+  <!-- Exclude sibling project folders from this project's compile glob -->
+  <ItemGroup>
+    <Compile Remove="Core\**" />
+    <Compile Remove="Linux\**" />
+    <EmbeddedResource Remove="Core\**" />
+    <EmbeddedResource Remove="Linux\**" />
+    <None Remove="Core\**" />
+    <None Remove="Linux\**" />
+    <Page Remove="Core\**" />
+    <Page Remove="Linux\**" />
+  </ItemGroup>
+
   <ItemGroup>
     <None Include="config.template.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -42,5 +54,9 @@
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
       <CopyToPublishDirectory>Never</CopyToPublishDirectory>
     </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="Core\OverREALITY.Core.csproj" />
   </ItemGroup>
 </Project>
