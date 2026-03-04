@@ -4,7 +4,6 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
-using OverREALITY.Core;
 using System;
 using System.Net.Http;
 using System.Runtime.InteropServices;

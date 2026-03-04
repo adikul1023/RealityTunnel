@@ -4,10 +4,6 @@ VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RealityTunnel", "RealityTunnel.csproj", "{286E45C0-381F-4DFF-1B83-2AE2E72B6382}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OverREALITY.Core", "Core\OverREALITY.Core.csproj", "{7198B89A-41DF-45F4-B287-21CB1752DDD4}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OverREALITY.Linux", "Linux\OverREALITY.Linux.csproj", "{567C4BFE-A0D1-4D01-854B-837E750DDB38}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -18,14 +14,6 @@ Global
 		{286E45C0-381F-4DFF-1B83-2AE2E72B6382}.Debug|x64.Build.0 = Debug|x64
 		{286E45C0-381F-4DFF-1B83-2AE2E72B6382}.Release|x64.ActiveCfg = Release|x64
 		{286E45C0-381F-4DFF-1B83-2AE2E72B6382}.Release|x64.Build.0 = Release|x64
-		{7198B89A-41DF-45F4-B287-21CB1752DDD4}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{7198B89A-41DF-45F4-B287-21CB1752DDD4}.Debug|x64.Build.0 = Debug|Any CPU
-		{7198B89A-41DF-45F4-B287-21CB1752DDD4}.Release|x64.ActiveCfg = Release|Any CPU
-		{7198B89A-41DF-45F4-B287-21CB1752DDD4}.Release|x64.Build.0 = Release|Any CPU
-		{567C4BFE-A0D1-4D01-854B-837E750DDB38}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{567C4BFE-A0D1-4D01-854B-837E750DDB38}.Debug|x64.Build.0 = Debug|Any CPU
-		{567C4BFE-A0D1-4D01-854B-837E750DDB38}.Release|x64.ActiveCfg = Release|Any CPU
-		{567C4BFE-A0D1-4D01-854B-837E750DDB38}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
