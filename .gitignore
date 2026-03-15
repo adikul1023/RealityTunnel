@@ -46,3 +46,22 @@ packages/
 
 ## Release zips — uploaded to GitHub Releases, not committed
 *.zip
+
+## Android local/generated
+android/.gradle/
+android/.idea/
+android/.kotlin/
+android/**/build/
+android/**/bin/
+android/local.properties
+android/stderr.log
+android/**/captures/
+android/*.iml
+
+## Mobile build artifacts
+*.apk
+*.aab
+
+## Local Android source dumps
+sing-box-for-android/
+sing-box-src/

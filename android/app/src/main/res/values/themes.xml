@@ -1,0 +1,10 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base theme for a full-Compose app — no ActionBar, dark window.
+         Compose owns all UI; this XML theme just satisfies the window host. -->
+    <style name="Theme.OverREALITYAndroid" parent="android:Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
+    </style>
+</resources>

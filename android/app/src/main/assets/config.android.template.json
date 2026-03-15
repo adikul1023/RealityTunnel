@@ -1,0 +1,41 @@
+{
+  "log": {
+    "level": "debug",
+    "output": "{{LOG_PATH}}",
+    "timestamp": true
+  },
+  "inbounds": [
+    {{TUN_INBOUND}}
+  ],
+  "outbounds": [
+    {
+      "type": "vless",
+      "tag": "proxy",
+      "server": "{{SERVER_IP}}",
+      "server_port": 443,
+      "uuid": "{{VPN_UUID}}",
+      "flow": "xtls-rprx-vision",
+      "tls": {
+        "enabled": true,
+        "server_name": "{{VPN_SNI}}",
+        "utls": {
+          "enabled": true,
+          "fingerprint": "chrome"
+        },
+        "reality": {
+          "enabled": true,
+          "public_key": "{{VPN_PUBLIC_KEY}}",
+          "short_id": "{{VPN_SHORT_ID}}"
+        }
+      }
+    },
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
+  ],
+  "route": {
+    "rules": [],
+    "final": "proxy"
+  }
+}
