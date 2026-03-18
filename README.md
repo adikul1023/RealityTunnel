@@ -1,12 +1,19 @@
 # RealityTunnel
 
-A compact WinUI 3 VPN client for Windows that tunnels all traffic through a VLESS + REALITY server via [sing-box](https://github.com/SagerNet/sing-box).
+VPN clients for Windows and Android that tunnel traffic through a VLESS + REALITY server via [sing-box](https://github.com/SagerNet/sing-box).
 
-**Features:** glassmorphism floating widget · system tray · auto-connect · connection timer · exit IP display · auto-retry with backoff · server IP saved across restarts.
+## Overview
+
+- **Windows:** Compact WinUI 3 desktop client — glassmorphism floating widget · system tray · auto-connect · connection timer · exit IP display · auto-retry with backoff · server IP saved across restarts.
+- **Android:** Jetpack Compose app with multi-profile support, persistent foreground notifications, and adaptive launcher icon.
 
 ---
 
-## Requirements
+---
+
+## Windows Setup
+
+### Requirements
 
 - Windows 10/11 (build 19041+)
 - `sing-box.exe` v1.13+ (with `with_gvisor` tag) placed next to the `.exe`
@@ -55,7 +62,73 @@ Launch `RealityTunnel.exe` as Administrator, enter your server IP, and click **C
 
 ---
 
-## How it works
+## Android Setup
+
+### Requirements
+
+- Android 8+ (API 26+)
+- Pre-built `libbox.aar` (sing-box for Android) included in `android/app/libs/`
+- Android Studio (recommended) or `./gradlew` from terminal
+
+### Build
+
+1. **Open project:**
+   ```powershell
+   cd android
+   ```
+
+2. **Build debug APK:**
+   ```bash
+   ./gradlew assembleDebug
+   ```
+   Output: `app/build/outputs/apk/debug/app-debug.apk`
+
+3. **Install on device:**
+   ```bash
+   adb install app/build/outputs/apk/debug/app-debug.apk
+   ```
+
+### Features
+
+- **Multi-profile support:** Save and switch between multiple server configurations
+- **Profile management:** Add, edit (including SNI), and delete profiles via bottom-sheet UI
+- **Foreground notification:** Connected/Connecting status with quick Disconnect action
+- **Runtime permissions:** Automatically requests VPN + notification permissions (POST_NOTIFICATIONS on Android 13+)
+- **Adaptive launcher icon:** Custom blue shield icon with OS-level theming support
+
+### How it works
+
+On connect:
+1. Reads profile from `SharedPreferences` (UUID, REALITY public key, SNI)
+2. Launches VPN service with foreground notification
+3. Establishes libbox tunnel with config substitution
+4. Updates notification dynamically (Connected/Connecting states)
+
+On disconnect (via UI or notification Disconnect button):
+1. Stops foreground service
+2. Cleanly terminates libbox process
+3. Returns to idle state
+
+### File Structure
+
+| Path | Purpose |
+|---|---|
+| `android/app/src/main/` | Kotlin + Compose source code |
+| `android/app/src/main/java/com/overreality/vpn/MainActivity.kt` | Compose UI, profile setup/editor, notification request |
+| `android/app/src/main/java/com/overreality/vpn/OverRealityVpnService.kt` | Foreground service, libbox platform interface |
+| `android/app/src/main/java/com/overreality/vpn/VpnConfigStore.kt` | Profile CRUD + SharedPreferences persistence |
+| `android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml` | Adaptive launcher icon definition |
+| `android/app/libs/libbox.aar` | sing-box Android library |
+| `android/app/src/main/assets/config.android.template.json` | sing-box template with `{{PLACEHOLDER}}` substitution |
+
+### Known limitations
+
+- Samsung One UI: May require toggling notification permission in app settings if toggle appears greyed out
+- Large APK: ~73 MB due to bundled libbox.aar (pre-compiled sing-box for ARM64)
+
+---
+
+### Windows: How it works
 
 On connect the app:
 1. Reads `.env` and `config.template.json`, substitutes all `{{PLACEHOLDER}}` values
