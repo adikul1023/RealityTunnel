@@ -60,6 +60,17 @@ Copy `sing-box.exe` into the publish folder alongside `RealityTunnel.exe`.
 
 Launch `RealityTunnel.exe` as Administrator, enter your server IP, and click **Connect**.
 
+### 5. Packaging the Setup Installer (Optional)
+
+To create a single-file, self-contained `setup.exe` installer that bundles all client files, configures the `.env` file via user prompt during installation, and creates a Desktop shortcut:
+
+1. Ensure all required files (including `sing-box.exe`, `wintun.dll`, `libcronet.dll`, etc.) are present in the publish folder.
+2. Run the build script in PowerShell:
+   ```powershell
+   ./build_setup.ps1
+   ```
+3. This creates a single-file `setup.exe` in the root folder, ready to distribute to your users.
+
 ---
 
 ## Android Setup

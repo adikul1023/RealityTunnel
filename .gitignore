@@ -68,3 +68,9 @@ sing-box-src/
 
 android/connectivity.txt
 android/overreality-release.jks
+
+## Setup compiler and output
+setup/bin/
+setup/obj/
+setup.exe
+
