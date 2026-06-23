@@ -60,9 +60,17 @@ Copy-Item (Join-Path $publishDir "app.ico") $icoPath -Force
 # 6. Clean up temporary payload folder (we only need payload.zip for compilation)
 Remove-Item $tempPayloadDir -Recurse -Force
 
-# 7. Compile the setup project as single-file exe
+# 7. Compile the setup project (AOT first, with Framework-dependent fallback for size reduction)
 Write-Host "Compiling setup project..." -ForegroundColor Gray
-dotnet publish (Join-Path $setupDir "setup.csproj") -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+$env:DOTNET_CLI_TELEMETRY_OPTOUT=1
+dotnet publish (Join-Path $setupDir "setup.csproj") -c Release -r win-x64
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Native AOT compilation failed (this is normal if C++ Build Tools are missing). Falling back to Framework-Dependent compilation..." -ForegroundColor Yellow
+    dotnet publish (Join-Path $setupDir "setup.csproj") -c Release -r win-x64 -p:PublishAot=false -p:SelfContained=false -p:PublishSingleFile=true
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Compilation failed completely."
+    }
+}
 
 # 8. Copy the final setup.exe to root
 $builtExe = Join-Path $setupDir "bin\Release\net8.0-windows\win-x64\publish\setup.exe"

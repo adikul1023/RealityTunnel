@@ -72,5 +72,6 @@ android/overreality-release.jks
 ## Setup compiler and output
 setup/bin/
 setup/obj/
-setup.exe
+setup*.exe
+
 
