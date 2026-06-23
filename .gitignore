@@ -65,3 +65,6 @@ android/*.iml
 ## Local Android source dumps
 sing-box-for-android/
 sing-box-src/
+
+android/connectivity.txt
+android/overreality-release.jks

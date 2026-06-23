@@ -1,1 +1,3 @@
-# Intentionally empty for now.
+-keep class io.nekohasekai.libbox.** { *; }
+-keep class com.overreality.vpn.** { *; }
+-dontwarn io.nekohasekai.libbox.**

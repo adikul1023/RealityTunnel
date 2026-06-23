@@ -83,7 +83,14 @@ Launch `RealityTunnel.exe` as Administrator, enter your server IP, and click **C
    ```
    Output: `app/build/outputs/apk/debug/app-debug.apk`
 
-3. **Install on device:**
+3. **Build release APK:**
+   ```bash
+   ./gradlew assembleRelease
+   ```
+   Output: `app/build/outputs/apk/release/app-release.apk`
+   *Note: Release configuration signs the APK using `android/overreality-release.jks` with alias `overreality` and passwords `overreality123`.*
+
+4. **Install on device:**
    ```bash
    adb install app/build/outputs/apk/debug/app-debug.apk
    ```
@@ -101,8 +108,11 @@ Launch `RealityTunnel.exe` as Administrator, enter your server IP, and click **C
 On connect:
 1. Reads profile from `SharedPreferences` (UUID, REALITY public key, SNI)
 2. Launches VPN service with foreground notification
-3. Establishes libbox tunnel with config substitution
-4. Updates notification dynamically (Connected/Connecting states)
+3. Configures DNS servers (`8.8.8.8` and `9.9.9.9`) directly on the Android `VpnService` builder
+4. Establishes libbox tunnel with config substitution
+5. Updates notification dynamically (Connected/Connecting states)
+
+*Note on DNS:* To prevent `EOF` issues when tunneling DNS UDP traffic over a VLESS proxy connecting to Xray servers (which do not support xUDP packet encoding), DNS traffic (`port: 53`) bypasses the proxy entirely (`direct` outbound) and is resolved directly through system-provided DNS/VpnService.
 
 On disconnect (via UI or notification Disconnect button):
 1. Stops foreground service
@@ -125,6 +135,7 @@ On disconnect (via UI or notification Disconnect button):
 
 - Samsung One UI: May require toggling notification permission in app settings if toggle appears greyed out
 - Large APK: ~73 MB due to bundled libbox.aar (pre-compiled sing-box for ARM64)
+- Xray Server Compatibility: The client template disables xUDP (`"packet_encoding": ""`) since xray servers reject it. If using pure sing-box on the server, you can set this back to `"xudp"` in the template configuration.
 
 ---
 
@@ -171,6 +182,10 @@ If UFW is enabled on the instance:
 ```bash
 sudo ufw allow 443/tcp
 ```
+
+UDP for games and streaming is carried inside the sing-box VLESS + REALITY tunnel, so you do not need to expose a separate public UDP port for this setup.
+
+If UDP still fails after this change, the usual causes are: the client is not using the TUN/VPN path, or the upstream server is not running sing-box VLESS + REALITY.
 
 ### 2. Install sing-box
 

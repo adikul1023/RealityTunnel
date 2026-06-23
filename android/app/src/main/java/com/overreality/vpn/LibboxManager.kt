@@ -1,6 +1,7 @@
 package com.overreality.vpn
 
 import android.content.Context
+import android.os.Process
 import android.util.Log
 import io.nekohasekai.libbox.CommandServer
 import io.nekohasekai.libbox.CommandServerHandler
@@ -10,6 +11,8 @@ import io.nekohasekai.libbox.PlatformInterface
 import io.nekohasekai.libbox.SetupOptions
 import io.nekohasekai.libbox.SystemProxyStatus
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 import java.util.UUID
 
@@ -21,6 +24,14 @@ class LibboxManager(private val context: Context) {
     }
 
     private var commandServer: CommandServer? = null
+
+    private fun logWithMetadata(message: String) {
+        val timestamp = SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date())
+        val pid = Process.myPid()
+        val tid = Process.myTid()
+        val thread = Thread.currentThread().name
+        Log.d(TAG, "[$timestamp] PID:$pid TID:$tid Thread:$thread - $message")
+    }
 
     private val commandHandler = object : CommandServerHandler {
         override fun serviceStop() {
@@ -45,26 +56,51 @@ class LibboxManager(private val context: Context) {
     fun isAvailable(): Boolean = available
 
     fun start(serverIp: String, platform: PlatformInterface) {
-        if (!available) throw IllegalStateException(
-            "libbox not available — add libbox.aar to android/app/libs/ and sync Gradle.")
+        logWithMetadata("start: called with serverIp='$serverIp'")
+        if (!available) {
+            logWithMetadata("start: libbox not available")
+            throw IllegalStateException(
+                "libbox not available — add libbox.aar to android/app/libs/ and sync Gradle.")
+        }
 
         try {
+            logWithMetadata("start: ensuring libbox setup")
             ensureLibboxSetup(context)
+            logWithMetadata("start: building config JSON")
             val configJson = buildConfigJson(serverIp)
+            logWithMetadata("start: config JSON built, length=${configJson.length}")
+            Log.d(TAG, "=== GENERATED SING-BOX CONFIG ===")
+            Log.d(TAG, configJson)
+            Log.d(TAG, "=== END GENERATED SING-BOX CONFIG ===")
             val server = commandServer ?: Libbox.newCommandServer(commandHandler, platform)
-                .also { commandServer = it }
+                .also { 
+                    commandServer = it
+                    logWithMetadata("start: created new command server")
+                }
+            logWithMetadata("start: calling server.startOrReloadService()")
             server.startOrReloadService(configJson, OverrideOptions())
+            logWithMetadata("start: server.startOrReloadService() completed successfully")
         } catch (t: Throwable) {
+            logWithMetadata("start: EXCEPTION - ${t.message}")
+            Log.e(TAG, "libbox start failed", t)
             throw IllegalStateException("libbox start failed: ${t.message ?: t::class.java.simpleName}", t)
         }
     }
 
     fun stop() {
+        logWithMetadata("stop: called")
         try {
+            logWithMetadata("stop: closing service")
             commandServer?.closeService()
+            logWithMetadata("stop: closing server")
             commandServer?.close()
+            logWithMetadata("stop: libbox stopped successfully")
+        } catch (t: Throwable) {
+            logWithMetadata("stop: EXCEPTION - ${t.message}")
+            Log.e(TAG, "libbox stop failed", t)
         } finally {
             commandServer = null
+            logWithMetadata("stop: commandServer set to null")
         }
     }
 

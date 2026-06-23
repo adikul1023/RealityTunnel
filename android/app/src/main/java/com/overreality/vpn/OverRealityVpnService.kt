@@ -1,4 +1,4 @@
-package com.overreality.vpn
+﻿package com.overreality.vpn
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -10,7 +10,11 @@ import android.net.ConnectivityManager
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.os.Process
 import android.util.Log
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import androidx.core.app.NotificationCompat
 import io.nekohasekai.libbox.ConnectionOwner
 import io.nekohasekai.libbox.ExchangeContext
@@ -28,7 +32,16 @@ class OverRealityVpnService : VpnService(), PlatformInterface {
     private var tunPfd: ParcelFileDescriptor? = null
     private lateinit var engine: AndroidVpnEngine
 
+    private fun logWithMetadata(message: String) {
+        val timestamp = SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date())
+        val pid = Process.myPid()
+        val tid = Process.myTid()
+        val thread = Thread.currentThread().name
+        Log.d(TAG, "[$timestamp] PID:$pid TID:$tid Thread:$thread - $message")
+    }
+
     private fun updateForegroundNotification(message: String, connected: Boolean) {
+        logWithMetadata("updateForegroundNotification: message='$message', connected=$connected")
         val nm = getSystemService(NotificationManager::class.java)
         val openIntent = Intent(this, MainActivity::class.java)
         val openPendingIntent = PendingIntent.getActivity(
@@ -59,6 +72,7 @@ class OverRealityVpnService : VpnService(), PlatformInterface {
 
         if (connected) {
             nm.notify(NOTIFICATION_ID, notification)
+            logWithMetadata("updateForegroundNotification: notification updated (connected state)")
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             try {
                 startForeground(
@@ -66,17 +80,21 @@ class OverRealityVpnService : VpnService(), PlatformInterface {
                     notification,
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
                 )
+                logWithMetadata("updateForegroundNotification: startForeground called with SPECIAL_USE type")
             } catch (t: Throwable) {
                 Log.w(TAG, "specialUse foreground failed, falling back", t)
+                logWithMetadata("updateForegroundNotification: specialUse failed, falling back to standard foreground")
                 startForeground(NOTIFICATION_ID, notification)
             }
         } else {
             startForeground(NOTIFICATION_ID, notification)
+            logWithMetadata("updateForegroundNotification: startForeground called (standard)")
         }
     }
 
     @Throws(Exception::class)
     override fun openTun(options: TunOptions): Int {
+        logWithMetadata("openTun: called with MTU=${options.getMTU()}")
         val builder = Builder()
             .setSession("OverREALITY")
             .setMtu(options.getMTU())
@@ -108,39 +126,16 @@ class OverRealityVpnService : VpnService(), PlatformInterface {
             builder.addRoute("128.0.0.0", 1)
         }
 
+        // Use real DNS servers instead of libbox's fake TUN address (10.0.85.3).
+        // The sing-box route rule "port: [53] -> direct" routes all DNS packets
+        // via VpnService.protect() directly to the real network, completely bypassing
+        // the proxy. This avoids all xUDP/EOF issues with the xray server for DNS.
+        // Web traffic (non-port-53) still goes through the VLESS proxy as normal.
         val dnsRaw = options.getDNSServerAddress().value
-        val dnsItems = dnsRaw
-            .split(',', ' ', ';', '|')
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-        var addedDns = false
-        for (dns in dnsItems) {
-            builder.addDnsServer(dns)
-            addedDns = true
-        }
-
-        // If libbox provides only internal DNS (10.0.85.3) or none, fall back to current
-        // network DNS servers so Chrome/system resolver don't time out with BAD_CONFIG.
-        if (!addedDns || (dnsItems.size == 1 && dnsItems[0] == "10.0.85.3")) {
-            val cm = getSystemService(ConnectivityManager::class.java)
-            val active = cm?.activeNetwork
-            val systemDns = if (active != null) {
-                cm.getLinkProperties(active)
-                    ?.dnsServers
-                    ?.mapNotNull { it.hostAddress }
-                    ?.filter { it.isNotBlank() && !it.contains(':') }
-                    .orEmpty()
-            } else {
-                emptyList()
-            }
-            val fallbackDns = if (systemDns.isNotEmpty()) systemDns else listOf("8.8.8.8", "4.2.2.2")
-            for (dns in fallbackDns) {
-                builder.addDnsServer(dns)
-            }
-            Log.d(TAG, "openTun: using fallback DNS $fallbackDns")
-        } else {
-            Log.d(TAG, "openTun: using libbox DNS $dnsItems")
-        }
+        Log.d(TAG, "openTun: libbox DNS raw: '$dnsRaw' (ignored — using real DNS servers)")
+        builder.addDnsServer("8.8.8.8")
+        builder.addDnsServer("9.9.9.9")
+        Log.d(TAG, "openTun: added real DNS 8.8.8.8 and 9.9.9.9 (routed via direct, not proxy)")
 
         try {
             builder.addDisallowedApplication(packageName)
@@ -152,6 +147,7 @@ class OverRealityVpnService : VpnService(), PlatformInterface {
         }
 
         val pfd = builder.establish() ?: throw Exception("VpnService.Builder.establish() returned null")
+        logWithMetadata("openTun: VPN file descriptor created successfully, fd=${pfd.fd}")
         tunPfd?.close()
         tunPfd = pfd
         return pfd.fd
@@ -234,10 +230,12 @@ class OverRealityVpnService : VpnService(), PlatformInterface {
     override fun localDNSTransport(): LocalDNSTransport {
         return object : LocalDNSTransport {
             override fun exchange(ctx: ExchangeContext, raw: ByteArray) {
+                Log.d("LOCALDNS", "exchange called size=${raw.size}")
                 ctx.rawSuccess(ByteArray(0))
             }
 
             override fun lookup(ctx: ExchangeContext, network: String, domain: String) {
+                Log.d("LOCALDNS", "lookup called network=$network domain=$domain")
                 ctx.success("")
             }
 
@@ -248,45 +246,61 @@ class OverRealityVpnService : VpnService(), PlatformInterface {
     }
 
     override fun onCreate() {
+        logWithMetadata("onCreate: service created")
         super.onCreate()
         engine = AndroidVpnEngineProvider.create(this)
+        logWithMetadata("onCreate: engine created: ${engine::class.simpleName}")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        logWithMetadata("onStartCommand: action=${intent?.action}, flags=$flags, startId=$startId")
         try {
             when (intent?.action) {
                 ACTION_START -> {
+                    logWithMetadata("onStartCommand: ACTION_START received")
                     ensureForeground()
                     val serverIp = intent.getStringExtra(EXTRA_SERVER_IP).orEmpty()
+                    logWithMetadata("onStartCommand: starting VPN with serverIp='$serverIp'")
                     startVpn(serverIp)
                 }
 
-                ACTION_STOP -> stopVpn()
+                ACTION_STOP -> {
+                    logWithMetadata("onStartCommand: ACTION_STOP received")
+                    stopVpn()
+                }
+                else -> {
+                    logWithMetadata("onStartCommand: unknown action ${intent?.action}")
+                }
             }
         } catch (t: Throwable) {
+            logWithMetadata("onStartCommand: EXCEPTION - ${t.message}")
+            Log.e(TAG, "onStartCommand failed", t)
             stopVpn()
             VpnStatusStore.setState(
                 VpnConnectionState.ERROR,
                 "[${engine.name}] startup failed: ${t.message ?: t::class.java.simpleName}",
             )
-            Log.e(TAG, "onStartCommand failed", t)
             return START_NOT_STICKY
         }
         return START_STICKY
     }
 
     override fun onRevoke() {
+        logWithMetadata("onRevoke: VPN revoked by system")
         stopVpn()
         super.onRevoke()
     }
 
     override fun onDestroy() {
+        logWithMetadata("onDestroy: service destroying")
         stopVpn()
         super.onDestroy()
     }
 
     private fun startVpn(serverIp: String) {
+        logWithMetadata("startVpn: called with serverIp='$serverIp'")
         if (tunPfd != null) {
+            logWithMetadata("startVpn: already connected, tunPfd exists")
             VpnStatusStore.setState(VpnConnectionState.CONNECTED, "Already connected")
             updateForegroundNotification("Connected", connected = true)
             return
@@ -297,14 +311,19 @@ class OverRealityVpnService : VpnService(), PlatformInterface {
 
         try {
             if (!engine.isAvailable()) {
+                logWithMetadata("startVpn: engine not available - ${engine.unavailableReason()}")
                 throw IllegalStateException(engine.unavailableReason() ?: "VPN engine unavailable")
             }
+            logWithMetadata("startVpn: calling engine.start()")
             engine.start(serverIp)
+            logWithMetadata("startVpn: engine.start() completed successfully")
             val msg = if (serverIp.isBlank()) "Connected (${engine.name})"
             else "Connected (${engine.name}): $serverIp"
             VpnStatusStore.setState(VpnConnectionState.CONNECTED, msg)
             updateForegroundNotification("Connected", connected = true)
         } catch (t: Throwable) {
+            logWithMetadata("startVpn: EXCEPTION - ${t.message}")
+            Log.e(TAG, "startVpn failed", t)
             stopVpn()
             VpnStatusStore.setState(
                 VpnConnectionState.ERROR,
@@ -314,17 +333,26 @@ class OverRealityVpnService : VpnService(), PlatformInterface {
     }
 
     private fun stopVpn() {
+        logWithMetadata("stopVpn: called")
         try {
+            logWithMetadata("stopVpn: calling engine.stop()")
             engine.stop()
-        } catch (_: Exception) {
+            logWithMetadata("stopVpn: engine.stop() completed")
+        } catch (t: Exception) {
+            logWithMetadata("stopVpn: EXCEPTION in engine.stop() - ${t.message}")
+            Log.e(TAG, "stopVpn: engine.stop() failed", t)
         }
         try {
             tunPfd?.close()
-        } catch (_: Exception) {
+            logWithMetadata("stopVpn: tunPfd closed")
+        } catch (t: Exception) {
+            logWithMetadata("stopVpn: EXCEPTION closing tunPfd - ${t.message}")
+            Log.e(TAG, "stopVpn: tunPfd.close() failed", t)
         } finally {
             tunPfd = null
         }
         stopForeground(STOP_FOREGROUND_REMOVE)
+        logWithMetadata("stopVpn: foreground stopped")
         VpnStatusStore.setState(VpnConnectionState.DISCONNECTED)
         stopSelf()
     }

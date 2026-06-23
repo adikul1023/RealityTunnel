@@ -25,6 +25,7 @@
       "server_port": 443,
       "uuid": "{{VPN_UUID}}",
       "flow": "xtls-rprx-vision",
+      "packet_encoding": "xudp",
       "tls": {
         "enabled": true,
         "server_name": "{{VPN_SNI}}",
