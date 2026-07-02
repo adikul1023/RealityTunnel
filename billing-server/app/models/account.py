@@ -38,6 +38,9 @@ class Account(Base, TimestampMixin):
     master_token_hash: Mapped[str] = mapped_column(
         String(64), unique=True, index=True, nullable=False
     )
+    # Invariant: marzban_username is write-only from Server 1.
+    # Server 1 creates/updates it via the Marzban API and never trusts values coming
+    # back from Marzban to overwrite its own state.
     marzban_username: Mapped[str | None] = mapped_column(
         String(64), unique=True, index=True, nullable=True
     )
