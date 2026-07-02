@@ -104,7 +104,7 @@ class BaseRepository(Generic[ModelType]):
     async def exists(self, **kwargs: Any) -> bool:
         """
         Check if at least one row matching the keyword arguments exists.
-        Uses LIMIT 1 for O(1) existence evaluation.
+        Performs an indexed existence check without counting rows.
         """
         try:
             stmt = select(self.model_class).filter_by(**kwargs).limit(1)
