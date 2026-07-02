@@ -1,0 +1,17 @@
+# RealityTunnel-Lab .gitignore
+
+# Marzban source clone (tracked as separate git repo)
+marzban/
+
+# Runtime data (DB, certs, etc.) — sensitive
+data/
+configs/
+
+# Python cache
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+
+# Compose secrets are covered by compose/.gitignore
+# but exclude compose/ top-level just in case
+compose/.env

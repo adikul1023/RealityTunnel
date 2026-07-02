@@ -1,0 +1,333 @@
+2026-07-02T18:21:53  [PASS]  Test 09 — Admin Token Behavior
+        jwt_algorithm: HS256
+        token_ttl_seconds: 86400
+        token_ttl_hours: 24.0
+        token_expires_at: 2026-07-03 12:51:52 UTC
+        wrong_password_status: 401
+        wrong_username_status: 401
+        missing_auth_status: 401
+        malformed_token_status: 401
+        expired_token_status: 401
+        no_refresh_endpoint: True
+
+============================================================
+2026-07-02T18:21:53  run_all.py summary
+  PASS  09 test_09_admin_token (1.1s)
+2026-07-02T18:22:06  [PASS]  Test 01 — Disable User
+        API disable round-trip (s): 0.048
+        Sub URL HTTP status after disable: 200
+        Xray restart triggered: NO — gRPC RemoveUser only
+        Existing TCP session fate: Survives indefinitely (RemoveUser deletes sync.Map entry; no goroutine signal sent to active conn)
+        New connection attempts after disable: Fail immediately (UUID no longer registered in Xray)
+        Background job enforcement (expiry/quota): Runs every 10 s — irrelevant for manual disable; takes effect on next review cycle regardless
+2026-07-02T18:22:08  [PASS]  Test 02 — Re-enable User
+        API re-enable round-trip (s): 0.041
+        Sub URL HTTP status after re-enable: 200
+        UUID unchanged by enable/disable: 5cbf949d-546c-42fd-b6a1-c0abda7bb97f
+        Xray mechanism: gRPC RemoveUser + AddUser (hot reload — no restart)
+        New connections after re-enable: Succeed immediately (AddUser re-inserts UUID into sync.Map)
+        Admin token validity window: 24 h (86 400 s) from login — no token rotation needed for this test
+2026-07-02T18:22:09  [PASS]  Test 03 — UUID Rotation via revoke_sub
+        revoke_sub API round-trip (s): 0.055
+        Old UUID: 8854bf3b-dd7e-44ad-a675-e758225cdd49
+        New UUID: 88defe8e-9b2f-4017-863f-7b92c3868aa6
+        Old sub URL fate: HTTP 404 — hard-404 immediately
+        New sub URL fate: HTTP 200 — live immediately
+        Xray restart triggered: NO — gRPC RemoveUser + AddUser only
+        Existing TCP session fate after UUID rotation: Survives (RemoveUser removes sync.Map entry; active goroutine is not signalled — VLESS auth checked once per connection)
+        Background review job interval: 10 s — enforces expiry/quota; does not affect UUID rotation
+2026-07-02T18:22:11  [FAIL]  Test 06 — revoke_sub Detail
+        UUID_0 (initial): 9450775a-1e2b-4ae3-b5b1-0b4dccf3c92b
+        UUID_1 (after revoke #1): c4a120bc-e536-4191-be0f-c59d6a676c04
+        UUID_2 (after revoke #2): 4840a4b0-33e3-4ac6-b5cc-c8f5f64d92f1
+        revoke_sub #1 round-trip (s): 0.053
+        revoke_sub #2 round-trip (s): 0.053
+        Sub URL hard-404s immediately: YES — verified on each revoke
+        UUID rotated on each call: YES — unique UUID per revoke
+        Xray restart triggered: NO — gRPC RemoveUser+AddUser only
+        'subscription revoked' in log: 2 time(s)
+        Existing TCP session fate: Survives until natural disconnect (VLESS auth checked once per TCP conn — RemoveUser does not signal active goroutine)
+        Background review job interval: 10 s — enforces expiry/quota independently of revoke_sub
+
+============================================================
+2026-07-02T18:22:11  run_all.py summary
+  PASS  01 test_01_disable_user (2.0s)
+  PASS  02 test_02_enable_user (1.6s)
+  PASS  03 test_03_uuid_change (1.6s)
+  FAIL  06 test_06_revoke_sub (1.9s)
+2026-07-02T18:22:32  [PASS]  Test 07 — Core Restart
+        restart_duration_s: 0.54
+        user_survived: True
+        inbound_survived: True
+
+============================================================
+2026-07-02T18:22:32  run_all.py summary
+  PASS  07 test_07_core_restart (4.2s)
+
+============================================================
+2026-07-02T18:23:46  run_all.py summary
+  FAIL  04 test_04_expiry (50.9s)
+  FAIL  05 test_05_quota (10.6s)
+2026-07-02T18:26:56  [FAIL]  Test 04 — Expiry Enforcement
+        inline_enforcement_ms: 47 ms
+        sub_url_on_expired_user: HTTP 200 (still serves link)
+        natural_expiry_lag_s: 11.1s after expire_ts
+        polls_until_detection: 28
+        background_job_interval: 10 s (JOB_REVIEW_USERS_INTERVAL default)
+        inline_expiry_set_to_past: Immediate — status recalculated in same PUT request
+        natural_expiry_lag: Measured above — up to ~10 s after expire timestamp
+2026-07-02T18:27:06  [FAIL]  Test 05 — Data Quota Enforcement
+        data_limit_bytes: 1048576
+        data_limit_set_via_api: Immediate — reflected in PUT response
+        injected_used_traffic_bytes: 2097152
+        quota_enforcement_lag_s: 8.3s after injection
+        polls_until_detection: 5
+        enforcement_mechanism: background job review() every 10 s
+        quota_pushed_to_xray: No — Xray has no quota concept
+        data_limit_zero_meaning: 0 = unlimited (not zero bytes)
+
+============================================================
+2026-07-02T18:27:06  run_all.py summary
+  FAIL  04 test_04_expiry (57.3s)
+  FAIL  05 test_05_quota (10.1s)
+2026-07-02T18:27:35  [FAIL]  Test 05 — Data Quota Enforcement
+        data_limit_bytes: 1048576
+        data_limit_set_via_api: Immediate — reflected in PUT response
+        injected_used_traffic_bytes: 2097152
+        quota_enforcement_lag_s: 6.3s after injection
+        polls_until_detection: 4
+        enforcement_mechanism: background job review() every 10 s
+        quota_pushed_to_xray: No — Xray has no quota concept
+        data_limit_zero_meaning: 0 = unlimited (not zero bytes)
+2026-07-02T18:33:15  [PASS]  Test 04 — Expiry Enforcement
+        inline_enforcement_ms: 42 ms
+        sub_url_on_expired_user: HTTP 200 (still serves link)
+        natural_expiry_lag_s: 1.0s after expire_ts
+        polls_until_detection: 23
+        background_job_interval: 10 s (JOB_REVIEW_USERS_INTERVAL default)
+        inline_expiry_set_to_past: Immediate — status recalculated in same PUT request
+        natural_expiry_lag: Measured above — up to ~10 s after expire timestamp
+2026-07-02T18:33:27  [PASS]  Test 05 — Data Quota Enforcement
+        data_limit_bytes: 1048576
+        data_limit_set_via_api: Immediate — reflected in PUT response
+        injected_used_traffic_bytes: 2097152
+        quota_enforcement_lag_s: 10.1s after injection
+        polls_until_detection: 6
+        enforcement_mechanism: background job review() every 10 s
+        quota_pushed_to_xray: No — Xray has no quota concept
+        data_limit_zero_meaning: 0 = unlimited (not zero bytes)
+
+============================================================
+2026-07-02T18:33:27  run_all.py summary
+  PASS  04 test_04_expiry (46.9s)
+  PASS  05 test_05_quota (12.0s)
+2026-07-02T18:33:54  [PASS]  Test 01 — Disable User
+        API disable round-trip (s): 0.043
+        Sub URL HTTP status after disable: 200
+        Xray restart triggered: NO — gRPC RemoveUser only
+        Existing TCP session fate: Survives indefinitely (RemoveUser deletes sync.Map entry; no goroutine signal sent to active conn)
+        New connection attempts after disable: Fail immediately (UUID no longer registered in Xray)
+        Background job enforcement (expiry/quota): Runs every 10 s — irrelevant for manual disable; takes effect on next review cycle regardless
+2026-07-02T18:33:55  [PASS]  Test 02 — Re-enable User
+        API re-enable round-trip (s): 0.040
+        Sub URL HTTP status after re-enable: 200
+        UUID unchanged by enable/disable: 51d32c9a-4c7d-4591-a9ad-cc9114e9fcf7
+        Xray mechanism: gRPC RemoveUser + AddUser (hot reload — no restart)
+        New connections after re-enable: Succeed immediately (AddUser re-inserts UUID into sync.Map)
+        Admin token validity window: 24 h (86 400 s) from login — no token rotation needed for this test
+2026-07-02T18:33:57  [PASS]  Test 03 — UUID Rotation via revoke_sub
+        revoke_sub API round-trip (s): 0.058
+        Old UUID: f214531d-10f1-49ba-9c06-9d2ecf1d395b
+        New UUID: 7bc96c15-4739-44ec-814f-c4fa9588ba0d
+        Old sub URL fate: HTTP 404 — hard-404 immediately
+        New sub URL fate: HTTP 200 — live immediately
+        Xray restart triggered: NO — gRPC RemoveUser + AddUser only
+        Existing TCP session fate after UUID rotation: Survives (RemoveUser removes sync.Map entry; active goroutine is not signalled — VLESS auth checked once per connection)
+        Background review job interval: 10 s — enforces expiry/quota; does not affect UUID rotation
+2026-07-02T18:33:58  [FAIL]  Test 06 — revoke_sub Detail
+        UUID_0 (initial): 54b2945b-42d9-4784-8591-bbcb66f52c7f
+        UUID_1 (after revoke #1): 3b84ca77-b33d-4f77-86f8-170c0b2c30cd
+        UUID_2 (after revoke #2): c42f5337-7f54-4da3-9878-c0a4b7fe5162
+        revoke_sub #1 round-trip (s): 0.056
+        revoke_sub #2 round-trip (s): 0.061
+        Sub URL hard-404s immediately: YES — verified on each revoke
+        UUID rotated on each call: YES — unique UUID per revoke
+        Xray restart triggered: NO — gRPC RemoveUser+AddUser only
+        'subscription revoked' in log: 2 time(s)
+        Existing TCP session fate: Survives until natural disconnect (VLESS auth checked once per TCP conn — RemoveUser does not signal active goroutine)
+        Background review job interval: 10 s — enforces expiry/quota independently of revoke_sub
+2026-07-02T18:34:01  [PASS]  Test 07 — Core Restart
+        restart_duration_s: 0.53
+        user_survived: True
+        inbound_survived: True
+2026-07-02T18:34:02  [FAIL]  Test 09 — Admin Token Behavior
+        jwt_algorithm: HS256
+        token_ttl_seconds: 86400
+        token_ttl_hours: 24.0
+        token_expires_at: 2026-07-03 13:04:02 UTC
+        wrong_password_status: 401
+        wrong_username_status: 401
+        missing_auth_status: 401
+        malformed_token_status: 401
+        expired_token_status: 401
+        no_refresh_endpoint: True
+
+============================================================
+2026-07-02T18:34:02  run_all.py summary
+  PASS  01 test_01_disable_user (1.4s)
+  PASS  02 test_02_enable_user (1.5s)
+  PASS  03 test_03_uuid_change (1.6s)
+  FAIL  06 test_06_revoke_sub (1.7s)
+  PASS  07 test_07_core_restart (3.0s)
+  FAIL  09 test_09_admin_token (0.9s)
+2026-07-02T18:34:20  [FAIL]  Test 06 — revoke_sub Detail
+        UUID_0 (initial): 581a6737-effc-4ebe-bf0c-64d962421a62
+        UUID_1 (after revoke #1): c6981a3c-3b9b-45cf-a6b9-d921304c0fac
+        UUID_2 (after revoke #2): 06876988-9052-434a-adee-8f7c1ae3789e
+        revoke_sub #1 round-trip (s): 0.050
+        revoke_sub #2 round-trip (s): 0.055
+        Sub URL hard-404s immediately: YES — verified on each revoke
+        UUID rotated on each call: YES — unique UUID per revoke
+        Xray restart triggered: NO — gRPC RemoveUser+AddUser only
+        'subscription revoked' in log: 2 time(s)
+        Existing TCP session fate: Survives until natural disconnect (VLESS auth checked once per TCP conn — RemoveUser does not signal active goroutine)
+        Background review job interval: 10 s — enforces expiry/quota independently of revoke_sub
+2026-07-02T18:34:52  [FAIL]  Test 06 — revoke_sub Detail
+        UUID_0 (initial): 717b68c5-d2ea-432e-a86d-eb804c1f40ff
+        UUID_1 (after revoke #1): 2ebaa5ee-39e4-45aa-ae79-60bb56964bfe
+        UUID_2 (after revoke #2): 8fb2c1a1-aea0-47c5-afb0-5c75e2246e65
+        revoke_sub #1 round-trip (s): 0.053
+        revoke_sub #2 round-trip (s): 0.085
+        Sub URL hard-404s immediately: YES — verified on each revoke
+        UUID rotated on each call: YES — unique UUID per revoke
+        Xray restart triggered: NO — gRPC RemoveUser+AddUser only
+        'subscription revoked' in log: 2 time(s)
+        Existing TCP session fate: Survives until natural disconnect (VLESS auth checked once per TCP conn — RemoveUser does not signal active goroutine)
+        Background review job interval: 10 s — enforces expiry/quota independently of revoke_sub
+2026-07-02T18:35:33  [FAIL]  Test 09 — Admin Token Behavior
+        jwt_algorithm: HS256
+        token_ttl_seconds: 86400
+        token_ttl_hours: 24.0
+        token_expires_at: 2026-07-03 13:05:32 UTC
+        wrong_password_status: 401
+        wrong_username_status: 401
+        missing_auth_status: 401
+        malformed_token_status: 401
+        expired_token_status: 401
+        no_refresh_endpoint: True
+2026-07-02T18:35:49  [FAIL]  Test 09 — Admin Token Behavior
+        jwt_algorithm: HS256
+        token_ttl_seconds: 86400
+        token_ttl_hours: 24.0
+        token_expires_at: 2026-07-03 13:05:49 UTC
+        wrong_password_status: 401
+        wrong_username_status: 401
+        missing_auth_status: 401
+        malformed_token_status: 401
+        expired_token_status: 401
+        no_refresh_endpoint: True
+2026-07-02T18:37:29  [PASS]  Test 01 — Disable User
+        API disable round-trip (s): 0.045
+        Sub URL HTTP status after disable: 200
+        Xray restart triggered: NO — gRPC RemoveUser only
+        Existing TCP session fate: Survives indefinitely (RemoveUser deletes sync.Map entry; no goroutine signal sent to active conn)
+        New connection attempts after disable: Fail immediately (UUID no longer registered in Xray)
+        Background job enforcement (expiry/quota): Runs every 10 s — irrelevant for manual disable; takes effect on next review cycle regardless
+2026-07-02T18:37:31  [PASS]  Test 02 — Re-enable User
+        API re-enable round-trip (s): 0.042
+        Sub URL HTTP status after re-enable: 200
+        UUID unchanged by enable/disable: 6ebc8cf9-72fc-4cdf-bba5-f4bd510f8e8e
+        Xray mechanism: gRPC RemoveUser + AddUser (hot reload — no restart)
+        New connections after re-enable: Succeed immediately (AddUser re-inserts UUID into sync.Map)
+        Admin token validity window: 24 h (86 400 s) from login — no token rotation needed for this test
+2026-07-02T18:37:33  [PASS]  Test 03 — UUID Rotation via revoke_sub
+        revoke_sub API round-trip (s): 0.051
+        Old UUID: ac49dc8c-66b0-4934-8f72-f6f9afdbd220
+        New UUID: 91e25786-9ca3-4475-a227-2f298a5840bc
+        Old sub URL fate: HTTP 404 — hard-404 immediately
+        New sub URL fate: HTTP 200 — live immediately
+        Xray restart triggered: NO — gRPC RemoveUser + AddUser only
+        Existing TCP session fate after UUID rotation: Survives (RemoveUser removes sync.Map entry; active goroutine is not signalled — VLESS auth checked once per connection)
+        Background review job interval: 10 s — enforces expiry/quota; does not affect UUID rotation
+2026-07-02T18:37:35  [FAIL]  Test 06 — revoke_sub Detail
+        UUID_0 (initial): 94b0b2c8-d8f6-4dcc-9077-f294b22c85c2
+        UUID_1 (after revoke #1): bd538430-3915-4554-b9b9-ae5689521c9d
+        UUID_2 (after revoke #2): 6b77bc77-e0b7-47e1-a18a-768869f4b8f4
+        revoke_sub #1 round-trip (s): 0.046
+        revoke_sub #2 round-trip (s): 0.051
+        Sub URL hard-404s immediately: YES — verified on each revoke
+        UUID rotated on each call: YES — unique UUID per revoke
+        Xray restart triggered: NO — gRPC RemoveUser+AddUser only
+        'subscription revoked' in log: 3 time(s)
+        Existing TCP session fate: Survives until natural disconnect (VLESS auth checked once per TCP conn — RemoveUser does not signal active goroutine)
+        Background review job interval: 10 s — enforces expiry/quota independently of revoke_sub
+2026-07-02T18:37:38  [PASS]  Test 07 — Core Restart
+        restart_duration_s: 0.53
+        user_survived: True
+        inbound_survived: True
+2026-07-02T18:37:40  [PASS]  Test 09 — Admin Token Behavior
+        jwt_algorithm: HS256
+        token_ttl_seconds: 86400
+        token_ttl_hours: 24.0
+        token_expires_at: 2026-07-03 13:07:39 UTC
+        wrong_password_status: 401
+        wrong_username_status: 401
+        missing_auth_status: 401
+        malformed_token_status: 401
+        expired_token_status: 401
+        no_refresh_endpoint: True
+
+============================================================
+2026-07-02T18:37:40  run_all.py summary
+  PASS  01 test_01_disable_user (2.0s)
+  PASS  02 test_02_enable_user (2.1s)
+  PASS  03 test_03_uuid_change (2.0s)
+  FAIL  06 test_06_revoke_sub (2.6s)
+  PASS  07 test_07_core_restart (3.3s)
+  PASS  09 test_09_admin_token (1.9s)
+2026-07-02T19:00:50  [PASS]  Test 06 — revoke_sub Detail
+        UUID_0 (initial): f200a941-452e-4dc2-bd6d-5355b2b36bf6
+        UUID_1 (after revoke #1): a46ae0f8-42cf-4012-90b1-2ccd8dfffdba
+        UUID_2 (after revoke #2): 0878ba0b-e8ad-42ff-bc88-513eb4c2a771
+        revoke_sub #1 round-trip (s): 0.049
+        revoke_sub #2 round-trip (s): 0.052
+        Sub URL hard-404s immediately: YES — verified on each revoke
+        UUID rotated on each call: YES — unique UUID per revoke
+        Xray restart triggered: NO — gRPC RemoveUser+AddUser only
+        'subscription revoked' in log: 2 time(s)
+        Existing TCP session fate: Survives until natural disconnect (VLESS auth checked once per TCP conn — RemoveUser does not signal active goroutine)
+        Background review job interval: 10 s — enforces expiry/quota independently of revoke_sub
+2026-07-02T19:01:05  [FAIL]  Test 06 — revoke_sub Detail
+        UUID_0 (initial): ecf51db2-dffd-4cb6-bb1e-29f5a592e6c6
+        UUID_1 (after revoke #1): 08602a4b-2ab5-4c37-823a-e0884c20eb54
+        UUID_2 (after revoke #2): 094b43f5-c02b-4eeb-b98a-1f5f86665b6a
+        revoke_sub #1 round-trip (s): 0.049
+        revoke_sub #2 round-trip (s): 0.056
+        Sub URL hard-404s immediately: YES — verified on each revoke
+        UUID rotated on each call: YES — unique UUID per revoke
+        Xray restart triggered: NO — gRPC RemoveUser+AddUser only
+        'subscription revoked' in log: 2 time(s)
+        Existing TCP session fate: Survives until natural disconnect (VLESS auth checked once per TCP conn — RemoveUser does not signal active goroutine)
+        Background review job interval: 10 s — enforces expiry/quota independently of revoke_sub
+2026-07-02T19:01:08  [PASS]  Test 06 — revoke_sub Detail
+        UUID_0 (initial): 1335f1bf-b0f9-4e95-9936-b0c5fefb8dac
+        UUID_1 (after revoke #1): 0647667c-377d-44eb-baa0-ea8cadc15251
+        UUID_2 (after revoke #2): 2bda78d3-3504-4746-b7d8-2ee4fdcd955b
+        revoke_sub #1 round-trip (s): 0.051
+        revoke_sub #2 round-trip (s): 0.051
+        Sub URL hard-404s immediately: YES — verified on each revoke
+        UUID rotated on each call: YES — unique UUID per revoke
+        Xray restart triggered: NO — gRPC RemoveUser+AddUser only
+        'subscription revoked' in log: 2 time(s)
+        Existing TCP session fate: Survives until natural disconnect (VLESS auth checked once per TCP conn — RemoveUser does not signal active goroutine)
+        Background review job interval: 10 s — enforces expiry/quota independently of revoke_sub
+2026-07-02T19:01:31  [PASS]  Test 08 — Full Stack Persistence
+        shutdown_duration_s: 2.7
+        startup_duration_s: 6.3
+        user_survived: True
+        uuid_unchanged: True
+        reality_key_unchanged: True
+        admin_survived: True
+        db_exists: True
+2026-07-02T19:03:14  [FAIL]  Test 10 — Webhook System
+        no_api_webhook_config: True — requires container restart to add/change URL
