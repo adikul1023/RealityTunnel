@@ -13,6 +13,7 @@ from app.database import Base
 from app.exceptions import (
     DuplicateEntityError,
     DatabaseOperationError,
+    EntityNotFoundError,
 )
 
 ModelType = TypeVar("ModelType", bound=Base)
@@ -59,6 +60,15 @@ class BaseRepository(Generic[ModelType]):
             raise DatabaseOperationError(
                 f"Database error querying {self.model_class.__name__} by ID"
             ) from exc
+
+    async def get_by_id_or_raise(self, entity_id: uuid.UUID | str | int) -> ModelType:
+        """Retrieve an entity by ID or raise EntityNotFoundError if missing."""
+        entity = await self.get_by_id(entity_id)
+        if entity is None:
+            raise EntityNotFoundError(
+                f"{self.model_class.__name__} with ID {entity_id} not found"
+            )
+        return entity
 
     async def update(self, entity: ModelType, **kwargs: Any) -> ModelType:
         """Update attribute values on an existing entity and commit changes."""
