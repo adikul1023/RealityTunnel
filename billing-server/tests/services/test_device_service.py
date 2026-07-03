@@ -9,7 +9,7 @@ import uuid
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.exceptions import RepositoryError
+from app.exceptions import RepositoryError, DuplicateEntityError
 from app.repositories import AccountRepository, DeviceRepository
 from app.services import (
     DeviceService,
@@ -71,6 +71,27 @@ async def test_register_device_existing_same_account(
 
 
 @pytest.mark.asyncio
+async def test_register_device_idempotence_100_loops(
+    device_service: DeviceService, account_factory
+):
+    """Audit Item 1: Verify register_device is truly idempotent over 100 calls."""
+    acc = await account_factory(account_id="DEV-SVC-IDEMP")
+    guid = "guid-idemp-100"
+
+    dev_initial = await device_service.register_device(acc.id, guid, "Idemp PC")
+    first_seen = dev_initial.first_seen_at
+
+    for _ in range(100):
+        dev_loop = await device_service.register_device(acc.id, guid, "Idemp PC")
+        assert dev_loop.id == dev_initial.id
+        assert dev_loop.first_seen_at == first_seen
+
+    devices = await device_service.get_devices_for_account(acc.id)
+    assert len(devices) == 1
+    assert devices[0].first_seen_at == first_seen
+
+
+@pytest.mark.asyncio
 async def test_register_device_ownership_error(
     device_service: DeviceService, account_factory
 ):
@@ -96,7 +117,7 @@ async def test_touch_device_updates_only_last_seen(
     first_seen = dev.first_seen_at
     name = dev.friendly_name
 
-    touched = await device_service.touch_device("guid-svc-004")
+    touched = await device_service.touch_device(acc.id, "guid-svc-004")
 
     assert touched.id == dev.id
     assert touched.first_seen_at == first_seen
@@ -105,10 +126,10 @@ async def test_touch_device_updates_only_last_seen(
 
 
 @pytest.mark.asyncio
-async def test_rename_device_verifies_ownership(
+async def test_rename_device_verifies_ownership_and_validation(
     device_service: DeviceService, account_factory
 ):
-    """5. rename_device updates friendly_name and verifies ownership."""
+    """5. rename_device updates friendly_name, verifies ownership, and validates names."""
     acc1 = await account_factory(account_id="DEV-SVC-05A")
     acc2 = await account_factory(account_id="DEV-SVC-05B")
 
@@ -122,12 +143,22 @@ async def test_rename_device_verifies_ownership(
     with pytest.raises(DeviceOwnershipError):
         await device_service.rename_device(acc2.id, "guid-svc-005", "Hacked Name")
 
+    # Validate name rejection
+    with pytest.raises(DeviceServiceError, match="empty or whitespace"):
+        await device_service.rename_device(acc1.id, "guid-svc-005", "")
+
+    with pytest.raises(DeviceServiceError, match="empty or whitespace"):
+        await device_service.rename_device(acc1.id, "guid-svc-005", "      ")
+
+    with pytest.raises(DeviceServiceError, match="exceeds maximum length"):
+        await device_service.rename_device(acc1.id, "guid-svc-005", "A" * 101)
+
 
 @pytest.mark.asyncio
 async def test_deactivate_and_reactivate_device(
     device_service: DeviceService, account_factory
 ):
-    """6. Deactivate and reactivate toggle is_active."""
+    """6. Deactivate and reactivate toggle is_active and verify ownership."""
     acc = await account_factory(account_id="DEV-SVC-06")
     dev = await device_service.register_device(account_id=acc.id, device_guid="guid-svc-006")
     assert dev.is_active is True
@@ -162,7 +193,7 @@ async def test_touch_inactive_device_raises_error(
     await device_service.deactivate_device(acc.id, "guid-svc-008")
 
     with pytest.raises(InactiveDeviceError):
-        await device_service.touch_device("guid-svc-008")
+        await device_service.touch_device(acc.id, "guid-svc-008")
 
 
 @pytest.mark.asyncio
@@ -180,6 +211,12 @@ async def test_manipulate_another_accounts_device(
     with pytest.raises(DeviceOwnershipError):
         await device_service.deactivate_device(acc2.id, "guid-svc-009")
 
+    with pytest.raises(DeviceOwnershipError):
+        await device_service.touch_device(acc2.id, "guid-svc-009")
+
+    with pytest.raises(DeviceOwnershipError):
+        await device_service.reactivate_device(acc2.id, "guid-svc-009")
+
 
 @pytest.mark.asyncio
 async def test_exception_translation(
@@ -194,7 +231,7 @@ async def test_exception_translation(
 
     # Non-existent account registration raises DeviceServiceError
     fake_uuid = uuid.uuid4()
-    with pytest.raises(DeviceServiceError, match="Account .* not found"):
+    with pytest.raises(DeviceServiceError, match="Account not found"):
         await device_service.register_device(fake_uuid, "guid-svc-fake")
 
     # Mock repository exception -> must translate to DeviceServiceError (never leak RepositoryError)
@@ -204,3 +241,35 @@ async def test_exception_translation(
         with pytest.raises(DeviceServiceError) as exc_info:
             await device_service.get_device(acc.id, "guid-svc-010")
         assert not isinstance(exc_info.value, RepositoryError)
+
+
+@pytest.mark.asyncio
+async def test_concurrent_register_device_race_recovery(
+    device_service: DeviceService, account_factory
+):
+    """Audit Item 8: Concurrency regression test verifying race recovery when simultaneous registrations collide."""
+    acc = await account_factory(account_id="DEV-SVC-CONC")
+    guid = "guid-conc-race"
+
+    real_create = device_service.device_repo.create
+    first_call = True
+
+    async def mock_create(**kwargs):
+        nonlocal first_call
+        if first_call:
+            first_call = False
+            # Actually create the device via real_create to simulate the concurrent insert winning the race
+            await real_create(**kwargs)
+            # Raise DuplicateEntityError as if our insert collided with the concurrent insert
+            raise DuplicateEntityError("Duplicate key value violates unique constraint")
+        return await real_create(**kwargs)
+
+    with patch.object(device_service.device_repo, "create", side_effect=mock_create):
+        dev = await device_service.register_device(acc.id, guid, "Concurrent PC")
+        assert dev.device_guid == guid
+        assert dev.friendly_name == "Concurrent PC"
+        assert dev.account_id == acc.id
+
+        # Verify exactly one device row exists in repository for this account
+        devices = await device_service.get_devices_for_account(acc.id)
+        assert len(devices) == 1

@@ -38,6 +38,33 @@ class DeviceService:
         self.device_repo = device_repository
         self.account_repo = account_repository
 
+    def _validate_friendly_name(self, name: str | None) -> str | None:
+        """
+        Validate friendly name formatting.
+        Rejects empty strings, whitespace-only strings, and excessively long names (>100 chars).
+        """
+        if name is None:
+            return None
+        if not isinstance(name, str):
+            raise DeviceServiceError("Device friendly name must be a string")
+        name_clean = name.strip()
+        if not name_clean:
+            raise DeviceServiceError("Device friendly name cannot be empty or whitespace")
+        if len(name_clean) > 100:
+            raise DeviceServiceError("Device friendly name exceeds maximum length of 100 characters")
+        return name_clean
+
+    def _normalize_device_timestamps(self, device: Device) -> Device:
+        """
+        Defensively ensure UTC timezone normalization on device timestamps.
+        Guards against drivers or migrations leaving tzinfo=None.
+        """
+        if device.first_seen_at and device.first_seen_at.tzinfo is None:
+            device.first_seen_at = device.first_seen_at.replace(tzinfo=timezone.utc)
+        if device.last_seen_at and device.last_seen_at.tzinfo is None:
+            device.last_seen_at = device.last_seen_at.replace(tzinfo=timezone.utc)
+        return device
+
     async def _get_and_verify_ownership(
         self, account_id: uuid.UUID, device_guid: str, *, for_update: bool = False
     ) -> Device:
@@ -52,19 +79,13 @@ class DeviceService:
             raise DeviceServiceError("Database error during device lookup") from exc
 
         if device is None:
-            raise DeviceNotFoundError(f"Device {device_guid} not found")
+            raise DeviceNotFoundError("Device not found")
 
         if device.account_id != account_id:
-            logger.warning(
-                "Ownership violation: account %s attempted access to device owned by %s",
-                account_id,
-                device.account_id,
-            )
-            raise DeviceOwnershipError(
-                f"Device {device_guid} is registered to another account"
-            )
+            logger.warning("Ownership violation: account attempted access to device owned by another account")
+            raise DeviceOwnershipError("Device is registered to another account")
 
-        return device
+        return self._normalize_device_timestamps(device)
 
     async def register_device(
         self,
@@ -80,6 +101,8 @@ class DeviceService:
         - If device already belongs to same account: update last_seen_at (and friendly_name if supplied).
         - If device belongs to different account: raise DeviceOwnershipError.
         """
+        clean_name = self._validate_friendly_name(friendly_name)
+
         try:
             device = await self.device_repo.get_by_guid(device_guid, for_update=True)
         except RepositoryError as exc:
@@ -90,21 +113,17 @@ class DeviceService:
 
         if device is not None:
             if device.account_id != account_id:
-                logger.warning(
-                    "Ownership violation during registration of device %s by account %s",
-                    device_guid,
-                    account_id,
-                )
-                raise DeviceOwnershipError(
-                    f"Device {device_guid} is registered to another account"
-                )
+                logger.warning("Ownership violation during device registration attempt")
+                raise DeviceOwnershipError("Device is registered to another account")
 
+            device = self._normalize_device_timestamps(device)
             device.last_seen_at = now
-            if friendly_name is not None:
-                device.friendly_name = friendly_name
+            if clean_name is not None:
+                device.friendly_name = clean_name
 
             try:
-                return await self.device_repo.update(device)
+                updated = await self.device_repo.update(device)
+                return self._normalize_device_timestamps(updated)
             except RepositoryError as exc:
                 logger.error("Repository error updating existing device in register_device")
                 raise DeviceServiceError("Database error updating device registration") from exc
@@ -117,21 +136,21 @@ class DeviceService:
             raise DeviceServiceError("Database error checking account existence") from exc
 
         if account is None:
-            raise DeviceServiceError(f"Account {account_id} not found")
+            raise DeviceServiceError("Account not found")
 
         try:
             new_device = await self.device_repo.create(
                 account_id=account_id,
                 device_guid=device_guid,
-                friendly_name=friendly_name,
+                friendly_name=clean_name,
                 is_active=True,
                 first_seen_at=now,
                 last_seen_at=now,
             )
-            return new_device
+            return self._normalize_device_timestamps(new_device)
         except DuplicateEntityError as exc:
             # Race condition: another transaction created the device after our read
-            logger.warning("Concurrent device registration detected for %s", device_guid)
+            logger.warning("Concurrent device registration detected")
             try:
                 existing = await self.device_repo.get_by_guid(device_guid, for_update=True)
             except RepositoryError as lookup_exc:
@@ -139,14 +158,14 @@ class DeviceService:
 
             if existing is not None:
                 if existing.account_id != account_id:
-                    raise DeviceOwnershipError(
-                        f"Device {device_guid} is registered to another account"
-                    ) from exc
+                    raise DeviceOwnershipError("Device is registered to another account") from exc
+                existing = self._normalize_device_timestamps(existing)
                 existing.last_seen_at = now
-                if friendly_name is not None:
-                    existing.friendly_name = friendly_name
+                if clean_name is not None:
+                    existing.friendly_name = clean_name
                 try:
-                    return await self.device_repo.update(existing)
+                    updated = await self.device_repo.update(existing)
+                    return self._normalize_device_timestamps(updated)
                 except RepositoryError as update_exc:
                     raise DeviceServiceError("Database error updating device after race") from update_exc
 
@@ -155,27 +174,22 @@ class DeviceService:
             logger.error("Repository error creating device in register_device")
             raise DeviceServiceError("Database error creating device") from exc
 
-    async def touch_device(self, device_guid: str) -> Device:
+    async def touch_device(self, account_id: uuid.UUID, device_guid: str) -> Device:
         """
         Update only last_seen_at timestamp for an active device. Nothing else.
+        Verifies ownership against account_id.
         Raises DeviceNotFoundError if missing, InactiveDeviceError if deactivated.
         """
-        try:
-            device = await self.device_repo.get_by_guid(device_guid, for_update=True)
-        except RepositoryError as exc:
-            logger.error("Repository error querying device in touch_device")
-            raise DeviceServiceError("Database error querying device in touch_device") from exc
-
-        if device is None:
-            raise DeviceNotFoundError(f"Device {device_guid} not found")
+        device = await self._get_and_verify_ownership(account_id, device_guid, for_update=True)
 
         if not device.is_active:
-            logger.info("Attempted touch on deactivated device %s", device_guid)
-            raise InactiveDeviceError(f"Device {device_guid} is deactivated")
+            logger.info("Attempted touch on deactivated device")
+            raise InactiveDeviceError("Device is deactivated")
 
         device.last_seen_at = datetime.now(timezone.utc)
         try:
-            return await self.device_repo.update(device)
+            updated = await self.device_repo.update(device)
+            return self._normalize_device_timestamps(updated)
         except RepositoryError as exc:
             logger.error("Repository error updating device timestamp in touch_device")
             raise DeviceServiceError("Database error updating device timestamp") from exc
@@ -188,15 +202,20 @@ class DeviceService:
         Must verify ownership. Return updated entity.
         Does NOT update last_seen_at.
         """
+        clean_name = self._validate_friendly_name(friendly_name)
+        if clean_name is None:
+            raise DeviceServiceError("Device friendly name cannot be None")
+
         device = await self._get_and_verify_ownership(account_id, device_guid, for_update=True)
 
         if not device.is_active:
-            logger.info("Attempted rename on deactivated device %s", device_guid)
-            raise InactiveDeviceError(f"Device {device_guid} is deactivated")
+            logger.info("Attempted rename on deactivated device")
+            raise InactiveDeviceError("Device is deactivated")
 
-        device.friendly_name = friendly_name
+        device.friendly_name = clean_name
         try:
-            return await self.device_repo.update(device)
+            updated = await self.device_repo.update(device)
+            return self._normalize_device_timestamps(updated)
         except RepositoryError as exc:
             logger.error("Repository error renaming device")
             raise DeviceServiceError("Database error renaming device") from exc
@@ -212,12 +231,13 @@ class DeviceService:
         device = await self._get_and_verify_ownership(account_id, device_guid, for_update=True)
 
         if not device.is_active:
-            logger.info("Attempted deactivation on already deactivated device %s", device_guid)
-            raise InactiveDeviceError(f"Device {device_guid} is already deactivated")
+            logger.info("Attempted deactivation on already deactivated device")
+            raise InactiveDeviceError("Device is already deactivated")
 
         device.is_active = False
         try:
-            return await self.device_repo.update(device)
+            updated = await self.device_repo.update(device)
+            return self._normalize_device_timestamps(updated)
         except RepositoryError as exc:
             logger.error("Repository error deactivating device")
             raise DeviceServiceError("Database error deactivating device") from exc
@@ -233,12 +253,13 @@ class DeviceService:
         device = await self._get_and_verify_ownership(account_id, device_guid, for_update=True)
 
         if device.is_active:
-            logger.info("Attempted reactivation on already active device %s", device_guid)
-            raise InactiveDeviceError(f"Device {device_guid} is already active")
+            logger.info("Attempted reactivation on already active device")
+            raise InactiveDeviceError("Device is already active")
 
         device.is_active = True
         try:
-            return await self.device_repo.update(device)
+            updated = await self.device_repo.update(device)
+            return self._normalize_device_timestamps(updated)
         except RepositoryError as exc:
             logger.error("Repository error reactivating device")
             raise DeviceServiceError("Database error reactivating device") from exc
@@ -266,10 +287,11 @@ class DeviceService:
             raise DeviceServiceError("Database error checking account existence") from exc
 
         if account is None:
-            raise DeviceServiceError(f"Account {account_id} not found")
+            raise DeviceServiceError("Account not found")
 
         try:
-            return await self.device_repo.get_devices_for_account(account_id)
+            devices = await self.device_repo.get_devices_for_account(account_id)
+            return [self._normalize_device_timestamps(d) for d in devices]
         except RepositoryError as exc:
             logger.error("Repository error querying devices for account")
             raise DeviceServiceError("Database error querying devices for account") from exc
