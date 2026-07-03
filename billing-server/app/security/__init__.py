@@ -38,6 +38,8 @@ from app.security.jwt_models import (
     JWT_AUDIENCE,
 )
 from app.security.jwt_service import JWTService
+from app.security.admin_password import AdminPasswordService
+from app.security.admin_jwt import AdminJWTService, AdminTokenClaims
 
 __all__ = [
     "MASTER_TOKEN_BYTES",
@@ -65,4 +67,7 @@ __all__ = [
     "JWT_ISSUER",
     "JWT_AUDIENCE",
     "JWTService",
+    "AdminPasswordService",
+    "AdminJWTService",
+    "AdminTokenClaims",
 ]

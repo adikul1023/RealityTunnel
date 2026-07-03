@@ -13,7 +13,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.config import settings
 from app.database import engine, verify_db
 from app.exceptions import DuplicateEntityError, EntityNotFoundError, RepositoryError
-from app.routers import auth, devices, health
+from app.routers import auth, devices, health, admin_auth
 from app.services.exceptions import (
     AuthenticationServiceError,
     AccountNotActiveError,
@@ -36,6 +36,11 @@ from app.services.exceptions import (
     TokenExpiredError,
     TokenNotYetValidError,
     UnknownPlanError,
+    AdminSecurityError,
+    AdminNotActiveError,
+    InvalidAdminTokenError,
+    AdminTokenExpiredError,
+    MFANotImplementedYet,
 )
 
 logger = logging.getLogger(__name__)
@@ -63,6 +68,7 @@ app = FastAPI(
 app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(devices.router)
+app.include_router(admin_auth.router)
 
 
 # ── Exception Handlers ───────────────────────────────────────────────────────
@@ -137,6 +143,13 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
     )
 
 
+async def mfa_not_implemented_exception_handler(request: Request, exc: MFANotImplementedYet) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        content={"detail": "MFA for administrative accounts is not yet implemented."},
+    )
+
+
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
@@ -160,10 +173,15 @@ auth_exceptions = (
     InvalidAudienceError,
     TokenNotYetValidError,
     EntityNotFoundError,
+    AdminNotActiveError,
+    InvalidAdminTokenError,
+    AdminTokenExpiredError,
+    AdminSecurityError,
 )
 for exc_class in auth_exceptions:
     app.add_exception_handler(exc_class, auth_exception_handler)
 
+app.add_exception_handler(MFANotImplementedYet, mfa_not_implemented_exception_handler)
 app.add_exception_handler(DeviceNotFoundError, device_not_found_exception_handler)
 app.add_exception_handler(DeviceOwnershipError, device_not_found_exception_handler)
 app.add_exception_handler(InactiveDeviceError, device_inactive_exception_handler)

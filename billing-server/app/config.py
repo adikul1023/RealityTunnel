@@ -57,6 +57,8 @@ class Settings(BaseSettings):
     secret_key: str = "CHANGE_ME_BEFORE_PRODUCTION"
     jwt_issuer: str = "RealityTunnel Billing/Auth"
     jwt_audience: str = "RealityTunnel Client"
+    admin_jwt_issuer: str = "RealityTunnel Admin"
+    admin_jwt_audience: str = "RealityTunnel Admin Panel"
 
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":

@@ -20,14 +20,19 @@ from app.repositories import (
     DeviceRepository,
     RefreshTokenRepository,
     ConnectionSignalRepository,
+    AdminUserRepository,
 )
-from app.security import JWTService
+from app.security.jwt_service import JWTService
+from app.security.admin_password import AdminPasswordService
+from app.security.admin_jwt import AdminJWTService
 from app.services import (
     AuthenticationService,
     DeviceService,
     RefreshTokenService,
     ConnectionSignalService,
+    AdminAuthenticationService,
 )
+from app.models.admin_user import AdminUser
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +46,8 @@ oauth2_scheme = HTTPBearer(
 # Singleton JWT service instance (stateless Ed25519 signer/verifier)
 # Instantiated once on first request; loads keys from disk once and never regenerates.
 _jwt_service: JWTService | None = None
+_admin_password_service: AdminPasswordService | None = None
+_admin_jwt_service: AdminJWTService | None = None
 
 
 def get_jwt_service() -> JWTService:
@@ -49,6 +56,22 @@ def get_jwt_service() -> JWTService:
     if _jwt_service is None:
         _jwt_service = JWTService()
     return _jwt_service
+
+
+def get_admin_password_service() -> AdminPasswordService:
+    """Dependency provider yielding the stateless singleton AdminPasswordService."""
+    global _admin_password_service
+    if _admin_password_service is None:
+        _admin_password_service = AdminPasswordService()
+    return _admin_password_service
+
+
+def get_admin_jwt_service() -> AdminJWTService:
+    """Dependency provider yielding the stateless singleton AdminJWTService."""
+    global _admin_jwt_service
+    if _admin_jwt_service is None:
+        _admin_jwt_service = AdminJWTService()
+    return _admin_jwt_service
 
 
 async def get_account_repo(session: AsyncSession = Depends(get_db)) -> AccountRepository:
@@ -159,3 +182,73 @@ async def get_current_account(
 
     logger.info("Authentication succeeded")
     return account
+
+
+async def get_admin_repo(session: AsyncSession = Depends(get_db)) -> AdminUserRepository:
+    """Dependency provider yielding AdminUserRepository tied to the request session."""
+    return AdminUserRepository(session)
+
+
+async def get_admin_auth_service(
+    admin_repo: AdminUserRepository = Depends(get_admin_repo),
+    password_service: AdminPasswordService = Depends(get_admin_password_service),
+    jwt_service: AdminJWTService = Depends(get_admin_jwt_service),
+) -> AdminAuthenticationService:
+    """Dependency provider yielding AdminAuthenticationService."""
+    return AdminAuthenticationService(admin_repo, password_service, jwt_service)
+
+
+async def get_current_admin(
+    request: Request,
+    _bearer: HTTPAuthorizationCredentials | None = Depends(oauth2_scheme),
+    admin_auth_service: AdminAuthenticationService = Depends(get_admin_auth_service),
+    admin_jwt_service: AdminJWTService = Depends(get_admin_jwt_service),
+) -> AdminUser:
+    """
+    Dependency yielding the authenticated and validated AdminUser model from an HTTP Authorization Bearer token.
+    Strictly isolated from customer account authentication.
+    """
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
+        logger.info("Admin authentication failed")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed or token invalid",
+        )
+
+    parts = auth_header.split()
+    if len(parts) != 2 or parts[0] != "Bearer":
+        logger.info("Admin authentication failed")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed or token invalid",
+        )
+
+    token = parts[1].strip()
+    if not token:
+        logger.info("Admin authentication failed")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed or token invalid",
+        )
+
+    try:
+        claims = admin_jwt_service.verify_admin_token(token)
+    except Exception:
+        logger.info("Admin token invalid")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed or token invalid",
+        )
+
+    try:
+        admin = await admin_auth_service.get_active_admin_by_id(uuid.UUID(claims.sub))
+    except Exception:
+        logger.info("Admin authentication failed")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed or token invalid",
+        )
+
+    logger.info("Admin authentication succeeded")
+    return admin

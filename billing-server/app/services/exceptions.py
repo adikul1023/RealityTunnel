@@ -150,3 +150,31 @@ class DeviceLimitExceededError(DeviceServiceError):
 class ConnectionSignalServiceError(ServiceError):
     """Raised when an error occurs while recording or querying connection security signals."""
     pass
+
+
+class AdminSecurityError(ServiceError):
+    """Base exception for administrative security operations."""
+    pass
+
+
+class AdminNotActiveError(AdminSecurityError):
+    """Raised when attempting to authenticate an inactive administrative account."""
+    pass
+
+
+class InvalidAdminTokenError(AdminSecurityError):
+    """Raised when an admin JWT signature, issuer, or audience is invalid."""
+    pass
+
+
+class AdminTokenExpiredError(AdminSecurityError):
+    """Raised when an admin JWT has passed its expiration timestamp."""
+    pass
+
+
+class MFANotImplementedYet(AdminSecurityError):
+    """
+    Raised when attempting to authenticate an administrative account with MFA enabled.
+    Intentionally blocks future rollout rather than silently bypassing MFA.
+    """
+    pass

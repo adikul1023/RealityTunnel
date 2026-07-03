@@ -29,7 +29,7 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Yield an isolated async database session."""
     from sqlalchemy import text
     async with AsyncSessionLocal() as session:
-        await session.execute(text("TRUNCATE TABLE accounts, connection_signals CASCADE"))
+        await session.execute(text("TRUNCATE TABLE accounts, connection_signals, admin_users CASCADE"))
         await session.commit()
         yield session
         await session.close()
@@ -125,5 +125,65 @@ async def auth_headers_factory(async_client, account_factory):
         assert login_resp.status_code == 200, login_resp.text
         token = login_resp.json()["access_token"]
         return {"Authorization": f"Bearer {token}"}, acc
+
+    return _helper
+
+
+@pytest_asyncio.fixture(scope="function")
+async def admin_user_factory(db_session: AsyncSession) -> AsyncGenerator[Callable[..., Any], None]:
+    """Factory fixture to generate test AdminUser instances."""
+    created_ids: list[uuid.UUID] = []
+    from app.models.admin_user import AdminUser
+    from app.repositories import AdminUserRepository
+    from app.security import AdminPasswordService
+    repo = AdminUserRepository(db_session)
+    pwd_service = AdminPasswordService()
+
+    async def _create(
+        username: str | None = None,
+        password: str | None = None,
+        is_active: bool = True,
+        is_super_admin: bool = False,
+        mfa_enabled: bool = False,
+        **kwargs,
+    ) -> AdminUser:
+        if username is None:
+            username = f"admin_{uuid.uuid4().hex[:8]}"
+        if password is None:
+            password = "SecretAdminPassword123!"
+        password_hash = pwd_service.hash_password(password)
+        admin = await repo.create(
+            username=username,
+            password_hash=password_hash,
+            is_active=is_active,
+            is_super_admin=is_super_admin,
+            mfa_enabled=mfa_enabled,
+            **kwargs,
+        )
+        created_ids.append(admin.id)
+        return admin
+
+    yield _create
+
+    for adm_id in created_ids:
+        try:
+            await repo.delete(adm_id)
+        except Exception:
+            pass
+
+
+@pytest_asyncio.fixture(scope="function")
+async def admin_auth_headers_factory(async_client, admin_user_factory):
+    """Generate authenticated HTTP Authorization Bearer headers for a test AdminUser."""
+    async def _helper(username: str = "test_admin", is_super_admin: bool = False) -> tuple[dict[str, str], Any]:
+        password = "SecretAdminPassword123!"
+        admin = await admin_user_factory(username=username, password=password, is_super_admin=is_super_admin)
+        login_resp = await async_client.post(
+            "/api/admin/login",
+            json={"username": username, "password": password},
+        )
+        assert login_resp.status_code == 200, login_resp.text
+        token = login_resp.json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}, admin
 
     return _helper

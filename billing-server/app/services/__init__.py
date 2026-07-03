@@ -26,6 +26,11 @@ from app.services.exceptions import (
     UnknownPlanError,
     DeviceLimitExceededError,
     ConnectionSignalServiceError,
+    AdminSecurityError,
+    AdminNotActiveError,
+    InvalidAdminTokenError,
+    AdminTokenExpiredError,
+    MFANotImplementedYet,
 )
 from app.services.authentication import (
     AuthenticationService,
@@ -41,6 +46,11 @@ from app.services.refresh_tokens import (
 from app.services.device import DeviceService
 from app.services.subscription_plan import SubscriptionPlanService
 from app.services.connection_signal import ConnectionSignalService
+from app.services.admin_auth import (
+    AdminAuthenticationService,
+    AdminAuthResult,
+    AdminAuthReason,
+)
 
 __all__ = [
     "ServiceError",
@@ -66,6 +76,11 @@ __all__ = [
     "UnknownPlanError",
     "DeviceLimitExceededError",
     "ConnectionSignalServiceError",
+    "AdminSecurityError",
+    "AdminNotActiveError",
+    "InvalidAdminTokenError",
+    "AdminTokenExpiredError",
+    "MFANotImplementedYet",
     "AuthenticationService",
     "AuthenticationResult",
     "AuthenticationReason",
@@ -76,5 +91,8 @@ __all__ = [
     "DeviceService",
     "SubscriptionPlanService",
     "ConnectionSignalService",
+    "AdminAuthenticationService",
+    "AdminAuthResult",
+    "AdminAuthReason",
 ]
 
