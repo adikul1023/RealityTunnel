@@ -22,10 +22,12 @@ class RefreshTokenRepository(BaseRepository[RefreshToken]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(RefreshToken, session)
 
-    async def get_by_hash(self, token_hash: str) -> RefreshToken | None:
-        """Retrieve a refresh token by its SHA-256 digest."""
+    async def get_by_hash(self, token_hash: str, *, for_update: bool = False) -> RefreshToken | None:
+        """Retrieve a refresh token by its SHA-256 digest. If for_update=True, acquires row-level exclusive lock."""
         try:
             stmt = select(RefreshToken).where(RefreshToken.token_hash == token_hash)
+            if for_update:
+                stmt = stmt.with_for_update()
             result = await self.session.execute(stmt)
             return result.scalar_one_or_none()
         except SQLAlchemyError as exc:

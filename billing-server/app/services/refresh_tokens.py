@@ -112,9 +112,10 @@ class RefreshTokenService:
     def __init__(self, repo: RefreshTokenRepository) -> None:
         self.repo = repo
 
-    async def _get_and_validate_token(self, plaintext_token: str) -> RefreshToken:
+    async def _get_and_validate_token(self, plaintext_token: str, *, for_update: bool = False) -> RefreshToken:
         """
         Validate token existence, expiration, and check for replay attack evidence.
+        If for_update=True, acquires row-level exclusive lock to prevent concurrent rotation races.
 
         Replay Attack Invariant:
         - If the token hash does not exist in the database, it is unknown/unrecognized.
@@ -128,7 +129,11 @@ class RefreshTokenService:
         except (TypeError, ValueError) as exc:
             raise RefreshTokenNotFoundError("Invalid refresh token format") from exc
 
-        entity = await self.repo.get_by_hash(token_hash)
+        try:
+            entity = await self.repo.get_by_hash(token_hash, for_update=for_update)
+        except RepositoryError as exc:
+            raise RefreshTokenServiceError("Database error querying refresh token", detail=str(exc)) from exc
+
         if entity is None:
             # Entirely random or unknown token -> simple failure, NO mass logout
             raise RefreshTokenNotFoundError("Refresh token not found or unrecognized")
@@ -136,7 +141,10 @@ class RefreshTokenService:
         if entity.is_revoked:
             # Replay detection: reuse of a legitimately issued token that was previously revoked!
             logger.warning("Replay detected! Revoking all sessions for account.")
-            await self.repo.revoke_all_for_account(entity.account_id)
+            try:
+                await self.repo.revoke_all_for_account(entity.account_id)
+            except RepositoryError as exc:
+                raise RefreshTokenServiceError("Database error during replay mass revocation", detail=str(exc)) from exc
             raise RefreshTokenReplayError(
                 "Replay attack detected: reuse of revoked refresh token. All sessions for this account have been revoked."
             )
@@ -155,12 +163,15 @@ class RefreshTokenService:
         token_hash = hash_refresh_token(plaintext_token)
         expires_at = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
 
-        await self.repo.create(
-            account_id=account_id,
-            device_guid=device_guid,
-            token_hash=token_hash,
-            expires_at=expires_at,
-        )
+        try:
+            await self.repo.create(
+                account_id=account_id,
+                device_guid=device_guid,
+                token_hash=token_hash,
+                expires_at=expires_at,
+            )
+        except RepositoryError as exc:
+            raise RefreshTokenServiceError("Failed to issue refresh token in database", detail=str(exc)) from exc
 
         logger.info("Refresh token issued")
         return RefreshTokenResult(
@@ -188,10 +199,10 @@ class RefreshTokenService:
     async def rotate_refresh_token(self, plaintext_token: str) -> RefreshRotationResult:
         """
         Perform transactional Refresh Token Rotation (RTR).
-        Validates the old token, marks it revoked, issues a new token bound to the same device,
+        Validates the old token (with row locking), marks it revoked, issues a new token bound to the same device,
         and commits both updates in a single atomic database transaction.
         """
-        entity = await self._get_and_validate_token(plaintext_token)
+        entity = await self._get_and_validate_token(plaintext_token, for_update=True)
 
         new_plaintext = generate_refresh_token()
         new_hash = hash_refresh_token(new_plaintext)
@@ -217,7 +228,7 @@ class RefreshTokenService:
             await self.repo.session.rollback()
             if isinstance(exc, (ServiceError, RepositoryError)):
                 raise
-            raise DatabaseOperationError("Database error during atomic refresh token rotation") from exc
+            raise RefreshTokenServiceError("Database error during atomic refresh token rotation", detail=str(exc)) from exc
 
         logger.info("Refresh token rotated")
         return RefreshRotationResult(
@@ -237,7 +248,11 @@ class RefreshTokenService:
         except (TypeError, ValueError):
             return False
 
-        revoked = await self.repo.revoke(token_hash)
+        try:
+            revoked = await self.repo.revoke(token_hash)
+        except RepositoryError as exc:
+            raise RefreshTokenServiceError("Database error revoking refresh token", detail=str(exc)) from exc
+
         if revoked:
             logger.info("Refresh token revoked")
         return revoked
@@ -247,7 +262,11 @@ class RefreshTokenService:
         Revoke all active refresh tokens for an account.
         Returns the count of newly revoked sessions.
         """
-        count = await self.repo.revoke_all_for_account(account_id)
+        try:
+            count = await self.repo.revoke_all_for_account(account_id)
+        except RepositoryError as exc:
+            raise RefreshTokenServiceError("Database error revoking all sessions for account", detail=str(exc)) from exc
+
         if count > 0:
             logger.info("All sessions revoked")
         return count

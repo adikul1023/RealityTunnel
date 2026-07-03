@@ -253,3 +253,26 @@ async def test_device_binding_preservation(
     # Verify in the database that the new session is bound to the original GUID
     info = await rtr_service.verify_refresh_token(rotated.new_token)
     assert info.device_guid == original_guid
+
+
+@pytest.mark.asyncio
+async def test_rotation_row_locking_invoked(
+    rtr_service: RefreshTokenService, account_factory
+):
+    """
+    CONCURRENCY RACE CONDITION DEFENSE TEST:
+    Verify that rotate_refresh_token explicitly invokes get_by_hash with for_update=True
+    to acquire a row-level exclusive lock (SELECT ... FOR UPDATE) before mutating token state.
+    """
+    account = await account_factory()
+    issued = await rtr_service.issue_refresh_token(account.id, "device-lock-test")
+
+    original_get_by_hash = rtr_service.repo.get_by_hash
+    with patch.object(
+        rtr_service.repo, "get_by_hash", wraps=original_get_by_hash
+    ) as mock_get_by_hash:
+        await rtr_service.rotate_refresh_token(issued.token)
+        # Confirm for_update=True was passed to get_by_hash during rotation
+        mock_get_by_hash.assert_called_once()
+        _, kwargs = mock_get_by_hash.call_args
+        assert kwargs.get("for_update") is True
