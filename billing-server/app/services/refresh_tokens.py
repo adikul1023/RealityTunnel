@@ -198,10 +198,7 @@ class RefreshTokenService:
         new_expires_at = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
 
         try:
-            # Step 1: Revoke old token within open transaction (commit=False)
-            await self.repo.revoke(entity.token_hash, commit=False)
-
-            # Step 2: Create new token entity bound to exact same device_guid within open transaction
+            # Step 1: Insert new token entity bound to exact same device_guid within open transaction (commit=False)
             new_entity = RefreshToken(
                 account_id=entity.account_id,
                 device_guid=entity.device_guid,  # Strict device binding preservation
@@ -210,7 +207,10 @@ class RefreshTokenService:
             )
             await self.repo.create(new_entity, commit=False)
 
-            # Step 3: Commit both operations atomically
+            # Step 2: Revoke old token hash within open transaction (commit=False)
+            await self.repo.revoke(entity.token_hash, commit=False)
+
+            # Step 3: Commit both operations atomically in one transaction
             await self.repo.session.commit()
             await self.repo.session.refresh(new_entity)
         except Exception as exc:
