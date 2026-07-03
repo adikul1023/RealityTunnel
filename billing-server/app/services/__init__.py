@@ -12,11 +12,22 @@ from app.services.exceptions import (
     InvalidIssuerError,
     InvalidAudienceError,
     TokenNotYetValidError,
+    RefreshTokenServiceError,
+    RefreshTokenNotFoundError,
+    RefreshTokenExpiredError,
+    RefreshTokenRevokedError,
+    RefreshTokenReplayError,
 )
 from app.services.authentication import (
     AuthenticationService,
     AuthenticationResult,
     AuthenticationReason,
+)
+from app.services.refresh_tokens import (
+    RefreshTokenService,
+    RefreshTokenResult,
+    RefreshRotationResult,
+    RefreshTokenInfo,
 )
 
 __all__ = [
@@ -29,7 +40,16 @@ __all__ = [
     "InvalidIssuerError",
     "InvalidAudienceError",
     "TokenNotYetValidError",
+    "RefreshTokenServiceError",
+    "RefreshTokenNotFoundError",
+    "RefreshTokenExpiredError",
+    "RefreshTokenRevokedError",
+    "RefreshTokenReplayError",
     "AuthenticationService",
     "AuthenticationResult",
     "AuthenticationReason",
+    "RefreshTokenService",
+    "RefreshTokenResult",
+    "RefreshRotationResult",
+    "RefreshTokenInfo",
 ]

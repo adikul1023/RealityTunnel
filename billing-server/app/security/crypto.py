@@ -66,3 +66,32 @@ def verify_master_token(token: str, expected_hash: str) -> bool:
     except (TypeError, ValueError):
         return False
     return compare_secrets(computed_hash, expected_hash)
+
+
+def hash_refresh_token(token: str) -> str:
+    """
+    Hash a 256-bit Refresh Token using SHA-256, returning a 64-character hexadecimal digest.
+
+    CRYPTOGRAPHIC REASONING — WHY SHA-256 IS SUFFICIENT FOR REFRESH TOKENS:
+    1. Like Master Tokens, Refresh Tokens are generated via CSPRNG (`secrets.token_hex`), providing 256 bits
+       of high-entropy server-generated secret data.
+    2. With 2^256 possible combinations, offline brute-force or dictionary attacks are mathematically infeasible.
+    3. Memory-hard algorithms like Argon2id are unnecessary and would cause CPU/RAM exhaustion under high concurrency.
+       SHA-256 provides optimal performance and complete cryptographic security for machine tokens.
+    """
+    if not isinstance(token, str):
+        raise TypeError("Refresh token must be a string")
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def verify_refresh_token_hash(token: str, expected_hash: str) -> bool:
+    """
+    Verify a raw Refresh Token against an expected SHA-256 hexadecimal digest in constant time.
+    """
+    if not isinstance(token, str) or not isinstance(expected_hash, str):
+        return False
+    try:
+        computed_hash = hash_refresh_token(token)
+    except (TypeError, ValueError):
+        return False
+    return compare_secrets(computed_hash, expected_hash)

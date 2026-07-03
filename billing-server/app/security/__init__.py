@@ -7,6 +7,8 @@ Strictly independent from FastAPI, SQLAlchemy, Alembic, Repositories, and JWT.
 
 from app.security.constants import (
     MASTER_TOKEN_BYTES,
+    REFRESH_TOKEN_BYTES,
+    REFRESH_TOKEN_EXPIRE_DAYS,
     DEVICE_GUID_BYTES,
     SHA256_HEX_LENGTH,
     ACCOUNT_ID_PREFIX,
@@ -15,9 +17,16 @@ from app.security.constants import (
     ACCOUNT_ID_SEPARATOR,
     ACCOUNT_ID_ALPHABET,
 )
-from app.security.crypto import hash_master_token, compare_secrets, verify_master_token
+from app.security.crypto import (
+    hash_master_token,
+    compare_secrets,
+    verify_master_token,
+    hash_refresh_token,
+    verify_refresh_token_hash,
+)
 from app.security.tokens import (
     generate_master_token,
+    generate_refresh_token,
     generate_device_guid,
     generate_account_id,
 )
@@ -32,6 +41,8 @@ from app.security.jwt_service import JWTService
 
 __all__ = [
     "MASTER_TOKEN_BYTES",
+    "REFRESH_TOKEN_BYTES",
+    "REFRESH_TOKEN_EXPIRE_DAYS",
     "DEVICE_GUID_BYTES",
     "SHA256_HEX_LENGTH",
     "ACCOUNT_ID_PREFIX",
@@ -42,7 +53,10 @@ __all__ = [
     "hash_master_token",
     "compare_secrets",
     "verify_master_token",
+    "hash_refresh_token",
+    "verify_refresh_token_hash",
     "generate_master_token",
+    "generate_refresh_token",
     "generate_device_guid",
     "generate_account_id",
     "AccessTokenClaims",

@@ -33,10 +33,11 @@ class RefreshTokenRepository(BaseRepository[RefreshToken]):
                 "Database error querying RefreshToken by token_hash"
             ) from exc
 
-    async def revoke(self, token_hash: str) -> bool:
+    async def revoke(self, token_hash: str, *, commit: bool = True) -> bool:
         """
         Revoke a single refresh token by marking is_revoked = True.
         Returns True if the token existed and was revoked, False if not found.
+        If commit=False, flushes the session without committing the transaction.
         """
         try:
             stmt = (
@@ -45,7 +46,10 @@ class RefreshTokenRepository(BaseRepository[RefreshToken]):
                 .values(is_revoked=True)
             )
             result = await self.session.execute(stmt)
-            await self.session.commit()
+            if commit:
+                await self.session.commit()
+            else:
+                await self.session.flush()
             return result.rowcount > 0
         except SQLAlchemyError as exc:
             await self.session.rollback()
@@ -53,10 +57,11 @@ class RefreshTokenRepository(BaseRepository[RefreshToken]):
                 "Database error revoking RefreshToken"
             ) from exc
 
-    async def revoke_all_for_account(self, account_id: uuid.UUID) -> int:
+    async def revoke_all_for_account(self, account_id: uuid.UUID, *, commit: bool = True) -> int:
         """
         Revoke all active refresh tokens for a given account.
         Returns the number of sessions that were newly revoked.
+        If commit=False, flushes the session without committing the transaction.
         """
         try:
             stmt = (
@@ -65,7 +70,10 @@ class RefreshTokenRepository(BaseRepository[RefreshToken]):
                 .values(is_revoked=True)
             )
             result = await self.session.execute(stmt)
-            await self.session.commit()
+            if commit:
+                await self.session.commit()
+            else:
+                await self.session.flush()
             return result.rowcount
         except SQLAlchemyError as exc:
             await self.session.rollback()

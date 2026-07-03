@@ -52,3 +52,31 @@ class InvalidAudienceError(InvalidTokenError):
 class TokenNotYetValidError(InvalidTokenError):
     """Raised when a JWT is used before its Not Before (nbf) timestamp."""
     pass
+
+
+class RefreshTokenServiceError(ServiceError):
+    """Base exception for refresh token rotation and lifecycle operations."""
+    pass
+
+
+class RefreshTokenNotFoundError(RefreshTokenServiceError):
+    """Raised when an unknown or unrecognized refresh token string is presented."""
+    pass
+
+
+class RefreshTokenExpiredError(RefreshTokenServiceError):
+    """Raised when a refresh token has passed its expiration timestamp."""
+    pass
+
+
+class RefreshTokenRevokedError(RefreshTokenServiceError):
+    """Raised when a refresh token operation fails because the token is revoked without replay evidence."""
+    pass
+
+
+class RefreshTokenReplayError(RefreshTokenServiceError):
+    """
+    Raised when replay attack evidence is detected (attempting to use an already-revoked valid token).
+    Triggers immediate account-wide session revocation.
+    """
+    pass

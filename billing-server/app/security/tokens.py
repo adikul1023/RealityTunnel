@@ -9,6 +9,7 @@ Strictly zero logging of generated tokens or identifiers.
 import secrets
 from app.security.constants import (
     MASTER_TOKEN_BYTES,
+    REFRESH_TOKEN_BYTES,
     DEVICE_GUID_BYTES,
     ACCOUNT_ID_PREFIX,
     ACCOUNT_ID_GROUPS,
@@ -32,6 +33,18 @@ def generate_master_token() -> str:
        with deterministic length, ideal for high-entropy machine-to-machine authentication.
     """
     return secrets.token_hex(MASTER_TOKEN_BYTES)
+
+
+def generate_refresh_token() -> str:
+    """
+    Generate a cryptographically secure 256-bit Refresh Token formatted as a 64-character hexadecimal string.
+
+    CRYPTOGRAPHIC REASONING:
+    Like Master Tokens, Refresh Tokens must possess 256 bits of true entropy generated via OS CSPRNG
+    (`secrets.token_hex`). This ensures long-lived sessions are immune to guessing or brute-force attacks
+    when stored as SHA-256 digests in the database.
+    """
+    return secrets.token_hex(REFRESH_TOKEN_BYTES)
 
 
 def generate_device_guid() -> str:

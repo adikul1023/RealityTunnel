@@ -14,6 +14,10 @@ DEVICE_GUID_BYTES: int = 32
 # SHA-256 digest output length when hexadecimal encoded (32 bytes * 2 hex chars/byte)
 SHA256_HEX_LENGTH: int = 64
 
+# Refresh Token: 256 bits of CSPRNG entropy, standard 30-day session lifetime
+REFRESH_TOKEN_BYTES: int = 32
+REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+
 # Account ID formatting constants
 # Format: RT-XXXX-XXXX-XXXX
 ACCOUNT_ID_PREFIX: str = "RT"

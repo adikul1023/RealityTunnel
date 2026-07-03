@@ -29,17 +29,21 @@ class BaseRepository(Generic[ModelType]):
         self.model_class = model_class
         self.session = session
 
-    async def create(self, entity: ModelType | None = None, **kwargs: Any) -> ModelType:
+    async def create(self, entity: ModelType | None = None, *, commit: bool = True, **kwargs: Any) -> ModelType:
         """
         Persist a new entity to the database.
         Accepts either an instantiated model object or keyword arguments.
+        If commit=False, flushes the session without committing the transaction.
         """
         if entity is None:
             entity = self.model_class(**kwargs)
         self.session.add(entity)
         try:
-            await self.session.commit()
-            await self.session.refresh(entity)
+            if commit:
+                await self.session.commit()
+                await self.session.refresh(entity)
+            else:
+                await self.session.flush()
             return entity
         except IntegrityError as exc:
             await self.session.rollback()
@@ -70,14 +74,17 @@ class BaseRepository(Generic[ModelType]):
             )
         return entity
 
-    async def update(self, entity: ModelType, **kwargs: Any) -> ModelType:
-        """Update attribute values on an existing entity and commit changes."""
+    async def update(self, entity: ModelType, *, commit: bool = True, **kwargs: Any) -> ModelType:
+        """Update attribute values on an existing entity and commit/flush changes."""
         for key, value in kwargs.items():
             if hasattr(entity, key):
                 setattr(entity, key, value)
         try:
-            await self.session.commit()
-            await self.session.refresh(entity)
+            if commit:
+                await self.session.commit()
+                await self.session.refresh(entity)
+            else:
+                await self.session.flush()
             return entity
         except IntegrityError as exc:
             await self.session.rollback()
@@ -90,7 +97,7 @@ class BaseRepository(Generic[ModelType]):
                 f"Database error updating {self.model_class.__name__}"
             ) from exc
 
-    async def delete(self, entity_id_or_obj: uuid.UUID | str | int | ModelType) -> bool:
+    async def delete(self, entity_id_or_obj: uuid.UUID | str | int | ModelType, *, commit: bool = True) -> bool:
         """
         Delete an entity by ID or object reference.
         Returns True if deleted, False if not found.
@@ -103,7 +110,10 @@ class BaseRepository(Generic[ModelType]):
             return False
         try:
             await self.session.delete(entity)
-            await self.session.commit()
+            if commit:
+                await self.session.commit()
+            else:
+                await self.session.flush()
             return True
         except SQLAlchemyError as exc:
             await self.session.rollback()
