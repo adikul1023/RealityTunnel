@@ -151,6 +151,10 @@ async def reactivate_device(
     device_service: DeviceService = Depends(get_device_service),
 ) -> DeviceResponse:
     """Reactivate a previously deactivated device."""
-    device = await device_service.reactivate_device(current_account.id, device_guid)
+    try:
+        device = await device_service.reactivate_device(current_account.id, device_guid)
+    except InactiveDeviceError:
+        logger.info("Reactivate device succeeded (already active)")
+        device = await device_service.get_device(current_account.id, device_guid)
     logger.info("Reactivate device succeeded")
     return DeviceResponse.model_validate(device)

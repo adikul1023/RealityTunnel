@@ -297,32 +297,33 @@ async def test_expired_subscription(async_client: AsyncClient, account_factory, 
     assert resp.json() == {"detail": "Authentication failed or token invalid"}
 
 
-# ── 16. Verify DELETE Remains Idempotent ─────────────────────────────────────
+# ── 16. Verify DELETE Remains Idempotent (3x Calls) ──────────────────────────
 @pytest.mark.asyncio
 async def test_delete_idempotent(async_client: AsyncClient, account_factory, device_service: DeviceService):
-    """16. Deleting an already inactive device returns 200 OK success without error."""
+    """16. Deleting an already inactive device returns 200 OK success without error across multiple calls."""
     headers, acc = await get_auth_headers(async_client, account_factory, "RT-IDEMP-DEL")
     await device_service.register_device(acc.id, "guid-idemp-del")
 
-    # First deletion
-    resp1 = await async_client.delete("/api/devices/guid-idemp-del", headers=headers)
-    assert resp1.status_code == 200
-    assert resp1.json()["success"] is True
-
-    # Second deletion (idempotent check)
-    resp2 = await async_client.delete("/api/devices/guid-idemp-del", headers=headers)
-    assert resp2.status_code == 200
-    assert resp2.json()["success"] is True
+    # Call DELETE three times — all must return 200 OK
+    for i in range(3):
+        resp = await async_client.delete("/api/devices/guid-idemp-del", headers=headers)
+        assert resp.status_code == 200, f"Attempt {i+1} failed with {resp.status_code}: {resp.text}"
+        assert resp.json()["success"] is True
 
 
 # ── 17. Verify No IDOR or Enumeration Across All Methods ─────────────────────
 @pytest.mark.asyncio
 async def test_no_idor_enumeration(async_client: AsyncClient, account_factory, device_service: DeviceService):
-    """17. Verify PATCH, DELETE, and POST /reactivate on another account's device return 404 Not Found."""
+    """17. Verify GET, PATCH, DELETE, and POST /reactivate on another account's device return 404 Not Found."""
     _, acc1 = await get_auth_headers(async_client, account_factory, "RT-IDOR-1")
     headers2, _ = await get_auth_headers(async_client, account_factory, "RT-IDOR-2")
 
     await device_service.register_device(acc1.id, "guid-idor-target", "Acc1 Target")
+
+    # Attempt GET
+    get_resp = await async_client.get("/api/devices/guid-idor-target", headers=headers2)
+    assert get_resp.status_code == 404, get_resp.text
+    assert get_resp.json() == {"detail": "Device not found"}
 
     # Attempt PATCH
     patch_resp = await async_client.patch(
@@ -342,3 +343,42 @@ async def test_no_idor_enumeration(async_client: AsyncClient, account_factory, d
     react_resp = await async_client.post("/api/devices/guid-idor-target/reactivate", headers=headers2)
     assert react_resp.status_code == 404, react_resp.text
     assert react_resp.json() == {"detail": "Device not found"}
+
+
+# ── 18. Reactivate Idempotency (2x Calls) ────────────────────────────────────
+@pytest.mark.asyncio
+async def test_reactivate_idempotent_2x(async_client: AsyncClient, account_factory, device_service: DeviceService):
+    """18. Calling POST /reactivate twice returns success twice without exception."""
+    headers, acc = await get_auth_headers(async_client, account_factory, "RT-REACT-IDEMP")
+    await device_service.register_device(acc.id, "guid-react-idemp")
+    await async_client.delete("/api/devices/guid-react-idemp", headers=headers)
+
+    # First reactivation
+    resp1 = await async_client.post("/api/devices/guid-react-idemp/reactivate", headers=headers)
+    assert resp1.status_code == 200, resp1.text
+    assert resp1.json()["is_active"] is True
+
+    # Second reactivation (idempotency check)
+    resp2 = await async_client.post("/api/devices/guid-react-idemp/reactivate", headers=headers)
+    assert resp2.status_code == 200, resp2.text
+    assert resp2.json()["is_active"] is True
+
+
+# ── 19. Friendly Name Trimming ───────────────────────────────────────────────
+@pytest.mark.asyncio
+async def test_friendly_name_trimming(async_client: AsyncClient, account_factory, device_service: DeviceService):
+    """19. Sending a friendly name with trailing/leading whitespace is cleanly trimmed and stored."""
+    headers, acc = await get_auth_headers(async_client, account_factory, "RT-TRIM-NAME")
+    await device_service.register_device(acc.id, "guid-trim-name", "Initial")
+
+    resp = await async_client.patch(
+        "/api/devices/guid-trim-name",
+        json={"friendly_name": "My Laptop    "},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["friendly_name"] == "My Laptop"
+
+    # Verify persistence in database
+    get_resp = await async_client.get("/api/devices/guid-trim-name", headers=headers)
+    assert get_resp.json()["friendly_name"] == "My Laptop"
