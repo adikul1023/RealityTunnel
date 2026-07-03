@@ -21,6 +21,7 @@ from app.services.exceptions import (
     DeviceOwnershipError,
     DeviceServiceError,
     InactiveDeviceError,
+    DeviceLimitExceededError,
     InvalidAudienceError,
     InvalidIssuerError,
     InvalidSignatureError,
@@ -31,8 +32,10 @@ from app.services.exceptions import (
     RefreshTokenRevokedError,
     RefreshTokenServiceError,
     ServiceError,
+    SubscriptionServiceError,
     TokenExpiredError,
     TokenNotYetValidError,
+    UnknownPlanError,
 )
 
 logger = logging.getLogger(__name__)
@@ -102,6 +105,20 @@ async def device_inactive_exception_handler(request: Request, exc: InactiveDevic
     )
 
 
+async def device_limit_exceeded_exception_handler(request: Request, exc: DeviceLimitExceededError) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_403_FORBIDDEN,
+        content=exc.detail,
+    )
+
+
+async def unknown_plan_exception_handler(request: Request, exc: UnknownPlanError) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={"detail": str(exc)},
+    )
+
+
 async def device_service_exception_handler(request: Request, exc: DeviceServiceError) -> JSONResponse:
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
@@ -150,7 +167,10 @@ for exc_class in auth_exceptions:
 app.add_exception_handler(DeviceNotFoundError, device_not_found_exception_handler)
 app.add_exception_handler(DeviceOwnershipError, device_not_found_exception_handler)
 app.add_exception_handler(InactiveDeviceError, device_inactive_exception_handler)
+app.add_exception_handler(DeviceLimitExceededError, device_limit_exceeded_exception_handler)
 app.add_exception_handler(DeviceServiceError, device_service_exception_handler)
+app.add_exception_handler(UnknownPlanError, unknown_plan_exception_handler)
+app.add_exception_handler(SubscriptionServiceError, device_service_exception_handler)
 app.add_exception_handler(DuplicateEntityError, duplicate_exception_handler)
 app.add_exception_handler(ServiceError, general_exception_handler)
 app.add_exception_handler(RepositoryError, general_exception_handler)

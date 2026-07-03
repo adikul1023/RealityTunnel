@@ -44,6 +44,13 @@ class Account(Base, TimestampMixin):
     marzban_username: Mapped[str | None] = mapped_column(
         String(64), unique=True, index=True, nullable=True
     )
+    plan_id: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        index=True,
+        default="free",
+        server_default="free",
+    )
     status: Mapped[SubscriptionStatus] = mapped_column(
         SQLEnum(
             SubscriptionStatus,

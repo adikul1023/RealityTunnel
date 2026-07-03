@@ -4,7 +4,7 @@ device_repository.py — Persistence layer for Device entities.
 from __future__ import annotations
 
 import uuid
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -40,7 +40,7 @@ class DeviceRepository(BaseRepository[Device]):
 
     async def get_devices_for_account(self, account_id: uuid.UUID) -> list[Device]:
         """
-        List all active devices registered under a specific account,
+        List all devices (active and inactive) registered under a specific account,
         ordered by most recently seen first.
         """
         try:
@@ -54,4 +54,22 @@ class DeviceRepository(BaseRepository[Device]):
         except SQLAlchemyError as exc:
             raise DatabaseOperationError(
                 "Database error querying devices for account"
+            ) from exc
+
+    async def count_active_devices_for_account(self, account_id: uuid.UUID) -> int:
+        """
+        Count the number of currently active devices registered under a specific account.
+        Inactive (soft-deactivated) devices are excluded from the limit count.
+        """
+        try:
+            stmt = (
+                select(func.count())
+                .select_from(Device)
+                .where(Device.account_id == account_id, Device.is_active.is_(True))
+            )
+            result = await self.session.execute(stmt)
+            return result.scalar_one()
+        except SQLAlchemyError as exc:
+            raise DatabaseOperationError(
+                "Database error counting active devices for account"
             ) from exc

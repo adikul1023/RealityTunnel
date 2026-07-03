@@ -107,3 +107,32 @@ class InactiveDeviceError(DeviceServiceError):
     """Raised when attempting an operation on a deactivated device or deactivating an already inactive device."""
     pass
 
+
+class SubscriptionServiceError(ServiceError):
+    """Base exception for subscription plans and policy enforcement."""
+    pass
+
+
+class UnknownPlanError(SubscriptionServiceError):
+    """Raised when an unrecognized plan_id is encountered."""
+    pass
+
+
+class DeviceLimitExceededError(DeviceServiceError):
+    """
+    Raised when an account attempts to register a new device beyond its subscription plan limit.
+    """
+    def __init__(self, current_device_count: int, max_devices: int, plan_id: str):
+        message = f"Device limit reached for plan '{plan_id}': {current_device_count}/{max_devices} devices registered."
+        detail = {
+            "detail": "Device limit reached",
+            "plan": plan_id,
+            "current_devices": current_device_count,
+            "max_devices": max_devices,
+        }
+        super().__init__(message, detail=detail)
+        self.current_device_count = current_device_count
+        self.max_devices = max_devices
+        self.plan_id = plan_id
+
+

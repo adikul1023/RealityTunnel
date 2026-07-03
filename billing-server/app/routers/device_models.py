@@ -31,6 +31,12 @@ class RenameDeviceRequest(BaseModel):
     friendly_name: str = Field(..., description="New friendly name for the device")
 
 
+class RegisterDeviceRequest(BaseModel):
+    """Payload for POST /api/devices to register a client device."""
+    device_guid: str = Field(..., description="Unique hardware or installation identifier")
+    friendly_name: str | None = Field(None, description="Optional user-assigned friendly device name")
+
+
 class SuccessResponse(BaseModel):
     """Generic success confirmation for device operations."""
     success: bool = Field(default=True, description="Indicates operation completed successfully")

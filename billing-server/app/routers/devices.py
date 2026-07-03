@@ -28,12 +28,40 @@ from app.services.exceptions import InactiveDeviceError
 from app.routers.device_models import (
     DeviceListResponse,
     DeviceResponse,
+    RegisterDeviceRequest,
     RenameDeviceRequest,
     SuccessResponse,
 )
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/devices", tags=["Devices"])
+
+
+@router.post(
+    "",
+    summary="Register a client device under the authenticated account",
+    response_model=DeviceResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"description": "Validation error"},
+        401: {"description": "Authentication failed or token invalid"},
+        403: {"description": "Device limit reached for subscription plan"},
+        500: {"description": "Unexpected service or database error"},
+    },
+)
+async def register_device(
+    request: RegisterDeviceRequest,
+    current_account: Account = Depends(get_current_account),
+    device_service: DeviceService = Depends(get_device_service),
+) -> DeviceResponse:
+    """Register a client device or update its timestamps if already registered."""
+    device = await device_service.register_device(
+        current_account.id,
+        request.device_guid,
+        request.friendly_name,
+    )
+    logger.info("Register device succeeded")
+    return DeviceResponse.model_validate(device)
 
 
 @router.get(

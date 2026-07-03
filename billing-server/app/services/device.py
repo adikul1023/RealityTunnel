@@ -15,11 +15,13 @@ from app.exceptions import (
 from app.models import Device
 from app.repositories import AccountRepository, DeviceRepository
 from app.services.exceptions import (
+    DeviceLimitExceededError,
     DeviceNotFoundError,
     DeviceOwnershipError,
     DeviceServiceError,
     InactiveDeviceError,
 )
+from app.services.subscription_plan import SubscriptionPlanService
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +36,11 @@ class DeviceService:
         self,
         device_repository: DeviceRepository,
         account_repository: AccountRepository,
+        plan_service: SubscriptionPlanService | None = None,
     ) -> None:
         self.device_repo = device_repository
         self.account_repo = account_repository
+        self.plan_service = plan_service or SubscriptionPlanService()
 
     def _validate_friendly_name(self, name: str | None) -> str | None:
         """
@@ -137,6 +141,24 @@ class DeviceService:
 
         if account is None:
             raise DeviceServiceError("Account not found")
+
+        # Evaluate subscription plan policy and check device limits (Phase 1.4.3).
+        # Note on Downgrade Policy:
+        # If an account already owns more active devices than the new plan allows:
+        # - Existing devices remain untouched in the database.
+        # - Existing active devices continue functioning normally (updating timestamps when they check in above).
+        # - New device registrations are rejected until the user deactivates/removes devices below the limit.
+        # - Never automatically delete devices or silently deactivate them.
+        try:
+            active_count = await self.device_repo.count_active_devices_for_account(account_id)
+        except RepositoryError as exc:
+            logger.error("Repository error counting active devices in register_device")
+            raise DeviceServiceError("Database error checking device limit") from exc
+
+        if self.plan_service.device_limit_reached(account, active_count):
+            logger.info("Device registration rejected due to subscription policy.")
+            max_devices = self.plan_service.get_max_devices(account)
+            raise DeviceLimitExceededError(active_count, max_devices, account.plan_id)
 
         try:
             new_device = await self.device_repo.create(

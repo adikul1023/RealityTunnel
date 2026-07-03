@@ -76,3 +76,46 @@ async def account_factory(db_session: AsyncSession) -> AsyncGenerator[Callable[.
             await repo.delete(acc_id)
         except Exception:
             pass
+
+
+@pytest_asyncio.fixture(scope="function")
+async def device_service(db_session: AsyncSession):
+    from app.repositories import AccountRepository, DeviceRepository
+    from app.services import DeviceService
+    dev_repo = DeviceRepository(db_session)
+    acc_repo = AccountRepository(db_session)
+    return DeviceService(dev_repo, acc_repo)
+
+
+@pytest_asyncio.fixture(scope="function")
+async def async_client(db_session: AsyncSession) -> AsyncGenerator[Any, None]:
+    from httpx import ASGITransport, AsyncClient
+    from app.database import get_db
+    from app.main import app
+
+    async def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        yield client
+    app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture(scope="function")
+async def auth_headers_factory(async_client, account_factory):
+    import secrets
+    from app.security import hash_master_token
+
+    async def _helper(account_id: str = "RT-DEV-001") -> tuple[dict[str, str], Any]:
+        master_token = secrets.token_hex(32)
+        acc = await account_factory(account_id=account_id, master_token_hash=hash_master_token(master_token))
+        login_resp = await async_client.post(
+            "/api/auth/login",
+            json={"account_id": account_id, "master_token": master_token, "device_guid": f"dev-{account_id}"},
+        )
+        assert login_resp.status_code == 200, login_resp.text
+        token = login_resp.json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}, acc
+
+    return _helper

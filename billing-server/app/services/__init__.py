@@ -22,6 +22,9 @@ from app.services.exceptions import (
     DeviceOwnershipError,
     DeviceNotFoundError,
     InactiveDeviceError,
+    SubscriptionServiceError,
+    UnknownPlanError,
+    DeviceLimitExceededError,
 )
 from app.services.authentication import (
     AuthenticationService,
@@ -35,6 +38,7 @@ from app.services.refresh_tokens import (
     RefreshTokenInfo,
 )
 from app.services.device import DeviceService
+from app.services.subscription_plan import SubscriptionPlanService
 
 __all__ = [
     "ServiceError",
@@ -56,6 +60,9 @@ __all__ = [
     "DeviceOwnershipError",
     "DeviceNotFoundError",
     "InactiveDeviceError",
+    "SubscriptionServiceError",
+    "UnknownPlanError",
+    "DeviceLimitExceededError",
     "AuthenticationService",
     "AuthenticationResult",
     "AuthenticationReason",
@@ -64,5 +71,6 @@ __all__ = [
     "RefreshRotationResult",
     "RefreshTokenInfo",
     "DeviceService",
+    "SubscriptionPlanService",
 ]
 
