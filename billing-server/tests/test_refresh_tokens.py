@@ -12,7 +12,7 @@ async def test_create_and_lookup_refresh_token(db_session: AsyncSession, account
     dev_repo = DeviceRepository(db_session)
     rt_repo = RefreshTokenRepository(db_session)
     acc = await account_factory(account_id="RT-ACC-01")
-    dev = await dev_repo.create(account_id=acc.id, device_guid="guid-rt-01", name="RT Device")
+    dev = await dev_repo.create(account_id=acc.id, device_guid="guid-rt-01", friendly_name="RT Device")
 
     expires = datetime.now(timezone.utc) + timedelta(days=30)
     rt = await rt_repo.create(
@@ -35,7 +35,7 @@ async def test_revoke_single_token(db_session: AsyncSession, account_factory):
     dev_repo = DeviceRepository(db_session)
     rt_repo = RefreshTokenRepository(db_session)
     acc = await account_factory(account_id="RT-ACC-02")
-    dev = await dev_repo.create(account_id=acc.id, device_guid="guid-rt-02", name="RT Device 2")
+    dev = await dev_repo.create(account_id=acc.id, device_guid="guid-rt-02", friendly_name="RT Device 2")
 
     expires = datetime.now(timezone.utc) + timedelta(days=30)
     rt = await rt_repo.create(
@@ -64,7 +64,7 @@ async def test_revoke_all_tokens_for_account(db_session: AsyncSession, account_f
     dev_repo = DeviceRepository(db_session)
     rt_repo = RefreshTokenRepository(db_session)
     acc = await account_factory(account_id="RT-ACC-03")
-    dev = await dev_repo.create(account_id=acc.id, device_guid="guid-rt-03", name="RT Device 3")
+    dev = await dev_repo.create(account_id=acc.id, device_guid="guid-rt-03", friendly_name="RT Device 3")
     expires = datetime.now(timezone.utc) + timedelta(days=30)
 
     # 2 active tokens
@@ -88,7 +88,7 @@ async def test_cascade_delete_token_on_account_removal(db_session: AsyncSession,
     dev_repo = DeviceRepository(db_session)
     rt_repo = RefreshTokenRepository(db_session)
     acc = await account_factory(account_id="RT-ACC-04")
-    dev = await dev_repo.create(account_id=acc.id, device_guid="guid-rt-04", name="RT Device 4")
+    dev = await dev_repo.create(account_id=acc.id, device_guid="guid-rt-04", friendly_name="RT Device 4")
 
     rt = await rt_repo.create(
         account_id=acc.id,

@@ -16,7 +16,7 @@ async def test_register_device(db_session: AsyncSession, account_factory):
     dev = await dev_repo.create(
         account_id=acc.id,
         device_guid="guid-pc-001",
-        name="Work Laptop",
+        friendly_name="Work Laptop",
     )
     assert dev.id is not None
     assert dev.device_guid == "guid-pc-001"
@@ -32,9 +32,9 @@ async def test_duplicate_device_guid_rejected_for_same_account(db_session: Async
     dev_repo = DeviceRepository(db_session)
     acc = await account_factory(account_id="DEV-ACC-02")
 
-    await dev_repo.create(account_id=acc.id, device_guid="guid-dup-100", name="Device 1")
+    await dev_repo.create(account_id=acc.id, device_guid="guid-dup-100", friendly_name="Device 1")
     with pytest.raises(DuplicateEntityError):
-        await dev_repo.create(account_id=acc.id, device_guid="guid-dup-100", name="Device 2")
+        await dev_repo.create(account_id=acc.id, device_guid="guid-dup-100", friendly_name="Device 2")
 
 
 @pytest.mark.asyncio
@@ -46,19 +46,19 @@ async def test_list_devices_ordered_by_last_seen_at(db_session: AsyncSession, ac
     dev_old = await dev_repo.create(
         account_id=acc.id,
         device_guid="guid-old",
-        name="Old Phone",
+        friendly_name="Old Phone",
         last_seen_at=now - timedelta(hours=5),
     )
     dev_recent = await dev_repo.create(
         account_id=acc.id,
         device_guid="guid-recent",
-        name="New Phone",
+        friendly_name="New Phone",
         last_seen_at=now - timedelta(minutes=10),
     )
     dev_oldest = await dev_repo.create(
         account_id=acc.id,
         device_guid="guid-oldest",
-        name="Ancient Tablet",
+        friendly_name="Ancient Tablet",
         last_seen_at=now - timedelta(days=2),
     )
 
@@ -75,7 +75,7 @@ async def test_cascade_delete_device_on_account_removal(db_session: AsyncSession
     dev_repo = DeviceRepository(db_session)
     acc = await account_factory(account_id="DEV-ACC-04")
 
-    dev = await dev_repo.create(account_id=acc.id, device_guid="guid-cascade", name="To Cascade")
+    dev = await dev_repo.create(account_id=acc.id, device_guid="guid-cascade", friendly_name="To Cascade")
     assert await dev_repo.exists(id=dev.id)
 
     dev_id = dev.id

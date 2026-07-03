@@ -18,6 +18,10 @@ from app.services.exceptions import (
     RefreshTokenExpiredError,
     RefreshTokenRevokedError,
     RefreshTokenReplayError,
+    DeviceServiceError,
+    DeviceOwnershipError,
+    DeviceNotFoundError,
+    InactiveDeviceError,
 )
 from app.services.authentication import (
     AuthenticationService,
@@ -30,6 +34,7 @@ from app.services.refresh_tokens import (
     RefreshRotationResult,
     RefreshTokenInfo,
 )
+from app.services.device import DeviceService
 
 __all__ = [
     "ServiceError",
@@ -47,6 +52,10 @@ __all__ = [
     "RefreshTokenExpiredError",
     "RefreshTokenRevokedError",
     "RefreshTokenReplayError",
+    "DeviceServiceError",
+    "DeviceOwnershipError",
+    "DeviceNotFoundError",
+    "InactiveDeviceError",
     "AuthenticationService",
     "AuthenticationResult",
     "AuthenticationReason",
@@ -54,4 +63,6 @@ __all__ = [
     "RefreshTokenResult",
     "RefreshRotationResult",
     "RefreshTokenInfo",
+    "DeviceService",
 ]
+

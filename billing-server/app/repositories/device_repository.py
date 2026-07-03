@@ -22,13 +22,15 @@ class DeviceRepository(BaseRepository[Device]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(Device, session)
 
-    async def get_by_guid(self, device_guid: str) -> Device | None:
+    async def get_by_guid(self, device_guid: str, *, for_update: bool = False) -> Device | None:
         """
         Retrieve a device instance by its client-generated GUID.
-        Returns the first matching device if multiple accounts used the same GUID.
+        If for_update=True, acquires row-level exclusive lock (SELECT ... FOR UPDATE).
         """
         try:
             stmt = select(Device).where(Device.device_guid == device_guid)
+            if for_update:
+                stmt = stmt.with_for_update()
             result = await self.session.execute(stmt)
             return result.scalars().first()
         except SQLAlchemyError as exc:

@@ -86,3 +86,24 @@ class RefreshTokenReplayError(RefreshTokenServiceError):
     Triggers immediate account-wide session revocation.
     """
     pass
+
+
+class DeviceServiceError(ServiceError):
+    """Base exception for device registration and management operations."""
+    pass
+
+
+class DeviceOwnershipError(DeviceServiceError):
+    """Raised when attempting to register or manipulate a device GUID owned by another account."""
+    pass
+
+
+class DeviceNotFoundError(DeviceServiceError):
+    """Raised when a requested device GUID does not exist."""
+    pass
+
+
+class InactiveDeviceError(DeviceServiceError):
+    """Raised when attempting an operation on a deactivated device or deactivating an already inactive device."""
+    pass
+
