@@ -270,3 +270,32 @@ def test_verify_algorithm_confusion_hs256(jwt_service: JWTService):
     with pytest.raises(InvalidTokenError) as exc_info:
         jwt_service.verify_access_token(hs256_token)
     assert "algorithm" in str(exc_info.value).lower() or "invalid" in str(exc_info.value).lower()
+
+
+def test_key_loading_partial_existence_edge_case(tmp_path: Path):
+    """
+    Verify behavior when only one key file exists (e.g. private exists, public missing):
+    1. Production mode must fail immediately with RuntimeError.
+    2. Development mode must cleanly regenerate both matching files without regenerating just one half.
+    """
+    dir_partial = tmp_path / "keys_partial"
+    dir_partial.mkdir()
+    private_file = dir_partial / "ed25519_private.pem"
+    # Write dummy content so only private file exists
+    private_file.write_bytes(b"dummy private pem content")
+
+    # In production, partial existence must fail immediately
+    with pytest.raises(RuntimeError) as exc_info:
+        JWTService(keys_dir=dir_partial, environment="production")
+    assert "production ed25519 signing keys are absent" in str(exc_info.value).lower()
+
+    # In development, partial existence cleanly regenerates a fresh valid keypair
+    service_dev = JWTService(keys_dir=dir_partial, environment="development")
+    assert private_file.exists()
+    assert (dir_partial / "ed25519_public.pem").exists()
+    assert private_file.read_bytes() != b"dummy private pem content"
+
+    # Verify the newly generated keypair issues and verifies valid tokens
+    token = service_dev.issue_access_token(uuid.uuid4(), "RT-PARTIAL-01", "dev_guid")
+    claims = service_dev.verify_access_token(token)
+    assert claims.account == "RT-PARTIAL-01"
