@@ -176,5 +176,19 @@ class MFANotImplementedYet(AdminSecurityError):
     """
     Raised when attempting to authenticate an administrative account with MFA enabled.
     Intentionally blocks future rollout rather than silently bypassing MFA.
+    See docs/adr/ADR-001-mfa-guard-fail-closed.md for the design rationale.
     """
+    pass
+
+
+# ── Admin Account Management ────────────────────────────────────────────────
+
+
+class AdminServiceError(ServiceError):
+    """Base exception for administrative account management operations."""
+    pass
+
+
+class AdminAccountNotFoundError(AdminServiceError):
+    """Raised when an account lookup by account_id finds no matching row."""
     pass

@@ -31,6 +31,7 @@ from app.services import (
     RefreshTokenService,
     ConnectionSignalService,
     AdminAuthenticationService,
+    AdminAccountService,
 )
 from app.models.admin_user import AdminUser
 
@@ -258,4 +259,29 @@ async def get_current_admin(
         )
 
     logger.info("Admin authentication succeeded")
+    return admin
+
+
+async def get_admin_account_service(
+    account_repo: AccountRepository = Depends(get_account_repo),
+    refresh_repo: RefreshTokenRepository = Depends(get_refresh_repo),
+) -> AdminAccountService:
+    """Dependency provider yielding AdminAccountService for administrative account management."""
+    return AdminAccountService(account_repo, refresh_repo)
+
+
+async def require_super_admin(
+    admin: AdminUser = Depends(get_current_admin),
+) -> AdminUser:
+    """
+    FastAPI dependency that enforces super-admin privilege.
+    Raises HTTP 403 Forbidden if the authenticated admin is not a super-admin.
+    Read-only operations use get_current_admin(); write operations use require_super_admin().
+    """
+    if not admin.is_super_admin:
+        logger.info("Admin access denied: super-admin privilege required")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Super-admin privilege required for this operation",
+        )
     return admin

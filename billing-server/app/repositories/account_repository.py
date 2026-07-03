@@ -53,3 +53,15 @@ class AccountRepository(BaseRepository[Account]):
             raise DatabaseOperationError(
                 "Database error querying Account by master_token_hash"
             ) from exc
+
+    async def list_all(self, *, limit: int = 50, offset: int = 0) -> list[Account]:
+        """Return a paginated list of accounts ordered by creation date descending."""
+        from sqlalchemy import desc
+        try:
+            stmt = select(Account).order_by(desc(Account.created_at)).limit(limit).offset(offset)
+            result = await self.session.execute(stmt)
+            return list(result.scalars().all())
+        except SQLAlchemyError as exc:
+            raise DatabaseOperationError(
+                "Database error listing accounts"
+            ) from exc

@@ -31,6 +31,8 @@ from app.services.exceptions import (
     InvalidAdminTokenError,
     AdminTokenExpiredError,
     MFANotImplementedYet,
+    AdminServiceError,
+    AdminAccountNotFoundError,
 )
 from app.services.authentication import (
     AuthenticationService,
@@ -51,6 +53,7 @@ from app.services.admin_auth import (
     AdminAuthResult,
     AdminAuthReason,
 )
+from app.services.admin_account import AdminAccountService
 
 __all__ = [
     "ServiceError",
@@ -81,6 +84,8 @@ __all__ = [
     "InvalidAdminTokenError",
     "AdminTokenExpiredError",
     "MFANotImplementedYet",
+    "AdminServiceError",
+    "AdminAccountNotFoundError",
     "AuthenticationService",
     "AuthenticationResult",
     "AuthenticationReason",
@@ -94,5 +99,6 @@ __all__ = [
     "AdminAuthenticationService",
     "AdminAuthResult",
     "AdminAuthReason",
+    "AdminAccountService",
 ]
 
