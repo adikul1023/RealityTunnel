@@ -50,6 +50,8 @@ async def account_factory(db_session: AsyncSession) -> AsyncGenerator[Callable[.
         master_token_hash: str | None = None,
         marzban_username: str | None = None,
         status: SubscriptionStatus = SubscriptionStatus.ACTIVE,
+        subscription_expires_at=None,
+        **kwargs,
     ) -> Account:
         if account_id is None:
             account_id = f"TEST-{uuid.uuid4().hex[:8].upper()}"
@@ -60,6 +62,8 @@ async def account_factory(db_session: AsyncSession) -> AsyncGenerator[Callable[.
             master_token_hash=master_token_hash,
             marzban_username=marzban_username,
             status=status,
+            subscription_expires_at=subscription_expires_at,
+            **kwargs,
         )
         created_ids.append(acc.id)
         return acc
