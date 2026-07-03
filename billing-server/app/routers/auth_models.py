@@ -14,7 +14,11 @@ from app.security import ACCESS_TOKEN_EXPIRE_MINUTES
 class LoginRequest(BaseModel):
     """Payload for POST /api/auth/login."""
     account_id: str = Field(..., description="Human-readable Account ID (e.g., RT-XXXX-XXXX)")
-    master_token: str = Field(..., description="64-character hexadecimal Master Token")
+    master_token: str = Field(
+        ...,
+        description="64-character hexadecimal Master Token",
+        json_schema_extra={"writeOnly": True},
+    )
     device_guid: str = Field(..., description="Unique hardware or installation identifier")
 
 

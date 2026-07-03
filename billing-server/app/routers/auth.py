@@ -18,10 +18,8 @@ from __future__ import annotations
 
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
-from app.repositories import AccountRepository, RefreshTokenRepository
+from app.dependencies import get_auth_service, get_jwt_service, get_refresh_service
 from app.security import JWTService
 from app.services import AuthenticationService, RefreshTokenService
 from app.services.exceptions import (
@@ -42,41 +40,6 @@ from app.routers.auth_models import (
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
-# Singleton JWT service instance (stateless Ed25519 signer/verifier)
-_jwt_service: JWTService | None = None
-
-
-def get_jwt_service() -> JWTService:
-    """Dependency provider yielding the stateless JWTService."""
-    global _jwt_service
-    if _jwt_service is None:
-        _jwt_service = JWTService()
-    return _jwt_service
-
-
-async def get_account_repo(session: AsyncSession = Depends(get_db)) -> AccountRepository:
-    """Dependency provider yielding AccountRepository tied to the request session."""
-    return AccountRepository(session)
-
-
-async def get_refresh_repo(session: AsyncSession = Depends(get_db)) -> RefreshTokenRepository:
-    """Dependency provider yielding RefreshTokenRepository tied to the request session."""
-    return RefreshTokenRepository(session)
-
-
-async def get_auth_service(
-    account_repo: AccountRepository = Depends(get_account_repo),
-) -> AuthenticationService:
-    """Dependency provider yielding AuthenticationService."""
-    return AuthenticationService(account_repo)
-
-
-async def get_rtr_service(
-    refresh_repo: RefreshTokenRepository = Depends(get_refresh_repo),
-) -> RefreshTokenService:
-    """Dependency provider yielding RefreshTokenService."""
-    return RefreshTokenService(refresh_repo)
-
 
 @router.post(
     "/login",
@@ -93,7 +56,7 @@ async def login(
     request: LoginRequest,
     auth_service: AuthenticationService = Depends(get_auth_service),
     jwt_service: JWTService = Depends(get_jwt_service),
-    rtr_service: RefreshTokenService = Depends(get_rtr_service),
+    refresh_service: RefreshTokenService = Depends(get_refresh_service),
 ) -> LoginResponse:
     """
     Authenticate Account ID and Master Token credential pair.
@@ -112,7 +75,7 @@ async def login(
         account_id=result.account.account_id,
         device_guid=request.device_guid,
     )
-    refresh_result = await rtr_service.issue_refresh_token(
+    refresh_result = await refresh_service.issue_refresh_token(
         account_id=result.account.id,
         device_guid=request.device_guid,
     )
@@ -137,9 +100,9 @@ async def login(
 )
 async def refresh(
     request: RefreshRequest,
-    rtr_service: RefreshTokenService = Depends(get_rtr_service),
+    refresh_service: RefreshTokenService = Depends(get_refresh_service),
     jwt_service: JWTService = Depends(get_jwt_service),
-    account_repo: AccountRepository = Depends(get_account_repo),
+    auth_service: AuthenticationService = Depends(get_auth_service),
 ) -> RefreshResponse:
     """
     Perform Refresh Token Rotation (RTR).
@@ -147,12 +110,12 @@ async def refresh(
     and returns a fresh short-lived Access JWT.
     """
     try:
-        rotated = await rtr_service.rotate_refresh_token(request.refresh_token)
+        rotated = await refresh_service.rotate_refresh_token(request.refresh_token)
     except Exception:
         logger.info("Refresh failed")
         raise
 
-    account = await account_repo.get_by_id_or_raise(rotated.account_id)
+    account = await auth_service.get_account(rotated.account_id)
     access_token = jwt_service.issue_access_token(
         account_uuid=account.id,
         account_id=account.account_id,
@@ -174,13 +137,13 @@ async def refresh(
 )
 async def logout(
     request: LogoutRequest,
-    rtr_service: RefreshTokenService = Depends(get_rtr_service),
+    refresh_service: RefreshTokenService = Depends(get_refresh_service),
 ) -> SuccessResponse:
     """
     Revoke only the presented refresh token session.
     Idempotent: returns success even if token was already revoked or unknown.
     """
-    await rtr_service.revoke_refresh_token(request.refresh_token)
+    await refresh_service.revoke_refresh_token(request.refresh_token)
     logger.info("Logout")
     return SuccessResponse(success=True)
 
@@ -193,7 +156,7 @@ async def logout(
 )
 async def logout_all(
     request: LogoutRequest,
-    rtr_service: RefreshTokenService = Depends(get_rtr_service),
+    refresh_service: RefreshTokenService = Depends(get_refresh_service),
 ) -> SuccessResponse:
     """
     Determine account identity from presented refresh token and revoke every active session
@@ -201,8 +164,8 @@ async def logout_all(
     Idempotent: returns success even if token was already revoked or unknown.
     """
     try:
-        info = await rtr_service.verify_refresh_token(request.refresh_token)
-        await rtr_service.revoke_all_for_account(info.account_id)
+        info = await refresh_service.verify_refresh_token(request.refresh_token)
+        await refresh_service.revoke_all_for_account(info.account_id)
     except (
         RefreshTokenNotFoundError,
         RefreshTokenExpiredError,

@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import enum
 import logging
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -82,6 +83,17 @@ class AuthenticationService:
 
     def __init__(self, account_repository: AccountRepository) -> None:
         self.account_repo = account_repository
+
+    async def get_account(self, account_uuid: uuid.UUID) -> Account:
+        """
+        Retrieve an Account model by its internal database UUID.
+        Translates repository exceptions into domain service exceptions.
+        """
+        try:
+            return await self.account_repo.get_by_id_or_raise(account_uuid)
+        except RepositoryError as exc:
+            logger.error("Repository error while retrieving account")
+            raise AuthenticationServiceError("Database operation failed during account retrieval") from exc
 
     async def authenticate(self, account_id: str, master_token: str) -> AuthenticationResult:
         """
