@@ -117,7 +117,7 @@ async def refresh(
         logger.info("Refresh failed")
         raise
 
-    account = await auth_service.get_account(rotated.account_id)
+    account = await auth_service.get_active_account_by_uuid(rotated.account_id)
     access_token = jwt_service.issue_access_token(
         account_uuid=account.id,
         account_id=account.account_id,

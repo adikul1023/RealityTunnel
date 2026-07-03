@@ -84,7 +84,10 @@ async def duplicate_exception_handler(request: Request, exc: DuplicateEntityErro
 
 
 async def general_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.error("Unexpected service or database error: %s", exc, exc_info=True)
+    # Log the exception type at ERROR level without the raw message (which may contain
+    # internal database details). The full traceback is logged separately to allow
+    # log aggregators to filter sensitive stack frames when needed.
+    logger.error("Unexpected error: %s", type(exc).__name__, exc_info=True)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": "Unexpected service/database error"},
@@ -94,9 +97,15 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
+# auth_exceptions maps to auth_exception_handler (HTTP 401).
+# All domain-level authentication and token validation exceptions are listed explicitly.
+# RefreshTokenServiceError (base class) is included here so that database-level errors
+# raised inside the refresh token service also produce 401 rather than falling through
+# to the ServiceError → 500 handler by coincidence of exception hierarchy.
 auth_exceptions = (
     AuthenticationServiceError,
     AccountNotActiveError,
+    RefreshTokenServiceError,
     RefreshTokenNotFoundError,
     RefreshTokenExpiredError,
     RefreshTokenRevokedError,

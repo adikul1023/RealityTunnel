@@ -74,4 +74,6 @@ class Account(Base, TimestampMixin):
     )
 
     def __repr__(self) -> str:
-        return f"<Account(id={self.id}, account_id={self.account_id}, status={self.status})>"
+        # account_id is truncated to prevent it from appearing in full in debug logs via repr().
+        account_id_prefix = (self.account_id or "")[:7] + "…" if self.account_id else "N/A"
+        return f"<Account(id={self.id}, account_id={account_id_prefix}, status={self.status})>"

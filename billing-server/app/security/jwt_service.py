@@ -206,31 +206,31 @@ class JWTService:
             )
         except jwt.ExpiredSignatureError as e:
             logger.info("JWT validation failed: Token expired")
-            raise TokenExpiredError("Access token has expired", detail=str(e)) from e
+            raise TokenExpiredError("Access token has expired") from e
         except jwt.ImmatureSignatureError as e:
             logger.info("JWT validation failed: Token not yet valid")
-            raise TokenNotYetValidError("Access token is not yet valid (nbf)", detail=str(e)) from e
+            raise TokenNotYetValidError("Access token is not yet valid (nbf)") from e
         except jwt.InvalidSignatureError as e:
             logger.info("JWT validation failed: Invalid signature")
-            raise InvalidSignatureError("Access token signature verification failed", detail=str(e)) from e
+            raise InvalidSignatureError("Access token signature verification failed") from e
         except jwt.InvalidIssuerError as e:
             logger.info("JWT validation failed: Invalid issuer")
-            raise InvalidIssuerError("Access token issuer verification failed", detail=str(e)) from e
+            raise InvalidIssuerError("Access token issuer verification failed") from e
         except jwt.InvalidAudienceError as e:
             logger.info("JWT validation failed: Invalid audience")
-            raise InvalidAudienceError("Access token audience verification failed", detail=str(e)) from e
+            raise InvalidAudienceError("Access token audience verification failed") from e
         except jwt.MissingRequiredClaimError as e:
             logger.info("JWT validation failed: Missing required claim")
-            raise InvalidTokenError(f"Missing required JWT claim: {str(e)}", detail=str(e)) from e
+            raise InvalidTokenError("Access token is missing a required claim") from e
         except jwt.PyJWTError as e:
             logger.info("JWT validation failed: Invalid token")
-            raise InvalidTokenError("Access token is invalid or malformed", detail=str(e)) from e
+            raise InvalidTokenError("Access token is invalid or malformed") from e
         except Exception as e:
             logger.info("JWT validation failed: Invalid token")
-            raise InvalidTokenError("Unexpected error validating access token", detail=str(e)) from e
+            raise InvalidTokenError("Unexpected error validating access token") from e
 
         try:
             return AccessTokenClaims.from_dict(payload)
         except ValueError as e:
             logger.info("JWT validation failed: Missing required claim")
-            raise InvalidTokenError(str(e), detail=str(e)) from e
+            raise InvalidTokenError("Access token is missing a required claim") from e

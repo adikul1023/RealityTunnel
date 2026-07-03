@@ -557,3 +557,54 @@ async def test_get_me_expired_subscription(async_client: AsyncClient, account_fa
     assert resp.status_code == 401
     assert resp.json() == {"detail": "Authentication failed or token invalid"}
 
+
+# ── Phase 1.3.8: Regression Tests for Audit FINDING-01 ───────────────────────
+
+
+@pytest.mark.asyncio
+async def test_refresh_rejects_suspended_account(
+    async_client: AsyncClient, account_factory, db_session: AsyncSession
+):
+    """FINDING-01 regression: suspended account must not receive new access tokens via refresh."""
+    master_token = "f" * 64
+    acc = await account_factory(account_id="RT-SUSP-REFRESH", master_token_hash=hash_master_token(master_token))
+    login_resp = await async_client.post(
+        "/api/auth/login",
+        json={"account_id": "RT-SUSP-REFRESH", "master_token": master_token, "device_guid": "dev-01"},
+    )
+    assert login_resp.status_code == 200
+    refresh_token = login_resp.json()["refresh_token"]
+
+    # Suspend account after initial login
+    acc.status = SubscriptionStatus.SUSPENDED
+    await db_session.commit()
+
+    # Refresh must now be rejected — suspended account cannot obtain new access tokens
+    resp = await async_client.post("/api/auth/refresh", json={"refresh_token": refresh_token})
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_refresh_rejects_expired_subscription(
+    async_client: AsyncClient, account_factory, db_session: AsyncSession
+):
+    """FINDING-01 regression: expired subscription must not receive new access tokens via refresh."""
+    master_token = "a1" * 32
+    acc = await account_factory(account_id="RT-EXP-REFRESH", master_token_hash=hash_master_token(master_token))
+    login_resp = await async_client.post(
+        "/api/auth/login",
+        json={"account_id": "RT-EXP-REFRESH", "master_token": master_token, "device_guid": "dev-01"},
+    )
+    assert login_resp.status_code == 200
+    refresh_token = login_resp.json()["refresh_token"]
+
+    # Expire subscription after initial login
+    acc.subscription_expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+    await db_session.commit()
+
+    # Refresh must now be rejected — expired subscription cannot obtain new access tokens
+    resp = await async_client.post("/api/auth/refresh", json={"refresh_token": refresh_token})
+    assert resp.status_code == 401
+
+
+

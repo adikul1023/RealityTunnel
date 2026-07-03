@@ -212,7 +212,7 @@ def test_verify_missing_required_claim(jwt_service: JWTService):
 
     with pytest.raises(InvalidTokenError) as exc_info:
         jwt_service.verify_access_token(token)
-    assert "missing required jwt claim" in str(exc_info.value).lower()
+    assert "missing a required claim" in str(exc_info.value).lower()
 
 
 def test_key_handling_and_isolation(tmp_path: Path):

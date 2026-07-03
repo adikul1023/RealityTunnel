@@ -50,10 +50,23 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8080
 
-    # ── Security ───────────────────────────────────────────────────────────
+    # ── Security ───────────────────────────────────────────────────────────────
+    # secret_key is reserved for future HMAC-based operations (e.g., cookie signing).
+    # In production, this MUST be overridden via environment variable SECRET_KEY.
+    # A RuntimeError is raised at startup if the default is used in production.
     secret_key: str = "CHANGE_ME_BEFORE_PRODUCTION"
     jwt_issuer: str = "RealityTunnel Billing/Auth"
     jwt_audience: str = "RealityTunnel Client"
+
+    @model_validator(mode="after")
+    def validate_production_secrets(self) -> "Settings":
+        if self.environment.lower() == "production":
+            if self.secret_key == "CHANGE_ME_BEFORE_PRODUCTION":
+                raise RuntimeError(
+                    "SECRET_KEY must be set to a strong random value in production. "
+                    "The default placeholder is not permitted."
+                )
+        return self
 
 
 @lru_cache

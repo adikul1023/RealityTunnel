@@ -171,7 +171,9 @@ async def test_authenticate_expired_timestamp(db_session: AsyncSession, account_
 
 @pytest.mark.asyncio
 async def test_authenticate_repository_failure(db_session: AsyncSession):
-    """Verify repository exceptions are translated into AuthenticationServiceError without leaking ORM errors."""
+    """Verify repository exceptions are translated into AuthenticationServiceError without leaking ORM errors.
+    Per FINDING-03 remediation: detail field no longer carries raw library error strings.
+    """
     repo = AccountRepository(db_session)
     service = AuthenticationService(repo)
 
@@ -179,13 +181,15 @@ async def test_authenticate_repository_failure(db_session: AsyncSession):
         with pytest.raises(AuthenticationServiceError) as exc_info:
             await service.authenticate("RT-ANY-ID-001", "some_token")
         assert "Database error during authentication lookup" in str(exc_info.value)
-        assert "Database unavailable" in str(exc_info.value.detail)
+        # detail field is intentionally not propagated (FINDING-03 remediation)
+        assert exc_info.value.detail is None
 
     with patch.object(repo, "get_by_account_id", side_effect=RuntimeError("Unexpected connection drop")):
         with pytest.raises(AuthenticationServiceError) as exc_info:
             await service.authenticate("RT-ANY-ID-002", "some_token")
         assert "Unexpected database error during authentication lookup" in str(exc_info.value)
-        assert "Unexpected connection drop" in str(exc_info.value.detail)
+        # detail field is intentionally not propagated (FINDING-03 remediation)
+        assert exc_info.value.detail is None
 
 
 @pytest.mark.asyncio

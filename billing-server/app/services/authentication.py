@@ -150,10 +150,10 @@ class AuthenticationService:
             account = await self.account_repo.get_by_account_id(account_id)
         except RepositoryError as e:
             logger.error("Authentication failed due to repository error")
-            raise AuthenticationServiceError("Database error during authentication lookup", detail=str(e)) from e
+            raise AuthenticationServiceError("Database error during authentication lookup") from e
         except Exception as e:
             logger.error("Authentication failed due to unexpected database error")
-            raise AuthenticationServiceError("Unexpected database error during authentication lookup", detail=str(e)) from e
+            raise AuthenticationServiceError("Unexpected database error during authentication lookup") from e
 
         # Step 2: Not Found check with Timing Attack Defense
         if account is None:
