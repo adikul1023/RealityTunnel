@@ -16,6 +16,7 @@ from app.services import (
     AuthenticationResult,
     AuthenticationService,
     AuthenticationServiceError,
+    AccountNotActiveError,
 )
 from app.services.authentication import DUMMY_MASTER_TOKEN_HASH
 
@@ -201,3 +202,39 @@ async def test_authenticate_timing_defense_invoked(db_session: AsyncSession):
         assert result.success is False
         assert result.reason == AuthenticationReason.ACCOUNT_NOT_FOUND
         mock_verify.assert_called_once_with("attempted_raw_token", DUMMY_MASTER_TOKEN_HASH)
+
+
+@pytest.mark.asyncio
+async def test_get_active_account_by_uuid_validation(db_session: AsyncSession, account_factory):
+    """Verify get_active_account_by_uuid rejects suspended, pending, and expired accounts."""
+    repo = AccountRepository(db_session)
+    service = AuthenticationService(repo)
+
+    active_acc = await account_factory(account_id="RT-ACT-001", status=SubscriptionStatus.ACTIVE)
+    res_active = await service.get_active_account_by_uuid(active_acc.id)
+    assert res_active.id == active_acc.id
+
+    susp_acc = await account_factory(account_id="RT-SUSP-001", status=SubscriptionStatus.SUSPENDED)
+    with pytest.raises(AccountNotActiveError) as exc_info:
+        await service.get_active_account_by_uuid(susp_acc.id)
+    assert "suspended" in str(exc_info.value).lower()
+
+    pend_acc = await account_factory(account_id="RT-PEND-001", status=SubscriptionStatus.PENDING)
+    with pytest.raises(AccountNotActiveError) as exc_info:
+        await service.get_active_account_by_uuid(pend_acc.id)
+    assert "pending" in str(exc_info.value).lower()
+
+    exp_acc = await account_factory(account_id="RT-EXP-001", status=SubscriptionStatus.EXPIRED)
+    with pytest.raises(AccountNotActiveError) as exc_info:
+        await service.get_active_account_by_uuid(exp_acc.id)
+    assert "expired" in str(exc_info.value).lower()
+
+    past_expiry = datetime.now(timezone.utc) - timedelta(minutes=5)
+    expt_acc = await account_factory(
+        account_id="RT-EXPT-001",
+        status=SubscriptionStatus.ACTIVE,
+        subscription_expires_at=past_expiry,
+    )
+    with pytest.raises(AccountNotActiveError) as exc_info:
+        await service.get_active_account_by_uuid(expt_acc.id)
+    assert "timestamp expired" in str(exc_info.value).lower()

@@ -42,7 +42,7 @@ from app.models.account import Account
 from app.models.base import SubscriptionStatus
 from app.repositories.account_repository import AccountRepository
 from app.security import verify_master_token, SHA256_HEX_LENGTH
-from app.services.exceptions import AuthenticationServiceError
+from app.services.exceptions import AuthenticationServiceError, AccountNotActiveError
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +94,41 @@ class AuthenticationService:
         except RepositoryError as exc:
             logger.error("Repository error while retrieving account")
             raise AuthenticationServiceError("Database operation failed during account retrieval") from exc
+
+    async def get_active_account_by_uuid(self, account_uuid: uuid.UUID) -> Account:
+        """
+        Retrieve an Account by UUID and validate that it is active and not expired.
+        Raises AccountNotActiveError (or EntityNotFoundError) if deleted,
+        suspended, pending, expired, or otherwise invalid.
+        """
+        account = await self.get_account(account_uuid)
+
+        if account.status == SubscriptionStatus.SUSPENDED:
+            logger.info("Token validation failed: account suspended")
+            raise AccountNotActiveError("Account suspended")
+
+        if account.status == SubscriptionStatus.PENDING:
+            logger.info("Token validation failed: account pending")
+            raise AccountNotActiveError("Account pending")
+
+        if account.status == SubscriptionStatus.EXPIRED:
+            logger.info("Token validation failed: subscription expired")
+            raise AccountNotActiveError("Subscription expired")
+
+        if account.status != SubscriptionStatus.ACTIVE:
+            logger.info("Token validation failed: account inactive")
+            raise AccountNotActiveError("Account inactive")
+
+        if account.subscription_expires_at is not None:
+            now = datetime.now(timezone.utc)
+            expires_at = account.subscription_expires_at
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+            if now >= expires_at:
+                logger.info("Token validation failed: subscription timestamp expired")
+                raise AccountNotActiveError("Subscription timestamp expired")
+
+        return account
 
     async def authenticate(self, account_id: str, master_token: str) -> AuthenticationResult:
         """

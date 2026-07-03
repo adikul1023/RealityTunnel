@@ -16,6 +16,7 @@ from app.exceptions import DuplicateEntityError, EntityNotFoundError, Repository
 from app.routers import auth, health
 from app.services.exceptions import (
     AuthenticationServiceError,
+    AccountNotActiveError,
     InvalidAudienceError,
     InvalidIssuerError,
     InvalidSignatureError,
@@ -95,6 +96,7 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
 auth_exceptions = (
     AuthenticationServiceError,
+    AccountNotActiveError,
     RefreshTokenNotFoundError,
     RefreshTokenExpiredError,
     RefreshTokenRevokedError,

@@ -2,17 +2,31 @@
 dependencies.py — Centralized dependency injection providers for OverREALITY API services.
 
 Encapsulates database session wiring and service instantiation so routers never touch
-repositories or SQLAlchemy sessions directly.
+repositories or SQLAlchemy sessions directly. Also provides JWT bearer token authentication
+and active account context for protected endpoints.
 """
 from __future__ import annotations
 
-from fastapi import Depends
+import logging
+import uuid
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.models.account import Account
 from app.repositories import AccountRepository, RefreshTokenRepository
 from app.security import JWTService
 from app.services import AuthenticationService, RefreshTokenService
+
+logger = logging.getLogger(__name__)
+
+# Bearer authentication scheme for OpenAPI Swagger documentation
+oauth2_scheme = HTTPBearer(
+    auto_error=False,
+    scheme_name="BearerAuthentication",
+    description="Enter Ed25519 Access JWT",
+)
 
 # Singleton JWT service instance (stateless Ed25519 signer/verifier)
 # Instantiated once on first request; loads keys from disk once and never regenerates.
@@ -49,3 +63,61 @@ async def get_refresh_service(
 ) -> RefreshTokenService:
     """Dependency provider yielding RefreshTokenService."""
     return RefreshTokenService(refresh_repo)
+
+
+async def get_current_account(
+    request: Request,
+    _bearer: HTTPAuthorizationCredentials | None = Depends(oauth2_scheme),
+    auth_service: AuthenticationService = Depends(get_auth_service),
+    jwt_service: JWTService = Depends(get_jwt_service),
+) -> Account:
+    """
+    Dependency yielding the authenticated and validated Account model from an HTTP Authorization Bearer token.
+
+    Requires Authorization: Bearer <token>. Rejects missing header, malformed header, missing Bearer prefix,
+    empty token, invalid/expired JWT, or inactive backing accounts with clean HTTP 401 Unauthorized responses.
+    """
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
+        logger.info("Authentication failed")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed or token invalid",
+        )
+
+    parts = auth_header.split()
+    if len(parts) != 2 or parts[0] != "Bearer":
+        logger.info("Authentication failed")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed or token invalid",
+        )
+
+    token = parts[1].strip()
+    if not token:
+        logger.info("Authentication failed")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed or token invalid",
+        )
+
+    try:
+        claims = jwt_service.verify_access_token(token)
+    except Exception:
+        logger.info("Token invalid")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed or token invalid",
+        )
+
+    try:
+        account = await auth_service.get_active_account_by_uuid(uuid.UUID(claims.sub))
+    except Exception:
+        logger.info("Authentication failed")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed or token invalid",
+        )
+
+    logger.info("Authentication succeeded")
+    return account

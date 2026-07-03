@@ -19,6 +19,12 @@ class AuthenticationServiceError(ServiceError):
     pass
 
 
+class AccountNotActiveError(AuthenticationServiceError):
+    """Raised when an authenticated account is deleted, suspended, pending, expired, or otherwise inactive during token validation."""
+    pass
+
+
+
 class JWTServiceError(ServiceError):
     """Base exception for JWT service and cryptographic validation operations."""
     pass

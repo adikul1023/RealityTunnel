@@ -5,6 +5,7 @@ Encapsulates core business logic and domain services.
 from app.services.exceptions import (
     ServiceError,
     AuthenticationServiceError,
+    AccountNotActiveError,
     JWTServiceError,
     InvalidTokenError,
     TokenExpiredError,
@@ -33,6 +34,7 @@ from app.services.refresh_tokens import (
 __all__ = [
     "ServiceError",
     "AuthenticationServiceError",
+    "AccountNotActiveError",
     "JWTServiceError",
     "InvalidTokenError",
     "TokenExpiredError",

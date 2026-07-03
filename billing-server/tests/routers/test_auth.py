@@ -13,12 +13,14 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import AsyncGenerator
 
+import jwt
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.dependencies import get_jwt_service
 from app.main import app
 from app.models import SubscriptionStatus
 from app.repositories import RefreshTokenRepository
@@ -346,3 +348,212 @@ async def test_logout_all_other_accounts_unaffected(async_client: AsyncClient, a
     refresh_b = await async_client.post("/api/auth/refresh", json={"refresh_token": ref_b})
     assert refresh_b.status_code == 200
     assert "access_token" in refresh_b.json()
+
+
+# ── Phase 1.3.6: Protected Endpoint GET /api/auth/me & Middleware Tests ──────
+
+
+@pytest.mark.asyncio
+async def test_get_me_success_with_valid_bearer_token(async_client: AsyncClient, account_factory):
+    """Valid access token returns non-sensitive profile information with 200 OK."""
+    master_token = "a" * 64
+    await account_factory(account_id="RT-ME-SUCCESS", master_token_hash=hash_master_token(master_token))
+
+    login_resp = await async_client.post(
+        "/api/auth/login",
+        json={"account_id": "RT-ME-SUCCESS", "master_token": master_token, "device_guid": "dev-me"},
+    )
+    access_token = login_resp.json()["access_token"]
+
+    me_resp = await async_client.get("/api/auth/me", headers={"Authorization": f"Bearer {access_token}"})
+    assert me_resp.status_code == 200
+    data = me_resp.json()
+    assert data["account_id"] == "RT-ME-SUCCESS"
+    assert data["status"] == "ACTIVE"
+    assert "subscription_expires_at" in data
+    # Ensure sensitive data never leaks
+    assert "id" not in data
+    assert "master_token" not in data
+    assert "master_token_hash" not in data
+    assert "marzban_username" not in data
+
+
+@pytest.mark.asyncio
+async def test_get_me_missing_authorization_header(async_client: AsyncClient):
+    """Missing Authorization header returns 401."""
+    resp = await async_client.get("/api/auth/me")
+    assert resp.status_code == 401
+    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+
+
+@pytest.mark.asyncio
+async def test_get_me_malformed_authorization_header(async_client: AsyncClient):
+    """Malformed Authorization header (e.g. 3 parts) returns 401."""
+    resp = await async_client.get("/api/auth/me", headers={"Authorization": "Bearer token1 token2"})
+    assert resp.status_code == 401
+    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+
+
+@pytest.mark.asyncio
+async def test_get_me_wrong_bearer_format(async_client: AsyncClient):
+    """Wrong authorization scheme (e.g. Basic instead of Bearer) returns 401."""
+    resp = await async_client.get("/api/auth/me", headers={"Authorization": "Basic sometoken"})
+    assert resp.status_code == 401
+    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+
+
+@pytest.mark.asyncio
+async def test_get_me_empty_token(async_client: AsyncClient):
+    """Authorization header with Bearer prefix but empty token string returns 401."""
+    resp = await async_client.get("/api/auth/me", headers={"Authorization": "Bearer   "})
+    assert resp.status_code == 401
+    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+
+
+@pytest.mark.asyncio
+async def test_get_me_expired_jwt(async_client: AsyncClient, account_factory):
+    """An expired Access JWT returns HTTP 401 Unauthorized (never 500)."""
+    acc = await account_factory(account_id="RT-ME-EXPIRED")
+    jwt_svc = get_jwt_service()
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": str(acc.id),
+        "account": acc.account_id,
+        "device": "dev-01",
+        "iss": "realitytunnel-auth",
+        "aud": "realitytunnel-api",
+        "iat": int(now.timestamp()) - 3600,
+        "nbf": int(now.timestamp()) - 3600,
+        "exp": int(now.timestamp()) - 1800,
+        "jti": uuid.uuid4().hex,
+    }
+    token = jwt.encode(payload, jwt_svc.private_key, algorithm="EdDSA")
+
+    resp = await async_client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 401
+    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+
+
+@pytest.mark.asyncio
+async def test_get_me_tampered_jwt(async_client: AsyncClient, account_factory):
+    """A tampered JWT returns HTTP 401 Unauthorized (never 500)."""
+    master_token = "b" * 64
+    await account_factory(account_id="RT-ME-TAMPER", master_token_hash=hash_master_token(master_token))
+    login_resp = await async_client.post(
+        "/api/auth/login",
+        json={"account_id": "RT-ME-TAMPER", "master_token": master_token, "device_guid": "dev-me"},
+    )
+    access_token = login_resp.json()["access_token"]
+    # Tamper with the token string
+    tampered = access_token[:-5] + "xxxxx"
+
+    resp = await async_client.get("/api/auth/me", headers={"Authorization": f"Bearer {tampered}"})
+    assert resp.status_code == 401
+    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+
+
+@pytest.mark.asyncio
+async def test_get_me_wrong_issuer(async_client: AsyncClient, account_factory):
+    """JWT with wrong issuer claim returns 401."""
+    acc = await account_factory(account_id="RT-ME-ISS")
+    jwt_svc = get_jwt_service()
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": str(acc.id),
+        "account": acc.account_id,
+        "device": "dev-01",
+        "iss": "wrong-issuer",
+        "aud": "realitytunnel-api",
+        "iat": int(now.timestamp()),
+        "nbf": int(now.timestamp()),
+        "exp": int(now.timestamp()) + 900,
+        "jti": uuid.uuid4().hex,
+    }
+    token = jwt.encode(payload, jwt_svc.private_key, algorithm="EdDSA")
+
+    resp = await async_client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_get_me_wrong_audience(async_client: AsyncClient, account_factory):
+    """JWT with wrong audience claim returns 401."""
+    acc = await account_factory(account_id="RT-ME-AUD")
+    jwt_svc = get_jwt_service()
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": str(acc.id),
+        "account": acc.account_id,
+        "device": "dev-01",
+        "iss": "realitytunnel-auth",
+        "aud": "wrong-audience",
+        "iat": int(now.timestamp()),
+        "nbf": int(now.timestamp()),
+        "exp": int(now.timestamp()) + 900,
+        "jti": uuid.uuid4().hex,
+    }
+    token = jwt.encode(payload, jwt_svc.private_key, algorithm="EdDSA")
+
+    resp = await async_client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_get_me_deleted_account(async_client: AsyncClient, account_factory, db_session: AsyncSession):
+    """Token is valid but account has been deleted from DB returns 401."""
+    master_token = "c" * 64
+    acc = await account_factory(account_id="RT-ME-DEL", master_token_hash=hash_master_token(master_token))
+    login_resp = await async_client.post(
+        "/api/auth/login",
+        json={"account_id": "RT-ME-DEL", "master_token": master_token, "device_guid": "dev-me"},
+    )
+    access_token = login_resp.json()["access_token"]
+
+    # Delete account from DB
+    await db_session.delete(acc)
+    await db_session.commit()
+
+    resp = await async_client.get("/api/auth/me", headers={"Authorization": f"Bearer {access_token}"})
+    assert resp.status_code == 401
+    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+
+
+@pytest.mark.asyncio
+async def test_get_me_suspended_account(async_client: AsyncClient, account_factory, db_session: AsyncSession):
+    """Token is valid but account status changed to SUSPENDED returns 401."""
+    master_token = "d" * 64
+    acc = await account_factory(account_id="RT-ME-SUSP", master_token_hash=hash_master_token(master_token))
+    login_resp = await async_client.post(
+        "/api/auth/login",
+        json={"account_id": "RT-ME-SUSP", "master_token": master_token, "device_guid": "dev-me"},
+    )
+    access_token = login_resp.json()["access_token"]
+
+    # Update account status to SUSPENDED
+    acc.status = SubscriptionStatus.SUSPENDED
+    await db_session.commit()
+
+    resp = await async_client.get("/api/auth/me", headers={"Authorization": f"Bearer {access_token}"})
+    assert resp.status_code == 401
+    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+
+
+@pytest.mark.asyncio
+async def test_get_me_expired_subscription(async_client: AsyncClient, account_factory, db_session: AsyncSession):
+    """Token is valid but subscription timestamp expired after token issuance returns 401."""
+    master_token = "e" * 64
+    acc = await account_factory(account_id="RT-ME-SUBEXP", master_token_hash=hash_master_token(master_token))
+    login_resp = await async_client.post(
+        "/api/auth/login",
+        json={"account_id": "RT-ME-SUBEXP", "master_token": master_token, "device_guid": "dev-me"},
+    )
+    access_token = login_resp.json()["access_token"]
+
+    # Expire subscription timestamp in DB
+    acc.subscription_expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+    await db_session.commit()
+
+    resp = await async_client.get("/api/auth/me", headers={"Authorization": f"Bearer {access_token}"})
+    assert resp.status_code == 401
+    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+

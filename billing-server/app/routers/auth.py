@@ -19,7 +19,8 @@ from __future__ import annotations
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.dependencies import get_auth_service, get_jwt_service, get_refresh_service
+from app.dependencies import get_auth_service, get_current_account, get_jwt_service, get_refresh_service
+from app.models.account import Account
 from app.security import JWTService
 from app.services import AuthenticationService, RefreshTokenService
 from app.services.exceptions import (
@@ -29,6 +30,7 @@ from app.services.exceptions import (
     RefreshTokenRevokedError,
 )
 from app.routers.auth_models import (
+    AccountMeResponse,
     LoginRequest,
     LoginResponse,
     LogoutRequest,
@@ -176,3 +178,29 @@ async def logout_all(
 
     logger.info("Logout all")
     return SuccessResponse(success=True)
+
+
+@router.get(
+    "/me",
+    summary="Retrieve non-sensitive profile information for the authenticated account",
+    response_model=AccountMeResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {"description": "Missing, invalid, expired, or unauthorized bearer token"},
+        500: {"description": "Unexpected service or database error"},
+    },
+)
+async def get_me(
+    current_account: Account = Depends(get_current_account),
+) -> AccountMeResponse:
+    """
+    Retrieve current authenticated account details.
+    Requires a valid Ed25519 Access JWT in the Authorization Bearer header.
+    Rejects access if the backing account is deleted, suspended, pending, or expired.
+    """
+    return AccountMeResponse(
+        account_id=current_account.account_id,
+        status=current_account.status,
+        subscription_expires_at=current_account.subscription_expires_at,
+    )
+

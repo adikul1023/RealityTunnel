@@ -6,8 +6,10 @@ Enforces clean OpenAPI documentation without exposing internal dataclasses or cr
 """
 from __future__ import annotations
 
+from datetime import datetime
 from pydantic import BaseModel, Field
 
+from app.models import SubscriptionStatus
 from app.security import ACCESS_TOKEN_EXPIRE_MINUTES
 
 
@@ -57,3 +59,16 @@ class RefreshResponse(BaseModel):
 class SuccessResponse(BaseModel):
     """Generic success confirmation for logout operations."""
     success: bool = Field(default=True, description="Indicates operation completed successfully")
+
+
+class AccountMeResponse(BaseModel):
+    """
+    Response model for GET /api/auth/me returning non-sensitive account identity.
+    Strictly omits credentials, tokens, hashes, database UUIDs, and internal metadata.
+    """
+    account_id: str = Field(..., description="Human-readable Account ID (e.g., RT-XXXX-XXXX)")
+    status: SubscriptionStatus = Field(..., description="Current subscription lifecycle status")
+    subscription_expires_at: datetime | None = Field(
+        None, description="Subscription expiration timestamp (UTC)"
+    )
+
