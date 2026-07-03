@@ -3,7 +3,7 @@ Unit Tests for Cryptographic Helpers (app/security/crypto.py)
 """
 
 import pytest
-from app.security import hash_master_token, compare_secrets, SHA256_HEX_LENGTH
+from app.security import hash_master_token, compare_secrets, verify_master_token, SHA256_HEX_LENGTH
 
 
 def test_hash_master_token_deterministic():
@@ -63,3 +63,14 @@ def test_compare_secrets_invalid_types():
     assert compare_secrets("secret", None) is False # type: ignore
     assert compare_secrets(12345, 12345) is False # type: ignore
     assert compare_secrets("secret", 12345) is False # type: ignore
+
+
+def test_verify_master_token():
+    """Verify verify_master_token correctly hashes and compares Master Tokens."""
+    token = "raw_master_token_value"
+    expected_hash = hash_master_token(token)
+    assert verify_master_token(token, expected_hash) is True
+    assert verify_master_token("wrong_token_value", expected_hash) is False
+    assert verify_master_token(token, "0000000000000000000000000000000000000000000000000000000000000000") is False
+    assert verify_master_token(12345, expected_hash) is False # type: ignore
+    assert verify_master_token(token, None) is False # type: ignore

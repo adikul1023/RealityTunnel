@@ -48,3 +48,21 @@ def compare_secrets(val1: AnyStr, val2: AnyStr) -> bool:
     if not isinstance(val1, (str, bytes)) or not isinstance(val2, (str, bytes)):
         return False
     return hmac.compare_digest(val1, val2)
+
+
+def verify_master_token(token: str, expected_hash: str) -> bool:
+    """
+    Verify a raw Master Token against an expected SHA-256 hexadecimal digest in constant time.
+
+    CRYPTOGRAPHIC REASONING:
+    Combining SHA-256 hashing (`hash_master_token`) and constant-time comparison (`compare_secrets`)
+    into a single verification utility prevents developers from accidentally using standard equality (`==`)
+    or skipping hashing during authentication workflows (e.g., in Phase 1.3.2 login endpoints).
+    """
+    if not isinstance(token, str) or not isinstance(expected_hash, str):
+        return False
+    try:
+        computed_hash = hash_master_token(token)
+    except (TypeError, ValueError):
+        return False
+    return compare_secrets(computed_hash, expected_hash)

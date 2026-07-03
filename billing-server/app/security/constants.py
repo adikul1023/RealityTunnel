@@ -21,7 +21,7 @@ ACCOUNT_ID_GROUPS: int = 3
 ACCOUNT_ID_GROUP_SIZE: int = 4
 ACCOUNT_ID_SEPARATOR: str = "-"
 
-# Unambiguous 32-character alphabet for Account ID generation.
+# Unambiguous 31-character alphabet for Account ID generation.
 # Excludes visually similar characters:
 # '0' (zero), 'O' (capital o), '1' (one), 'I' (capital i), 'L' (capital l).
 # This minimizes manual transcription and visual reading errors for users.
