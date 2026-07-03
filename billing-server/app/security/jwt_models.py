@@ -24,11 +24,12 @@ from __future__ import annotations
 from dataclasses import dataclass, asdict
 from typing import Any
 
+from app.config import settings
 
 # Centralized JWT Constants
 ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
-JWT_ISSUER: str = "RealityTunnel Billing/Auth"
-JWT_AUDIENCE: str = "RealityTunnel Client"
+JWT_ISSUER: str = settings.jwt_issuer
+JWT_AUDIENCE: str = settings.jwt_audience
 JWT_ALGORITHM: str = "EdDSA"
 
 

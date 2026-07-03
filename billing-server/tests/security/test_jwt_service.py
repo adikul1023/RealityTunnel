@@ -245,3 +245,28 @@ def test_key_handling_and_isolation(tmp_path: Path):
     with pytest.raises(RuntimeError) as exc_info:
         JWTService(keys_dir=dir_prod, environment="production")
     assert "production ed25519 signing keys are absent" in str(exc_info.value).lower()
+
+
+def test_verify_algorithm_confusion_hs256(jwt_service: JWTService):
+    """
+    Verify algorithm confusion defense:
+    Attempting to validate an HS256 token against the Ed25519 public key must fail immediately.
+    """
+    now = int(datetime.now(timezone.utc).timestamp())
+    payload = {
+        "sub": str(uuid.uuid4()),
+        "account": "RT-CONFUSE-01",
+        "device": "dev_guid",
+        "iss": JWT_ISSUER,
+        "aud": JWT_AUDIENCE,
+        "iat": now,
+        "nbf": now,
+        "exp": now + 900,
+        "jti": "jti_hs256_test",
+    }
+    # Encode with HS256 using a symmetric secret
+    hs256_token = jwt.encode(payload, "symmetric_secret_key", algorithm="HS256")
+
+    with pytest.raises(InvalidTokenError) as exc_info:
+        jwt_service.verify_access_token(hs256_token)
+    assert "algorithm" in str(exc_info.value).lower() or "invalid" in str(exc_info.value).lower()

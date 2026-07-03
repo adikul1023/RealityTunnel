@@ -50,8 +50,10 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8080
 
-    # ── Security (stubs — populated in later phases) ───────────────────────
+    # ── Security ───────────────────────────────────────────────────────────
     secret_key: str = "CHANGE_ME_BEFORE_PRODUCTION"
+    jwt_issuer: str = "RealityTunnel Billing/Auth"
+    jwt_audience: str = "RealityTunnel Client"
 
 
 @lru_cache

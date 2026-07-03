@@ -193,6 +193,7 @@ class JWTService:
                 algorithms=[JWT_ALGORITHM],
                 issuer=JWT_ISSUER,
                 audience=JWT_AUDIENCE,
+                leeway=0,  # Explicitly disallow clock skew for stateless access tokens
                 options={
                     "require": ["sub", "account", "device", "iss", "aud", "iat", "nbf", "exp", "jti"],
                     "verify_signature": True,

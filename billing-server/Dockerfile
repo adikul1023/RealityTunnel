@@ -24,7 +24,8 @@ COPY --from=builder /install /usr/local
 
 # Non-root user for security
 RUN groupadd --gid 1001 billing \
-    && useradd --uid 1001 --gid billing --shell /bin/bash --create-home billing
+    && useradd --uid 1001 --gid billing --shell /bin/bash --create-home billing \
+    && chown -R billing:billing /app
 
 COPY --chown=billing:billing . .
 
