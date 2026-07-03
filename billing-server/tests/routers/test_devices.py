@@ -1,0 +1,344 @@
+"""
+test_devices.py — Integration Tests for Device Management REST API (Phase 1.4.2).
+
+Verifies all authenticated device endpoints, ownership isolation (anti-IDOR 404 mapping),
+idempotent deletion, status transitions, and JWT security requirements.
+"""
+from __future__ import annotations
+
+import asyncio
+from datetime import datetime, timedelta, timezone
+from typing import AsyncGenerator
+
+import pytest
+import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.database import get_db
+from app.dependencies import get_device_service, get_jwt_service
+from app.main import app
+from app.models import SubscriptionStatus
+from app.repositories import AccountRepository, DeviceRepository
+from app.security import hash_master_token
+from app.services import DeviceService
+
+
+@pytest_asyncio.fixture(scope="function")
+async def async_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+    """Yield an httpx AsyncClient configured with overridden database dependencies."""
+    async def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        yield client
+    app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture(scope="function")
+async def device_service(db_session: AsyncSession) -> DeviceService:
+    dev_repo = DeviceRepository(db_session)
+    acc_repo = AccountRepository(db_session)
+    return DeviceService(dev_repo, acc_repo)
+
+
+import secrets
+
+
+async def get_auth_headers(async_client: AsyncClient, account_factory, account_id: str = "RT-DEV-001") -> tuple[dict[str, str], any]:
+    """Helper to create account, login, and return authorization header + account object."""
+    master_token = secrets.token_hex(32)
+    acc = await account_factory(account_id=account_id, master_token_hash=hash_master_token(master_token))
+    login_resp = await async_client.post(
+        "/api/auth/login",
+        json={"account_id": account_id, "master_token": master_token, "device_guid": f"dev-{account_id}"},
+    )
+    assert login_resp.status_code == 200, login_resp.text
+    token = login_resp.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}, acc
+
+
+# ── 1. List Devices ──────────────────────────────────────────────────────────
+@pytest.mark.asyncio
+async def test_list_devices(async_client: AsyncClient, account_factory, device_service: DeviceService):
+    """1. GET /api/devices returns all devices owned by current account."""
+    headers, acc = await get_auth_headers(async_client, account_factory, "RT-LIST-001")
+    await device_service.register_device(acc.id, "guid-list-1", "Desktop")
+    await device_service.register_device(acc.id, "guid-list-2", "Laptop")
+
+    resp = await async_client.get("/api/devices", headers=headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert "devices" in data
+    assert len(data["devices"]) == 2
+
+    guids = {d["device_guid"] for d in data["devices"]}
+    assert guids == {"guid-list-1", "guid-list-2"}
+
+    # Verify public fields only (never expose database UUID or foreign keys)
+    for dev in data["devices"]:
+        assert "id" not in dev
+        assert "account_id" not in dev
+        assert "friendly_name" in dev
+        assert "first_seen_at" in dev
+        assert "last_seen_at" in dev
+        assert dev["is_active"] is True
+
+
+# ── 2. Get Own Device ────────────────────────────────────────────────────────
+@pytest.mark.asyncio
+async def test_get_own_device(async_client: AsyncClient, account_factory, device_service: DeviceService):
+    """2. GET /api/devices/{guid} returns details for own device."""
+    headers, acc = await get_auth_headers(async_client, account_factory, "RT-GET-001")
+    await device_service.register_device(acc.id, "guid-get-1", "My Phone")
+
+    resp = await async_client.get("/api/devices/guid-get-1", headers=headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["device_guid"] == "guid-get-1"
+    assert data["friendly_name"] == "My Phone"
+    assert data["is_active"] is True
+    assert "id" not in data
+
+
+# ── 3. Request Another Account's Device (404 Anti-Enumeration) ───────────────
+@pytest.mark.asyncio
+async def test_get_other_account_device_404(async_client: AsyncClient, account_factory, device_service: DeviceService):
+    """3. GET /api/devices/{guid} for another account's device returns 404 (not 403)."""
+    headers1, acc1 = await get_auth_headers(async_client, account_factory, "RT-GET-OTHER-1")
+    headers2, acc2 = await get_auth_headers(async_client, account_factory, "RT-GET-OTHER-2")
+
+    await device_service.register_device(acc1.id, "guid-secret-acc1", "Acc1 Device")
+
+    # Account 2 attempts to get Account 1's device
+    resp = await async_client.get("/api/devices/guid-secret-acc1", headers=headers2)
+    assert resp.status_code == 404, resp.text
+    assert resp.json() == {"detail": "Device not found"}
+
+
+# ── 4. Rename Device ─────────────────────────────────────────────────────────
+@pytest.mark.asyncio
+async def test_rename_device(async_client: AsyncClient, account_factory, device_service: DeviceService):
+    """4. PATCH /api/devices/{guid} updates friendly name."""
+    headers, acc = await get_auth_headers(async_client, account_factory, "RT-RENAME-001")
+    await device_service.register_device(acc.id, "guid-rename-1", "Old Name")
+
+    resp = await async_client.patch(
+        "/api/devices/guid-rename-1",
+        json={"friendly_name": "New Name"},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["friendly_name"] == "New Name"
+
+    # Verify persistence
+    get_resp = await async_client.get("/api/devices/guid-rename-1", headers=headers)
+    assert get_resp.json()["friendly_name"] == "New Name"
+
+
+# ── 5. Deactivate Device ─────────────────────────────────────────────────────
+@pytest.mark.asyncio
+async def test_deactivate_device(async_client: AsyncClient, account_factory, device_service: DeviceService):
+    """5. DELETE /api/devices/{guid} soft-deactivates device."""
+    headers, acc = await get_auth_headers(async_client, account_factory, "RT-DEACT-001")
+    await device_service.register_device(acc.id, "guid-deact-1", "To Be Deactivated")
+
+    resp = await async_client.delete("/api/devices/guid-deact-1", headers=headers)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["success"] is True
+
+    # Verify soft-delete state
+    get_resp = await async_client.get("/api/devices/guid-deact-1", headers=headers)
+    assert get_resp.status_code == 200
+    assert get_resp.json()["is_active"] is False
+
+
+# ── 6. Reactivate Device ─────────────────────────────────────────────────────
+@pytest.mark.asyncio
+async def test_reactivate_device(async_client: AsyncClient, account_factory, device_service: DeviceService):
+    """6. POST /api/devices/{guid}/reactivate reactivates an inactive device."""
+    headers, acc = await get_auth_headers(async_client, account_factory, "RT-REACT-001")
+    await device_service.register_device(acc.id, "guid-react-1")
+    await async_client.delete("/api/devices/guid-react-1", headers=headers)
+
+    resp = await async_client.post("/api/devices/guid-react-1/reactivate", headers=headers)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["is_active"] is True
+
+
+# ── 7. Rename Inactive Device ────────────────────────────────────────────────
+@pytest.mark.asyncio
+async def test_rename_inactive_device_400(async_client: AsyncClient, account_factory, device_service: DeviceService):
+    """7. PATCH /api/devices/{guid} on an inactive device returns 400 Bad Request."""
+    headers, acc = await get_auth_headers(async_client, account_factory, "RT-REN-INACT")
+    await device_service.register_device(acc.id, "guid-ren-inact")
+    await async_client.delete("/api/devices/guid-ren-inact", headers=headers)
+
+    resp = await async_client.patch(
+        "/api/devices/guid-ren-inact",
+        json={"friendly_name": "Should Fail"},
+        headers=headers,
+    )
+    assert resp.status_code == 400, resp.text
+    assert resp.json() == {"detail": "Device is deactivated"}
+
+
+# ── 8. Missing JWT ───────────────────────────────────────────────────────────
+@pytest.mark.asyncio
+async def test_missing_jwt(async_client: AsyncClient):
+    """8. GET /api/devices without Authorization header returns 401."""
+    resp = await async_client.get("/api/devices")
+    assert resp.status_code == 401
+    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+
+
+# ── 9. Invalid JWT ───────────────────────────────────────────────────────────
+@pytest.mark.asyncio
+async def test_invalid_jwt(async_client: AsyncClient):
+    """9. GET /api/devices with malformed or invalid JWT returns 401."""
+    resp = await async_client.get("/api/devices", headers={"Authorization": "Bearer not-a-valid-token"})
+    assert resp.status_code == 401
+    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+
+
+# ── 10. Expired JWT ──────────────────────────────────────────────────────────
+@pytest.mark.asyncio
+async def test_expired_jwt(async_client: AsyncClient, account_factory):
+    """10. GET /api/devices with expired JWT returns 401."""
+    _, acc = await get_auth_headers(async_client, account_factory, "RT-EXP-JWT")
+    jwt_service = get_jwt_service()
+
+    # Craft an expired token directly using jwt_service keys
+    expired_payload = {
+        "sub": str(acc.id),
+        "account_id": acc.account_id,
+        "device_guid": "dev-exp",
+        "iss": "realitytunnel-auth",
+        "aud": "realitytunnel-client",
+        "iat": int((datetime.now(timezone.utc) - timedelta(hours=2)).timestamp()),
+        "exp": int((datetime.now(timezone.utc) - timedelta(hours=1)).timestamp()),
+    }
+    import jwt
+    expired_token = jwt.encode(expired_payload, jwt_service.private_key, algorithm="EdDSA")
+
+    resp = await async_client.get("/api/devices", headers={"Authorization": f"Bearer {expired_token}"})
+    assert resp.status_code == 401
+    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+
+
+# ── 11. Tampered JWT ─────────────────────────────────────────────────────────
+@pytest.mark.asyncio
+async def test_tampered_jwt(async_client: AsyncClient, account_factory):
+    """11. GET /api/devices with tampered JWT signature returns 401."""
+    headers, _ = await get_auth_headers(async_client, account_factory, "RT-TAMP-JWT")
+    token = headers["Authorization"].split(" ")[1]
+    tampered_token = token[:-4] + "aaaa"
+
+    resp = await async_client.get("/api/devices", headers={"Authorization": f"Bearer {tampered_token}"})
+    assert resp.status_code == 401
+    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+
+
+# ── 12. Deleted Account ──────────────────────────────────────────────────────
+@pytest.mark.asyncio
+async def test_deleted_account(async_client: AsyncClient, account_factory, db_session: AsyncSession):
+    """12. Valid JWT for subsequently deleted account returns 401."""
+    headers, acc = await get_auth_headers(async_client, account_factory, "RT-DEL-ACC")
+    await db_session.delete(acc)
+    await db_session.commit()
+
+    resp = await async_client.get("/api/devices", headers=headers)
+    assert resp.status_code == 401
+    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+
+
+# ── 13. Suspended Account ────────────────────────────────────────────────────
+@pytest.mark.asyncio
+async def test_suspended_account(async_client: AsyncClient, account_factory, db_session: AsyncSession):
+    """13. Valid JWT for subsequently suspended account returns 401."""
+    headers, acc = await get_auth_headers(async_client, account_factory, "RT-SUSP-ACC")
+    acc.status = SubscriptionStatus.SUSPENDED
+    await db_session.commit()
+
+    resp = await async_client.get("/api/devices", headers=headers)
+    assert resp.status_code == 401
+    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+
+
+# ── 14. Pending Account ──────────────────────────────────────────────────────
+@pytest.mark.asyncio
+async def test_pending_account(async_client: AsyncClient, account_factory, db_session: AsyncSession):
+    """14. Account in PENDING status cannot access endpoints (returns 401)."""
+    master_token = "a" * 64
+    acc = await account_factory(
+        account_id="RT-PEND-ACC",
+        master_token_hash=hash_master_token(master_token),
+        status=SubscriptionStatus.PENDING,
+    )
+    jwt_service = get_jwt_service()
+    token = jwt_service.issue_access_token(acc.id, acc.account_id, "dev-pend")
+
+    resp = await async_client.get("/api/devices", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 401
+    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+
+
+# ── 15. Expired Subscription ─────────────────────────────────────────────────
+@pytest.mark.asyncio
+async def test_expired_subscription(async_client: AsyncClient, account_factory, db_session: AsyncSession):
+    """15. Valid JWT where subscription expires after issuance returns 401."""
+    headers, acc = await get_auth_headers(async_client, account_factory, "RT-SUBEXP-ACC")
+    acc.subscription_expires_at = datetime.now(timezone.utc) - timedelta(minutes=5)
+    await db_session.commit()
+
+    resp = await async_client.get("/api/devices", headers=headers)
+    assert resp.status_code == 401
+    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+
+
+# ── 16. Verify DELETE Remains Idempotent ─────────────────────────────────────
+@pytest.mark.asyncio
+async def test_delete_idempotent(async_client: AsyncClient, account_factory, device_service: DeviceService):
+    """16. Deleting an already inactive device returns 200 OK success without error."""
+    headers, acc = await get_auth_headers(async_client, account_factory, "RT-IDEMP-DEL")
+    await device_service.register_device(acc.id, "guid-idemp-del")
+
+    # First deletion
+    resp1 = await async_client.delete("/api/devices/guid-idemp-del", headers=headers)
+    assert resp1.status_code == 200
+    assert resp1.json()["success"] is True
+
+    # Second deletion (idempotent check)
+    resp2 = await async_client.delete("/api/devices/guid-idemp-del", headers=headers)
+    assert resp2.status_code == 200
+    assert resp2.json()["success"] is True
+
+
+# ── 17. Verify No IDOR or Enumeration Across All Methods ─────────────────────
+@pytest.mark.asyncio
+async def test_no_idor_enumeration(async_client: AsyncClient, account_factory, device_service: DeviceService):
+    """17. Verify PATCH, DELETE, and POST /reactivate on another account's device return 404 Not Found."""
+    _, acc1 = await get_auth_headers(async_client, account_factory, "RT-IDOR-1")
+    headers2, _ = await get_auth_headers(async_client, account_factory, "RT-IDOR-2")
+
+    await device_service.register_device(acc1.id, "guid-idor-target", "Acc1 Target")
+
+    # Attempt PATCH
+    patch_resp = await async_client.patch(
+        "/api/devices/guid-idor-target",
+        json={"friendly_name": "Hacked Name"},
+        headers=headers2,
+    )
+    assert patch_resp.status_code == 404, patch_resp.text
+    assert patch_resp.json() == {"detail": "Device not found"}
+
+    # Attempt DELETE
+    del_resp = await async_client.delete("/api/devices/guid-idor-target", headers=headers2)
+    assert del_resp.status_code == 404, del_resp.text
+    assert del_resp.json() == {"detail": "Device not found"}
+
+    # Attempt REACTIVATE
+    react_resp = await async_client.post("/api/devices/guid-idor-target/reactivate", headers=headers2)
+    assert react_resp.status_code == 404, react_resp.text
+    assert react_resp.json() == {"detail": "Device not found"}

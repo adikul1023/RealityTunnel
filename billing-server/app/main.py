@@ -13,10 +13,14 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.config import settings
 from app.database import engine, verify_db
 from app.exceptions import DuplicateEntityError, EntityNotFoundError, RepositoryError
-from app.routers import auth, health
+from app.routers import auth, devices, health
 from app.services.exceptions import (
     AuthenticationServiceError,
     AccountNotActiveError,
+    DeviceNotFoundError,
+    DeviceOwnershipError,
+    DeviceServiceError,
+    InactiveDeviceError,
     InvalidAudienceError,
     InvalidIssuerError,
     InvalidSignatureError,
@@ -55,6 +59,7 @@ app = FastAPI(
 
 app.include_router(health.router)
 app.include_router(auth.router)
+app.include_router(devices.router)
 
 
 # ── Exception Handlers ───────────────────────────────────────────────────────
@@ -80,6 +85,27 @@ async def duplicate_exception_handler(request: Request, exc: DuplicateEntityErro
     return JSONResponse(
         status_code=status.HTTP_409_CONFLICT,
         content={"detail": "Duplicate entity"},
+    )
+
+
+async def device_not_found_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
+        content={"detail": "Device not found"},
+    )
+
+
+async def device_inactive_exception_handler(request: Request, exc: InactiveDeviceError) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={"detail": "Device is deactivated"},
+    )
+
+
+async def device_service_exception_handler(request: Request, exc: DeviceServiceError) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={"detail": str(exc)},
     )
 
 
@@ -121,6 +147,10 @@ auth_exceptions = (
 for exc_class in auth_exceptions:
     app.add_exception_handler(exc_class, auth_exception_handler)
 
+app.add_exception_handler(DeviceNotFoundError, device_not_found_exception_handler)
+app.add_exception_handler(DeviceOwnershipError, device_not_found_exception_handler)
+app.add_exception_handler(InactiveDeviceError, device_inactive_exception_handler)
+app.add_exception_handler(DeviceServiceError, device_service_exception_handler)
 app.add_exception_handler(DuplicateEntityError, duplicate_exception_handler)
 app.add_exception_handler(ServiceError, general_exception_handler)
 app.add_exception_handler(RepositoryError, general_exception_handler)
