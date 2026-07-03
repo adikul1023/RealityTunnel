@@ -146,7 +146,9 @@ class RefreshTokenService:
             except RepositoryError as exc:
                 raise RefreshTokenServiceError("Database error during replay mass revocation") from exc
             raise RefreshTokenReplayError(
-                "Replay attack detected: reuse of revoked refresh token. All sessions for this account have been revoked."
+                "Replay attack detected: reuse of revoked refresh token. All sessions for this account have been revoked.",
+                account_id=entity.account_id,
+                device_guid=entity.device_guid,
             )
 
         # Defensive timezone normalization: DateTime(timezone=True) should always return
@@ -155,7 +157,11 @@ class RefreshTokenService:
         if expires_at.tzinfo is None:
             expires_at = expires_at.replace(tzinfo=timezone.utc)
         if expires_at < datetime.now(timezone.utc):
-            raise RefreshTokenExpiredError("Refresh token has expired")
+            raise RefreshTokenExpiredError(
+                "Refresh token has expired",
+                account_id=entity.account_id,
+                device_guid=entity.device_guid,
+            )
 
         return entity
 

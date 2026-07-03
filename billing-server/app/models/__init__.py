@@ -6,6 +6,7 @@ from app.models.account import Account
 from app.models.device import Device
 from app.models.refresh_token import RefreshToken
 from app.models.subscription_plan import SubscriptionPlan, FREE, PRO, FAMILY, PLANS_REGISTRY
+from app.models.connection_signal import ConnectionSignal, ConnectionEventType
 
 __all__ = [
     "SubscriptionStatus",
@@ -18,4 +19,6 @@ __all__ = [
     "PRO",
     "FAMILY",
     "PLANS_REGISTRY",
+    "ConnectionSignal",
+    "ConnectionEventType",
 ]

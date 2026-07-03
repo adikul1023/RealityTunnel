@@ -3,6 +3,7 @@ exceptions.py — Service layer exceptions.
 Translates repository and domain errors into clean service exceptions without HTTP or framework coupling.
 """
 from __future__ import annotations
+import uuid
 from typing import Any
 
 
@@ -62,7 +63,17 @@ class TokenNotYetValidError(InvalidTokenError):
 
 class RefreshTokenServiceError(ServiceError):
     """Base exception for refresh token rotation and lifecycle operations."""
-    pass
+    def __init__(
+        self,
+        message: str,
+        *,
+        account_id: uuid.UUID | None = None,
+        device_guid: str | None = None,
+        detail: Any = None,
+    ) -> None:
+        super().__init__(message, detail=detail)
+        self.account_id = account_id
+        self.device_guid = device_guid
 
 
 class RefreshTokenNotFoundError(RefreshTokenServiceError):
@@ -136,3 +147,6 @@ class DeviceLimitExceededError(DeviceServiceError):
         self.plan_id = plan_id
 
 
+class ConnectionSignalServiceError(ServiceError):
+    """Raised when an error occurs while recording or querying connection security signals."""
+    pass

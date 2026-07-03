@@ -25,6 +25,7 @@ from app.services.exceptions import (
     SubscriptionServiceError,
     UnknownPlanError,
     DeviceLimitExceededError,
+    ConnectionSignalServiceError,
 )
 from app.services.authentication import (
     AuthenticationService,
@@ -39,6 +40,7 @@ from app.services.refresh_tokens import (
 )
 from app.services.device import DeviceService
 from app.services.subscription_plan import SubscriptionPlanService
+from app.services.connection_signal import ConnectionSignalService
 
 __all__ = [
     "ServiceError",
@@ -63,6 +65,7 @@ __all__ = [
     "SubscriptionServiceError",
     "UnknownPlanError",
     "DeviceLimitExceededError",
+    "ConnectionSignalServiceError",
     "AuthenticationService",
     "AuthenticationResult",
     "AuthenticationReason",
@@ -72,5 +75,6 @@ __all__ = [
     "RefreshTokenInfo",
     "DeviceService",
     "SubscriptionPlanService",
+    "ConnectionSignalService",
 ]
 

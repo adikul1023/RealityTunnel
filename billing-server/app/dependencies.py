@@ -15,9 +15,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.account import Account
-from app.repositories import AccountRepository, DeviceRepository, RefreshTokenRepository
+from app.repositories import (
+    AccountRepository,
+    DeviceRepository,
+    RefreshTokenRepository,
+    ConnectionSignalRepository,
+)
 from app.security import JWTService
-from app.services import AuthenticationService, DeviceService, RefreshTokenService
+from app.services import (
+    AuthenticationService,
+    DeviceService,
+    RefreshTokenService,
+    ConnectionSignalService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +86,20 @@ async def get_device_service(
 ) -> DeviceService:
     """Dependency provider yielding DeviceService."""
     return DeviceService(device_repo, account_repo)
+
+
+async def get_signal_repo(
+    session: AsyncSession = Depends(get_db),
+) -> ConnectionSignalRepository:
+    """Dependency provider yielding ConnectionSignalRepository tied to request session."""
+    return ConnectionSignalRepository(session)
+
+
+async def get_signal_service(
+    signal_repo: ConnectionSignalRepository = Depends(get_signal_repo),
+) -> ConnectionSignalService:
+    """Dependency provider yielding ConnectionSignalService."""
+    return ConnectionSignalService(signal_repo)
 
 
 

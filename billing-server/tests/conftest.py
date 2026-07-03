@@ -29,7 +29,7 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Yield an isolated async database session."""
     from sqlalchemy import text
     async with AsyncSessionLocal() as session:
-        await session.execute(text("TRUNCATE TABLE accounts CASCADE"))
+        await session.execute(text("TRUNCATE TABLE accounts, connection_signals CASCADE"))
         await session.commit()
         yield session
         await session.close()
@@ -85,6 +85,14 @@ async def device_service(db_session: AsyncSession):
     dev_repo = DeviceRepository(db_session)
     acc_repo = AccountRepository(db_session)
     return DeviceService(dev_repo, acc_repo)
+
+
+@pytest_asyncio.fixture(scope="function")
+async def signal_service(db_session: AsyncSession):
+    from app.repositories import ConnectionSignalRepository
+    from app.services import ConnectionSignalService
+    repo = ConnectionSignalRepository(db_session)
+    return ConnectionSignalService(repo)
 
 
 @pytest_asyncio.fixture(scope="function")
