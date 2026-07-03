@@ -36,11 +36,18 @@ from app.models.admin_user import AdminUser
 
 logger = logging.getLogger(__name__)
 
-# Bearer authentication scheme for OpenAPI Swagger documentation
-oauth2_scheme = HTTPBearer(
+# Bearer authentication schemes for OpenAPI Swagger documentation
+customer_oauth2_scheme = HTTPBearer(
     auto_error=False,
-    scheme_name="BearerAuthentication",
-    description="Enter Ed25519 Access JWT",
+    scheme_name="CustomerBearer",
+    description="Customer Ed25519 Access JWT",
+)
+oauth2_scheme = customer_oauth2_scheme  # backward compatibility alias
+
+admin_oauth2_scheme = HTTPBearer(
+    auto_error=False,
+    scheme_name="AdminBearer",
+    description="Administrative Ed25519 Access JWT",
 )
 
 # Singleton JWT service instance (stateless Ed25519 signer/verifier)
@@ -200,7 +207,7 @@ async def get_admin_auth_service(
 
 async def get_current_admin(
     request: Request,
-    _bearer: HTTPAuthorizationCredentials | None = Depends(oauth2_scheme),
+    _bearer: HTTPAuthorizationCredentials | None = Depends(admin_oauth2_scheme),
     admin_auth_service: AdminAuthenticationService = Depends(get_admin_auth_service),
     admin_jwt_service: AdminJWTService = Depends(get_admin_jwt_service),
 ) -> AdminUser:

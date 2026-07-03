@@ -37,8 +37,14 @@ class AdminPasswordService:
     """
 
     def __init__(self) -> None:
-        # Default Argon2id parameters: memory_cost=65536 KB (64 MB), time_cost=3, parallelism=4
-        self._hasher = PasswordHasher()
+        # Explicitly configured Argon2id parameters: memory_cost=65536 KB (64 MB), time_cost=3, parallelism=4
+        self._hasher = PasswordHasher(
+            time_cost=3,
+            memory_cost=65536,
+            parallelism=4,
+            hash_len=32,
+            salt_len=16,
+        )
 
     def hash_password(self, password: str) -> str:
         """

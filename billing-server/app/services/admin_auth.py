@@ -98,8 +98,8 @@ class AdminAuthenticationService:
             logger.info("Admin authentication failed: deactivated account")
             return AdminAuthResult(success=False, reason=AdminAuthReason.USER_INACTIVE, admin_user=admin)
 
-        if admin.mfa_enabled:
-            logger.info("Admin authentication blocked: MFA required but not implemented")
+        if getattr(admin, "mfa_enabled", None) is not False:
+            logger.info("Admin authentication blocked: MFA required or data malformed/omitted")
             raise MFANotImplementedYet("MFA for administrative accounts is not yet implemented.")
 
         # Update last login timestamp
