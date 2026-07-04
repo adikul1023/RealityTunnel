@@ -56,18 +56,18 @@ class BaseRepository(Generic[ModelType]):
                 f"Database error while creating {self.model_class.__name__}"
             ) from exc
 
-    async def get_by_id(self, entity_id: uuid.UUID | str | int) -> ModelType | None:
+    async def get_by_id(self, entity_id: uuid.UUID | str | int, *, for_update: bool = False) -> ModelType | None:
         """Retrieve an entity by its primary key ID."""
         try:
-            return await self.session.get(self.model_class, entity_id)
+            return await self.session.get(self.model_class, entity_id, with_for_update=for_update)
         except SQLAlchemyError as exc:
             raise DatabaseOperationError(
                 f"Database error querying {self.model_class.__name__} by ID"
             ) from exc
 
-    async def get_by_id_or_raise(self, entity_id: uuid.UUID | str | int) -> ModelType:
+    async def get_by_id_or_raise(self, entity_id: uuid.UUID | str | int, *, for_update: bool = False) -> ModelType:
         """Retrieve an entity by ID or raise EntityNotFoundError if missing."""
-        entity = await self.get_by_id(entity_id)
+        entity = await self.get_by_id(entity_id, for_update=for_update)
         if entity is None:
             raise EntityNotFoundError(
                 f"{self.model_class.__name__} with ID {entity_id} not found"

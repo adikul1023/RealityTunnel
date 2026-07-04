@@ -50,7 +50,7 @@ async def login(
             detail="Authentication failed: invalid credentials or inactive account",
         )
 
-    logger.info("Admin login succeeded for username: %s", request.username)
+    logger.info("Admin login succeeded")
     role = "super_admin" if result.admin_user.is_super_admin else "admin"
     return AdminLoginResponse(
         access_token=result.access_token,

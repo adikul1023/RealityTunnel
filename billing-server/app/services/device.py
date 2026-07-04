@@ -120,6 +120,10 @@ class DeviceService:
                 logger.warning("Ownership violation during device registration attempt")
                 raise DeviceOwnershipError("Device is registered to another account")
 
+            if not device.is_active:
+                logger.info("Attempted registration/update on deactivated device")
+                raise InactiveDeviceError("Device is deactivated")
+
             device = self._normalize_device_timestamps(device)
             device.last_seen_at = now
             if clean_name is not None:
@@ -132,9 +136,9 @@ class DeviceService:
                 logger.error("Repository error updating existing device in register_device")
                 raise DeviceServiceError("Database error updating device registration") from exc
 
-        # Device does not exist; verify account exists before creating
+        # Device does not exist; verify account exists before creating (with row lock to prevent TOCTOU races)
         try:
-            account = await self.account_repo.get_by_id(account_id)
+            account = await self.account_repo.get_by_id(account_id, for_update=True)
         except RepositoryError as exc:
             logger.error("Repository error querying account in register_device")
             raise DeviceServiceError("Database error checking account existence") from exc
@@ -269,7 +273,7 @@ class DeviceService:
     ) -> Device:
         """
         Reactivate a deactivated device.
-        Must verify ownership.
+        Must verify ownership and enforce subscription plan device limit.
         If already active -> raise InactiveDeviceError.
         """
         device = await self._get_and_verify_ownership(account_id, device_guid, for_update=True)
@@ -277,6 +281,20 @@ class DeviceService:
         if device.is_active:
             logger.info("Attempted reactivation on already active device")
             raise InactiveDeviceError("Device is already active")
+
+        try:
+            account = await self.account_repo.get_by_id(account_id, for_update=True)
+            if account is None:
+                raise DeviceServiceError("Account not found")
+            active_count = await self.device_repo.count_active_devices_for_account(account_id)
+        except RepositoryError as exc:
+            logger.error("Repository error checking active devices in reactivate_device")
+            raise DeviceServiceError("Database error checking device limit") from exc
+
+        if self.plan_service.device_limit_reached(account, active_count):
+            logger.info("Device reactivation rejected due to subscription policy.")
+            max_devices = self.plan_service.get_max_devices(account)
+            raise DeviceLimitExceededError(active_count, max_devices, account.plan_id)
 
         device.is_active = True
         try:

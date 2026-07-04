@@ -273,3 +273,23 @@ async def test_concurrent_register_device_race_recovery(
         # Verify exactly one device row exists in repository for this account
         devices = await device_service.get_devices_for_account(acc.id)
         assert len(devices) == 1
+
+
+@pytest.mark.asyncio
+async def test_register_device_on_deactivated_device_raises_error(
+    account_factory, device_service: DeviceService
+):
+    """
+    Audit Regression Test (Part 1):
+    Verify that calling register_device on an already registered but deactivated device
+    raises InactiveDeviceError rather than silently reactivating or mutating timestamps.
+    """
+    acc = await account_factory(account_id="DEV-SVC-INACT-REG")
+    guid = "guid-inact-reg"
+    await device_service.register_device(acc.id, guid, "My Laptop")
+    await device_service.deactivate_device(acc.id, guid)
+
+    with pytest.raises(InactiveDeviceError) as exc_info:
+        await device_service.register_device(acc.id, guid, "Hacked Name")
+
+    assert "deactivated" in str(exc_info.value).lower()

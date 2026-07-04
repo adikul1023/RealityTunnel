@@ -439,30 +439,37 @@ async def test_openapi_security_admin_accounts_routes(async_client):
                 )
 
 
-async def test_no_repository_access_in_admin_router():
+async def test_no_repository_access_in_any_router():
     """
-    Architectural invariant: app/routers/admin.py must never import or use repositories directly.
+    Architectural invariant (Audit Part 7):
+    All files in app/routers/ must never import or use repositories directly.
+    Routers strictly orchestrate domain services.
     """
     import ast
     import pathlib
 
-    admin_router_path = pathlib.Path(__file__).parent.parent.parent / "app" / "routers" / "admin.py"
-    source = admin_router_path.read_text()
-    tree = ast.parse(source)
+    routers_dir = pathlib.Path(__file__).parent.parent.parent / "app" / "routers"
+    forbidden_patterns = [
+        "AccountRepository", "DeviceRepository", "RefreshTokenRepository",
+        "ConnectionSignalRepository", "AdminUserRepository", "BaseRepository"
+    ]
 
-    forbidden_patterns = ["AccountRepository", "DeviceRepository", "RefreshTokenRepository",
-                          "ConnectionSignalRepository", "AdminUserRepository"]
+    for router_file in routers_dir.glob("*.py"):
+        if router_file.name.startswith("__"):
+            continue
+        source = router_file.read_text(encoding="utf-8")
+        tree = ast.parse(source)
 
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.Import, ast.ImportFrom)):
-            src = ast.unparse(node)
-            for pattern in forbidden_patterns:
-                assert pattern not in src, (
-                    f"Router imports repository directly: '{pattern}' found in admin.py"
-                )
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                src = ast.unparse(node)
+                for pattern in forbidden_patterns:
+                    assert pattern not in src, (
+                        f"Router {router_file.name} imports repository directly: '{pattern}' found"
+                    )
 
-        if isinstance(node, ast.Name):
-            for pattern in forbidden_patterns:
-                assert node.id != pattern, (
-                    f"Router references repository class '{pattern}' in admin.py"
-                )
+            if isinstance(node, ast.Name):
+                for pattern in forbidden_patterns:
+                    assert node.id != pattern, (
+                        f"Router {router_file.name} references repository class '{pattern}'"
+                    )

@@ -164,3 +164,32 @@ async def test_downgrade_behavior_retains_existing_devices(
 
     assert exc_info.value.current_device_count == 4
     assert exc_info.value.max_devices == 2
+
+
+@pytest.mark.asyncio
+async def test_reactivate_device_enforces_subscription_limit(
+    db_session: AsyncSession, account_factory, device_service: DeviceService
+):
+    """
+    Audit Regression Test (Part 2 / Part 9):
+    Verify that reactivating a deactivated device checks the active device count against the plan limit.
+    If at capacity, reactivate_device must raise DeviceLimitExceededError and prevent limit bypass.
+    """
+    acc = await account_factory("REACT-LIMIT-1")  # FREE plan: max 2 devices
+    await device_service.register_device(acc.id, "guid-react-limit-1", "Device 1")
+    await device_service.register_device(acc.id, "guid-react-limit-2", "Device 2")
+
+    # Deactivate Device 1 (active count is now 1)
+    await device_service.deactivate_device(acc.id, "guid-react-limit-1")
+
+    # Register Device 3 (active count is now 2, filling capacity)
+    await device_service.register_device(acc.id, "guid-react-limit-3", "Device 3")
+
+    # Attempt to reactivate Device 1 -> must fail with DeviceLimitExceededError
+    with pytest.raises(DeviceLimitExceededError) as exc_info:
+        await device_service.reactivate_device(acc.id, "guid-react-limit-1")
+
+    err = exc_info.value
+    assert err.current_device_count == 2
+    assert err.max_devices == 2
+    assert err.plan_id == "free"
