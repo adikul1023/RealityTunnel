@@ -47,7 +47,7 @@ _URL_PASSWORD_REGEX = re.compile(r"(://[^:@/\s]+:)([^@/\s]+)(@)")
 _BEARER_REGEX = re.compile(r"(bearer\s+)([a-zA-Z0-9_\-\.]+)", re.IGNORECASE)
 _JWT_REGEX = re.compile(r"(ey[a-zA-Z0-9_-]{10,}\.ey[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]+)")
 _KEY_VAL_REGEX = re.compile(
-    r"([a-zA-Z0-9_-]*(?:" + "|".join(re.escape(k) for k in SENSITIVE_KEYWORDS) + r")[a-zA-Z0-9_-]*\s*[=:]\s*)(['\"]?[^'\",\s\]\}]+['\"]?)",
+    r"([a-zA-Z0-9_-]*(?:" + "|".join(re.escape(k) for k in SENSITIVE_KEYWORDS) + r")[a-zA-Z0-9_-]*\s*[=:]\s*)(?:[\"'][^\"']+[\"']|[^'\",\s\]\}]+)",
     re.IGNORECASE,
 )
 
@@ -95,6 +95,9 @@ def redact_string(text: str) -> str:
     text = _KEY_VAL_REGEX.sub(rf"\1{REDACTED_STR}", text)
     
     return text
+
+
+redact_secrets = redact_string
 
 
 class RedactingFormatter(logging.Formatter):

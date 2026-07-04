@@ -92,6 +92,12 @@ class Settings(BaseSettings):
     razorpay_payments_path: str = "/payments/{payment_id}"   # [Internal Config]
     razorpay_refunds_path: str = "/payments/{payment_id}/refund"  # [Internal Config]
 
+    # ── Observability & Monitoring [Operational Parameter / Config] ──────────
+    log_format: str = "json"                  # [Operational Parameter]: json | console
+    log_sampling_rate: float = 1.0            # [Operational Parameter]: 1.0 = 100%, 0.1 = 10%
+    slow_request_threshold_ms: float = 500.0  # [Operational Parameter]: threshold in milliseconds
+    metrics_auth_required: bool = False       # [Security Config]: whether /metrics requires Admin JWT
+
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":
         if self.environment.lower() == "production":

@@ -4,7 +4,7 @@ Async SQLAlchemy 2.x database engine and session factory.
 import logging
 from typing import AsyncGenerator
 
-from sqlalchemy import text
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import DeclarativeBase
 
 from app.config import settings
+from app.observability.metrics import metrics_registry
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,17 @@ engine = create_async_engine(
     pool_size=5,
     max_overflow=10,
 )
+
+
+@event.listens_for(engine.sync_engine, "after_cursor_execute")
+def receive_after_cursor_execute(conn, cursor, statement, parameters, context, execmany):
+    metrics_registry.inc_counter("db_queries_total")
+
+
+@event.listens_for(engine.sync_engine, "rollback")
+def receive_rollback(conn):
+    metrics_registry.inc_counter("db_transaction_failures_total")
+
 
 # ── Session factory ─────────────────────────────────────────────────────────
 
