@@ -25,6 +25,7 @@ from fastapi import APIRouter, Depends, Request, status
 from app.dependencies import get_current_account, get_device_service, get_signal_service
 from app.models.account import Account
 from app.models.connection_signal import ConnectionEventType
+from app.rate_limit import require_rate_limit
 from app.services import DeviceService, ConnectionSignalService
 from app.services.exceptions import InactiveDeviceError
 from app.routers.device_models import (
@@ -68,10 +69,12 @@ async def safe_record_signal(
     summary="Register a client device under the authenticated account",
     response_model=DeviceResponse,
     status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_rate_limit("device_register"))],
     responses={
         400: {"description": "Validation error"},
         401: {"description": "Authentication failed or token invalid"},
         403: {"description": "Device limit reached for subscription plan"},
+        429: {"description": "Rate limit exceeded"},
         500: {"description": "Unexpected service or database error"},
     },
 )

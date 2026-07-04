@@ -26,6 +26,7 @@ from app.dependencies import (
 )
 from app.models.admin_user import AdminUser
 from app.models.account import Account
+from app.rate_limit import require_rate_limit
 from app.routers.admin_dtos import (
     AdminAccountListResponse,
     AdminAccountResponse,
@@ -46,6 +47,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/api/admin",
     tags=["Admin Accounts"],
+    dependencies=[Depends(require_rate_limit("admin_endpoints"))],
 )
 
 # ── DTO builders ─────────────────────────────────────────────────────────────

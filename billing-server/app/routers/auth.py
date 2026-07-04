@@ -29,6 +29,7 @@ from app.dependencies import (
 )
 from app.models.account import Account
 from app.models.connection_signal import ConnectionEventType
+from app.rate_limit import require_rate_limit
 from app.security import JWTService
 from app.services import AuthenticationService, RefreshTokenService, ConnectionSignalService
 from app.services.exceptions import (
@@ -80,9 +81,11 @@ async def safe_record_signal(
     summary="Authenticate credentials and issue session tokens",
     response_model=LoginResponse,
     status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_rate_limit("login"))],
     responses={
         400: {"description": "Validation error"},
         401: {"description": "Authentication failed or account inactive"},
+        429: {"description": "Rate limit exceeded"},
         500: {"description": "Unexpected service or database error"},
     },
 )
@@ -144,9 +147,11 @@ async def login(
     summary="Rotate refresh token and issue new access token",
     response_model=RefreshResponse,
     status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_rate_limit("refresh"))],
     responses={
         400: {"description": "Validation error"},
         401: {"description": "Invalid, expired, or replayed refresh token"},
+        429: {"description": "Rate limit exceeded"},
         500: {"description": "Unexpected service or database error"},
     },
 )
@@ -204,6 +209,7 @@ async def refresh(
     summary="Revoke a single refresh token session",
     response_model=SuccessResponse,
     status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_rate_limit("refresh"))],
 )
 async def logout(
     request: LogoutRequest,
@@ -242,6 +248,7 @@ async def logout(
     summary="Revoke all refresh token sessions for an account",
     response_model=SuccessResponse,
     status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_rate_limit("refresh"))],
 )
 async def logout_all(
     request: LogoutRequest,

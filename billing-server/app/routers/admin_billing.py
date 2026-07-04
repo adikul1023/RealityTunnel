@@ -16,6 +16,7 @@ from app.dependencies import (
     require_super_admin,
 )
 from app.models.admin_user import AdminUser
+from app.rate_limit import require_rate_limit
 from app.services.admin_billing_service import AdminBillingService
 from app.services.admin_billing_dtos import (
     AdminDashboardDTO,
@@ -45,6 +46,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/api/admin",
     tags=["Admin Billing & Operations"],
+    dependencies=[Depends(require_rate_limit("admin_endpoints"))],
 )
 
 

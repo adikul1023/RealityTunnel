@@ -15,6 +15,7 @@ from app.database import engine, verify_db, AsyncSessionLocal
 from app.exceptions import DuplicateEntityError, EntityNotFoundError, RepositoryError
 from app.routers import auth, devices, health, admin_auth, admin, credentials, webhooks, billing, admin_billing, metrics
 from app.observability.middleware import RequestObservabilityMiddleware, record_exception_metric
+from app.rate_limit import RateLimitMiddleware, RateLimitExceeded
 
 from app.scheduler import JobScheduler
 
@@ -94,6 +95,7 @@ app.include_router(billing.router)
 app.include_router(admin_billing.router)
 app.include_router(metrics.router)
 
+app.add_middleware(RateLimitMiddleware)
 app.add_middleware(RequestObservabilityMiddleware)
 
 
@@ -205,6 +207,17 @@ async def mfa_not_implemented_exception_handler(request: Request, exc: MFANotImp
 
 
 
+async def rate_limit_exception_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    _record_exc(request, exc, status.HTTP_429_TOO_MANY_REQUESTS)
+    return JSONResponse(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        content={"detail": "Rate limit exceeded", "retry_after": exc.retry_after},
+        headers=getattr(exc, "headers", None),
+    )
+
+
+
+app.add_exception_handler(RateLimitExceeded, rate_limit_exception_handler)
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 

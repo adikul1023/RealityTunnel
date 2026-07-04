@@ -53,6 +53,11 @@ class MetricsRegistry:
         self.register_metric("db_transaction_failures_total", "counter", "Total database transaction rollback failures.")
         self.register_metric("exceptions_total", "counter", "Total unhandled or mapped exceptions by type.")
 
+        self.register_metric("rate_limit_hits_total", "counter", "Total rate limit checks performed.")
+        self.register_metric("rate_limit_denied_total", "counter", "Total rate limit checks denied (HTTP 429).")
+        self.register_metric("rate_limit_active_keys", "gauge", "Number of currently active rate limit tracking keys.")
+        self.register_metric("rate_limit_backend_errors", "counter", "Total rate limit storage backend errors.")
+
     def register_metric(self, name: str, metric_type: str, help_text: str) -> None:
         with self._lock:
             self._descriptions[name] = (metric_type, help_text)

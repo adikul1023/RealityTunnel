@@ -98,6 +98,22 @@ class Settings(BaseSettings):
     slow_request_threshold_ms: float = 500.0  # [Operational Parameter]: threshold in milliseconds
     metrics_auth_required: bool = False       # [Security Config]: whether /metrics requires Admin JWT
 
+    # ── Rate Limiting & Abuse Protection [Operational Parameter / Security] ──
+    rate_limit_enabled: bool = True           # [Operational Parameter]
+    trust_proxy: bool = False                 # [Security Config]: Trust X-Forwarded-For / X-Real-IP
+    rate_limit_allow_localhost: bool = False  # [Operational Parameter]: Configurable exemption
+    rate_limit_allow_internal_ips: bool = False # [Operational Parameter]: Configurable exemption
+    rate_limit_allow_healthchecks: bool = True # [Operational Parameter]: Configurable exemption
+    rate_limit_anonymous: str = "100/minute"  # [Operational Parameter]
+    rate_limit_login: str = "10/minute"       # [Operational Parameter]
+    rate_limit_register: str = "5/minute"     # [Operational Parameter]
+    rate_limit_refresh: str = "30/minute"     # [Operational Parameter]
+    rate_limit_device_register: str = "20/hour" # [Operational Parameter]
+    rate_limit_admin_login: str = "5/minute"  # [Operational Parameter]
+    rate_limit_admin_endpoints: str = "100/minute" # [Operational Parameter]
+    rate_limit_webhook: str = "unlimited"     # [Operational Parameter]
+    rate_limit_health: str = "unlimited"      # [Operational Parameter]
+
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":
         if self.environment.lower() == "production":

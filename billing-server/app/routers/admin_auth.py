@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.dependencies import get_admin_auth_service, get_current_admin
 from app.models.admin_user import AdminUser
+from app.rate_limit import require_rate_limit
 from app.routers.admin_models import (
     AdminLoginRequest,
     AdminLoginResponse,
@@ -27,9 +28,11 @@ router = APIRouter(prefix="/api/admin", tags=["Admin Authentication"])
     summary="Authenticate administrative user and issue Admin JWT",
     response_model=AdminLoginResponse,
     status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_rate_limit("admin_login"))],
     responses={
         400: {"description": "Validation error"},
         401: {"description": "Authentication failed or account inactive"},
+        429: {"description": "Rate limit exceeded"},
         501: {"description": "MFA required but not implemented"},
         500: {"description": "Unexpected service or database error"},
     },

@@ -19,6 +19,10 @@ from app.repositories import AccountRepository
 @pytest_asyncio.fixture(scope="function", autouse=True)
 async def dispose_engine() -> AsyncGenerator[None, None]:
     """Ensure async database engine is cleanly disposed after each test to avoid event loop reuse errors."""
+    from app.observability.metrics import metrics_registry
+    from app.rate_limit.storage import get_rate_limit_backend
+    metrics_registry.reset()
+    await get_rate_limit_backend().clear()
     yield
     from app.database import engine
     await engine.dispose()
