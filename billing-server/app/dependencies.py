@@ -275,6 +275,26 @@ async def get_current_admin(
     return admin
 
 
+async def get_current_admin_optional(
+    request: Request,
+    admin_auth_service: AdminAuthenticationService = Depends(get_admin_auth_service),
+    admin_jwt_service: AdminJWTService = Depends(get_admin_jwt_service),
+) -> AdminUser | None:
+    """Optionally returns AdminUser if a valid Admin Bearer token is provided, otherwise None."""
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
+        return None
+    parts = auth_header.split()
+    if len(parts) != 2 or parts[0] != "Bearer":
+        return None
+    try:
+        token = parts[1]
+        claims = admin_jwt_service.verify_admin_token(token)
+        return await admin_auth_service.get_active_admin_by_id(uuid.UUID(claims.sub))
+    except Exception:
+        return None
+
+
 async def get_admin_account_service(
     account_repo: AccountRepository = Depends(get_account_repo),
     refresh_repo: RefreshTokenRepository = Depends(get_refresh_repo),

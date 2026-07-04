@@ -534,4 +534,9 @@ class AdminBillingService:
             )
 
         status_str = "ok" if overall_ok else "degraded"
-        return AdminSystemHealthDTO(status=status_str, components=components)
+        from app.core.fingerprint import compute_configuration_fingerprint
+        return AdminSystemHealthDTO(
+            status=status_str,
+            components=components,
+            fingerprint=compute_configuration_fingerprint(),
+        )

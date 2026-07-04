@@ -50,6 +50,9 @@ from app.services.exceptions import (
     MFANotImplementedYet,
 )
 
+from app.logging_config import configure_logging
+configure_logging()
+
 logger = logging.getLogger(__name__)
 
 
@@ -57,6 +60,8 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Manage startup / shutdown lifecycle."""
     logger.info("Billing server starting up…")
+    from app.core.startup_validator import validate_startup_configuration
+    validate_startup_configuration(settings)
     logger.info("Database URL: %s", settings.database_url_safe)
     scheduler = JobScheduler(AsyncSessionLocal)
     scheduler.start()
@@ -231,7 +236,7 @@ async def root():
     return {
         "service": "RealityTunnel Billing/Auth API",
         "version": settings.app_version,
-        "phase": "2.8 — Administrative Billing & Operations API",
+        "phase": "3.1 — Configuration Hardening & Secret Management",
         "docs": "/docs",
     }
 

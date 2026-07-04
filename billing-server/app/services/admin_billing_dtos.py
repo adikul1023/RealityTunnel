@@ -150,3 +150,4 @@ class AdminSystemHealthDTO(BaseModel):
     """Aggregated health status across all billing and provisioning dependencies."""
     status: str  # "ok", "degraded", or "down"
     components: list[AdminComponentHealthDTO]
+    fingerprint: dict[str, Any] | None = None

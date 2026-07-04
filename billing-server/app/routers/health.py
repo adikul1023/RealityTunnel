@@ -8,13 +8,16 @@ Verifies:
 """
 import logging
 import time
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db, verify_db
+from app.dependencies import get_current_admin_optional
 from app.repositories import SystemHealthRepository
+from app.core.fingerprint import compute_configuration_fingerprint
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Health"])
@@ -29,6 +32,7 @@ class ComponentStatus(BaseModel):
 class HealthResponse(BaseModel):
     status: str           # "ok" | "degraded"
     components: dict[str, ComponentStatus]
+    fingerprint: dict[str, Any] | None = None
 
 
 @router.get(
@@ -40,7 +44,10 @@ class HealthResponse(BaseModel):
         503: {"description": "One or more components degraded"},
     },
 )
-async def health_check(session: AsyncSession = Depends(get_db)) -> HealthResponse:
+async def health_check(
+    session: AsyncSession = Depends(get_db),
+    admin: Any = Depends(get_current_admin_optional),
+) -> HealthResponse:
     """
     Returns 200 when all components are healthy.
     Returns 503 when any component is degraded.
@@ -104,6 +111,7 @@ async def health_check(session: AsyncSession = Depends(get_db)) -> HealthRespons
     response = HealthResponse(
         status=status_str,
         components=components,
+        fingerprint=compute_configuration_fingerprint() if admin else None,
     )
 
     if not overall_ok:
