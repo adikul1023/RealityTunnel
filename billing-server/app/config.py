@@ -71,6 +71,17 @@ class Settings(BaseSettings):
     marzban_delete_user_path: str = "/api/user/{username}"
     marzban_system_stats_path: str = "/api/system"
 
+    # ── Payment Gateway (Razorpay Integration) ─────────────────────────────
+    razorpay_key_id: str = ""
+    razorpay_key_secret: str = ""
+    razorpay_webhook_secret: str = ""
+    razorpay_base_url: str = "https://api.razorpay.com/v1"
+    razorpay_timeout_seconds: float = 10.0
+    razorpay_max_retries: int = 3
+    razorpay_orders_path: str = "/orders"
+    razorpay_payments_path: str = "/payments/{payment_id}"
+    razorpay_refunds_path: str = "/payments/{payment_id}/refund"
+
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":
         if self.environment.lower() == "production":

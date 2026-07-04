@@ -10,6 +10,7 @@ from app.repositories.connection_signal_repository import ConnectionSignalReposi
 from app.repositories.admin_user_repository import AdminUserRepository
 from app.repositories.subscription_repository import SubscriptionRepository
 from app.repositories.provisioning_repository import ProvisioningRepository
+from app.repositories.payment_repository import PaymentRepository
 
 __all__ = [
     "BaseRepository",
@@ -20,5 +21,7 @@ __all__ = [
     "AdminUserRepository",
     "SubscriptionRepository",
     "ProvisioningRepository",
+    "PaymentRepository",
 ]
+
 

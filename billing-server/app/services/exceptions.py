@@ -245,3 +245,42 @@ class ProvisioningSynchronizationError(ProvisioningServiceError):
 class ProvisioningTimeoutError(ProvisioningServiceError):
     """Raised when an HTTP or network request to the remote provisioning provider times out."""
     pass
+
+
+# ── Payment Domain & Gateway Integration Exceptions (Phase 2.3) ────────────
+
+
+class PaymentServiceError(ServiceError):
+    """Base exception for payment domain orchestration and gateway integration."""
+    pass
+
+
+class PaymentProviderError(PaymentServiceError):
+    """Raised when the payment gateway provider returns an API or business error."""
+    pass
+
+
+class PaymentVerificationError(PaymentServiceError):
+    """Raised when payment signature verification or provider status verification fails."""
+    pass
+
+
+class PaymentWebhookError(PaymentServiceError):
+    """Raised when processing a payment webhook fails."""
+    pass
+
+
+class DuplicateWebhookError(PaymentWebhookError):
+    """Raised when an already processed webhook is received (handled idempotently)."""
+    pass
+
+
+class PaymentTimeoutError(PaymentServiceError):
+    """Raised when an HTTP request to the payment gateway provider times out."""
+    pass
+
+
+class PaymentRefundError(PaymentServiceError):
+    """Raised when attempting to refund a payment fails or is rejected by the provider."""
+    pass
+

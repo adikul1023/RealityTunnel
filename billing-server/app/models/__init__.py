@@ -10,6 +10,7 @@ from app.models.connection_signal import ConnectionSignal, ConnectionEventType
 from app.models.admin_user import AdminUser
 from app.models.subscription import Subscription
 from app.models.provisioning import ProvisioningState, ProvisioningProfile
+from app.models.payment import PaymentStatus, PaymentProviderType, Payment
 
 __all__ = [
     "SubscriptionStatus",
@@ -29,5 +30,9 @@ __all__ = [
     "Subscription",
     "ProvisioningState",
     "ProvisioningProfile",
+    "PaymentStatus",
+    "PaymentProviderType",
+    "Payment",
 ]
+
 
