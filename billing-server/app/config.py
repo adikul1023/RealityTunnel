@@ -114,6 +114,13 @@ class Settings(BaseSettings):
     rate_limit_webhook: str = "unlimited"     # [Operational Parameter]
     rate_limit_health: str = "unlimited"      # [Operational Parameter]
 
+    # ── Phase 3.4 — Disaster Recovery & Backup Settings ───────────────────
+    backup_directory: str = "./backups"       # [Operational Parameter]
+    backup_retention_days: int = 30           # [Operational Parameter]
+    backup_max_count: int = 50                # [Operational Parameter]
+    backup_max_storage_mb: int = 1024         # [Operational Parameter]
+    backup_compression_algorithm: str = "gzip" # [Operational Parameter]
+
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":
         if self.environment.lower() == "production":

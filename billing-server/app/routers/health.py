@@ -44,6 +44,7 @@ class HealthResponse(BaseModel):
     retry_queue: dict[str, Any] | None = None
     provider_health: dict[str, Any] | None = None
     metrics_summary: dict[str, Any] | None = None
+    backups: dict[str, Any] | None = None
 
 
 @router.get(
@@ -150,6 +151,40 @@ async def health_check(
             "payment_gateway": components.get("payment_gateway", ComponentStatus(status="ok")).status,
         }
         response_kwargs["metrics_summary"] = metrics_registry.get_summary()
+
+        try:
+            from app.recovery.backup import BackupService
+            from app.recovery.integrity import get_verification_state
+            from datetime import datetime, timezone
+            backup_srv = BackupService()
+            stored = backup_srv.list_backups()
+            backup_count = len(stored)
+            latest_age = None
+            if stored and "created_at" in stored[0]:
+                try:
+                    ts_str = str(stored[0]["created_at"])
+                    if ts_str.endswith("Z"):
+                        ts_str = ts_str[:-1] + "+00:00"
+                    created_dt = datetime.fromisoformat(ts_str)
+                    latest_age = round((datetime.now(timezone.utc) - created_dt).total_seconds(), 1)
+                except Exception:
+                    pass
+            ver_state = get_verification_state(backup_srv.backup_dir)
+            response_kwargs["backups"] = {
+                "count": backup_count,
+                "latest_backup_age": latest_age,
+                "last_successful_verification": ver_state.get("last_successful_verification"),
+                "last_failed_verification": ver_state.get("last_failed_verification"),
+            }
+        except Exception as exc:
+            logger.warning("Failed to retrieve backup recovery health: %s", exc)
+            response_kwargs["backups"] = {
+                "count": 0,
+                "latest_backup_age": None,
+                "last_successful_verification": None,
+                "last_failed_verification": None,
+                "error": str(exc),
+            }
 
     response = HealthResponse(**response_kwargs)
 

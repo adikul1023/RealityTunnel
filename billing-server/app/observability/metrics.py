@@ -58,6 +58,12 @@ class MetricsRegistry:
         self.register_metric("rate_limit_active_keys", "gauge", "Number of currently active rate limit tracking keys.")
         self.register_metric("rate_limit_backend_errors", "counter", "Total rate limit storage backend errors.")
 
+        self.register_metric("backup_success_total", "counter", "Total successful data backup operations.")
+        self.register_metric("backup_failure_total", "counter", "Total failed data backup operations.")
+        self.register_metric("backup_duration_seconds", "summary", "Duration of backup snapshot creation in seconds.")
+        self.register_metric("backup_size_bytes", "gauge", "Total storage size of latest backup archive in bytes.")
+        self.register_metric("backup_verification_failures", "counter", "Total backup archive integrity verification failures.")
+
     def register_metric(self, name: str, metric_type: str, help_text: str) -> None:
         with self._lock:
             self._descriptions[name] = (metric_type, help_text)
