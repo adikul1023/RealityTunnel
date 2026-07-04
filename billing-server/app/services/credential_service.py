@@ -239,3 +239,11 @@ class CredentialService:
             logger.info("Successfully restored credentials for account_id=%s", account_id)
         except Exception as exc:
             raise CredentialServiceError(f"Failed to restore credentials: {str(exc)}") from exc
+
+    async def generate(self, account_id: uuid.UUID) -> dict[str, Any]:
+        """
+        Verify active provisioning profile and generate client configuration payload on demand.
+        Alias for get_credentials in event-driven provisioning workflows (Phase 2.5).
+        """
+        return await self.get_credentials(account_id)
+

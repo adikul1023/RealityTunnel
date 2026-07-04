@@ -33,9 +33,10 @@ class ProvisioningService:
     Decouples all HTTP routers and billing domain rules from Marzban or other VPN gateways.
     """
 
-    def __init__(self, session: AsyncSession, provider: ProvisioningProvider) -> None:
+    def __init__(self, session: AsyncSession, provider: ProvisioningProvider, credential_service: Any | None = None) -> None:
         self.session = session
         self.provider = provider
+        self.credential_service = credential_service
         self.account_repo = AccountRepository(session)
         self.provisioning_repo = ProvisioningRepository(session)
 
@@ -62,6 +63,8 @@ class ProvisioningService:
         plan_id: str,
         expire_at: datetime | None = None,
         data_limit: int | None = None,
+        *,
+        commit: bool = True,
     ) -> ProvisioningProfile:
         """
         Provision or re-verify a VPN user profile for an account.
@@ -86,8 +89,13 @@ class ProvisioningService:
                     logger.warning("Remote user check failed during idempotent provision: %s", str(exc))
                 profile.last_sync_at = datetime.now(timezone.utc)
                 profile.last_error = None
-                await self.session.commit()
-                await self.session.refresh(profile)
+                if commit:
+                    await self.session.commit()
+                    await self.session.refresh(profile)
+                else:
+                    await self.session.flush()
+                if self.credential_service:
+                    await self.credential_service.generate(account_id)
                 return profile
 
             remote_username = account.marzban_username or f"user_{account.account_id.lower()}"
@@ -124,20 +132,28 @@ class ProvisioningService:
                 profile.last_error = None
 
             account.marzban_username = user_dto.remote_user_id
-            await self.session.commit()
-            await self.session.refresh(profile)
+            if commit:
+                await self.session.commit()
+                await self.session.refresh(profile)
+            else:
+                await self.session.flush()
+            if self.credential_service:
+                await self.credential_service.generate(account_id)
             return profile
 
         except (EntityNotFoundError, DatabaseOperationError):
             raise
         except Exception as exc:
-            await self.session.rollback()
+            if commit:
+                await self.session.rollback()
             raise self._translate_exception(exc, "provision_subscription") from exc
 
     async def extend_subscription(
         self,
         account_id: uuid.UUID,
         new_expires_at: datetime,
+        *,
+        commit: bool = True,
     ) -> ProvisioningProfile:
         """Extend expiration timestamp for an existing provisioned user."""
         try:
@@ -156,17 +172,23 @@ class ProvisioningService:
             profile.provisioning_state = ProvisioningState.ACTIVE
             profile.last_sync_at = datetime.now(timezone.utc)
             profile.last_error = None
-            await self.session.commit()
-            await self.session.refresh(profile)
+            if commit:
+                await self.session.commit()
+                await self.session.refresh(profile)
+            else:
+                await self.session.flush()
+            if self.credential_service:
+                await self.credential_service.generate(account_id)
             return profile
 
         except (EntityNotFoundError, DatabaseOperationError, ProvisioningServiceError):
             raise
         except Exception as exc:
-            await self.session.rollback()
+            if commit:
+                await self.session.rollback()
             raise self._translate_exception(exc, "extend_subscription") from exc
 
-    async def suspend_subscription(self, account_id: uuid.UUID) -> ProvisioningProfile:
+    async def suspend_subscription(self, account_id: uuid.UUID, *, commit: bool = True) -> ProvisioningProfile:
         """
         Suspend VPN access for an account.
         Idempotent: calling twice on an already suspended profile succeeds without error.
@@ -190,17 +212,21 @@ class ProvisioningService:
             profile.provisioning_state = ProvisioningState.SUSPENDED
             profile.last_sync_at = datetime.now(timezone.utc)
             profile.last_error = None
-            await self.session.commit()
-            await self.session.refresh(profile)
+            if commit:
+                await self.session.commit()
+                await self.session.refresh(profile)
+            else:
+                await self.session.flush()
             return profile
 
         except (EntityNotFoundError, DatabaseOperationError, ProvisioningServiceError):
             raise
         except Exception as exc:
-            await self.session.rollback()
+            if commit:
+                await self.session.rollback()
             raise self._translate_exception(exc, "suspend_subscription") from exc
 
-    async def reactivate_subscription(self, account_id: uuid.UUID) -> ProvisioningProfile:
+    async def reactivate_subscription(self, account_id: uuid.UUID, *, commit: bool = True) -> ProvisioningProfile:
         """Reactivate VPN access for a suspended account."""
         try:
             profile = await self.provisioning_repo.get_by_account_id(account_id, for_update=True)
@@ -217,17 +243,23 @@ class ProvisioningService:
             profile.provisioning_state = ProvisioningState.ACTIVE
             profile.last_sync_at = datetime.now(timezone.utc)
             profile.last_error = None
-            await self.session.commit()
-            await self.session.refresh(profile)
+            if commit:
+                await self.session.commit()
+                await self.session.refresh(profile)
+            else:
+                await self.session.flush()
+            if self.credential_service:
+                await self.credential_service.generate(account_id)
             return profile
 
         except (EntityNotFoundError, DatabaseOperationError, ProvisioningServiceError):
             raise
         except Exception as exc:
-            await self.session.rollback()
+            if commit:
+                await self.session.rollback()
             raise self._translate_exception(exc, "reactivate_subscription") from exc
 
-    async def terminate_subscription(self, account_id: uuid.UUID) -> ProvisioningProfile | None:
+    async def terminate_subscription(self, account_id: uuid.UUID, *, commit: bool = True) -> ProvisioningProfile | None:
         """
         Permanently delete the remote VPN user for an account.
         Idempotent: calling twice succeeds without error.
@@ -252,14 +284,18 @@ class ProvisioningService:
             profile.provisioning_state = ProvisioningState.TERMINATED
             profile.last_sync_at = datetime.now(timezone.utc)
             profile.last_error = None
-            await self.session.commit()
-            await self.session.refresh(profile)
+            if commit:
+                await self.session.commit()
+                await self.session.refresh(profile)
+            else:
+                await self.session.flush()
             return profile
 
         except (EntityNotFoundError, DatabaseOperationError, ProvisioningServiceError):
             raise
         except Exception as exc:
-            await self.session.rollback()
+            if commit:
+                await self.session.rollback()
             raise self._translate_exception(exc, "terminate_subscription") from exc
 
     async def synchronize(self, account_id: uuid.UUID) -> ProvisioningProfile:

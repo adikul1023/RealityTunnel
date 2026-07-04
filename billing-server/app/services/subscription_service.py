@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from typing import Any
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,8 +29,9 @@ class SubscriptionService:
     and lifecycle transitions. Independent of HTTP and framework layers.
     """
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, provisioning_service: Any | None = None) -> None:
         self.session = session
+        self.provisioning_service = provisioning_service
         self.repository = SubscriptionRepository(session)
         self.account_repo = AccountRepository(session)
 
@@ -42,6 +44,7 @@ class SubscriptionService:
         *,
         auto_renew: bool = True,
         status: SubscriptionLifecycleStatus = SubscriptionLifecycleStatus.ACTIVE,
+        commit: bool = True,
     ) -> Subscription:
         """
         Create a new subscription contract for an account.
@@ -69,11 +72,14 @@ class SubscriptionService:
             starts_at=starts_at,
             expires_at=expires_at,
             auto_renew=auto_renew,
+            commit=commit,
         )
         logger.info("Created new subscription id=%s for plan=%s status=%s", subscription.id, clean_plan_id, status.value)
+        if self.provisioning_service and status == SubscriptionLifecycleStatus.ACTIVE:
+            await self.provisioning_service.provision_subscription(account_id, clean_plan_id, expires_at, commit=commit)
         return subscription
 
-    async def activate_subscription(self, subscription_id: uuid.UUID) -> Subscription:
+    async def activate_subscription(self, subscription_id: uuid.UUID, *, commit: bool = True) -> Subscription:
         """
         Activate a pending, trial, or grace subscription.
         Idempotent if already ACTIVE. Blocks activation of CANCELLED or EXPIRED subscriptions.
@@ -91,11 +97,13 @@ class SubscriptionService:
 
         sub.status = SubscriptionLifecycleStatus.ACTIVE
         sub.grace_expires_at = None
-        await self.repository.update(sub)
+        await self.repository.update(sub, commit=commit)
         logger.info("Activated subscription id=%s", sub.id)
+        if self.provisioning_service:
+            await self.provisioning_service.provision_subscription(sub.account_id, sub.plan_id, sub.expires_at, commit=commit)
         return sub
 
-    async def renew_subscription(self, subscription_id: uuid.UUID, new_expires_at: datetime) -> Subscription:
+    async def renew_subscription(self, subscription_id: uuid.UUID, new_expires_at: datetime, *, commit: bool = True) -> Subscription:
         """
         Renew an existing subscription by extending its expiration date and resetting status to ACTIVE.
         Blocks renewal of CANCELLED subscriptions.
@@ -110,11 +118,13 @@ class SubscriptionService:
         sub.expires_at = new_expires_at
         sub.status = SubscriptionLifecycleStatus.ACTIVE
         sub.grace_expires_at = None
-        await self.repository.update(sub)
+        await self.repository.update(sub, commit=commit)
         logger.info("Renewed subscription id=%s until %s", sub.id, new_expires_at.isoformat())
+        if self.provisioning_service:
+            await self.provisioning_service.extend_subscription(sub.account_id, new_expires_at, commit=commit)
         return sub
 
-    async def cancel_subscription(self, subscription_id: uuid.UUID) -> Subscription:
+    async def cancel_subscription(self, subscription_id: uuid.UUID, *, commit: bool = True) -> Subscription:
         """
         Cancel a subscription and disable auto-renewal.
         Idempotent if already CANCELLED.
@@ -128,11 +138,13 @@ class SubscriptionService:
 
         sub.status = SubscriptionLifecycleStatus.CANCELLED
         sub.auto_renew = False
-        await self.repository.update(sub)
+        await self.repository.update(sub, commit=commit)
         logger.info("Cancelled subscription id=%s", sub.id)
+        if self.provisioning_service:
+            await self.provisioning_service.suspend_subscription(sub.account_id, commit=commit)
         return sub
 
-    async def enter_grace_period(self, subscription_id: uuid.UUID, grace_duration_days: int = 7) -> Subscription:
+    async def enter_grace_period(self, subscription_id: uuid.UUID, grace_duration_days: int = 7, *, commit: bool = True) -> Subscription:
         """
         Transition an ACTIVE subscription into a GRACE period after payment failure or renewal warning.
         Requires the subscription to be currently ACTIVE with auto_renew enabled.
@@ -151,11 +163,11 @@ class SubscriptionService:
         now = datetime.now(timezone.utc)
         sub.status = SubscriptionLifecycleStatus.GRACE
         sub.grace_expires_at = now + timedelta(days=grace_duration_days)
-        await self.repository.update(sub)
+        await self.repository.update(sub, commit=commit)
         logger.info("Subscription id=%s entered grace period until %s", sub.id, sub.grace_expires_at.isoformat())
         return sub
 
-    async def expire_subscription(self, subscription_id: uuid.UUID) -> Subscription:
+    async def expire_subscription(self, subscription_id: uuid.UUID, *, commit: bool = True) -> Subscription:
         """
         Mark a subscription as EXPIRED when it reaches end of term or grace period without renewal.
         Cannot expire a CANCELLED subscription.
@@ -168,8 +180,10 @@ class SubscriptionService:
             raise InvalidSubscriptionStateError("Cannot expire an already cancelled subscription.")
 
         sub.status = SubscriptionLifecycleStatus.EXPIRED
-        await self.repository.update(sub)
+        await self.repository.update(sub, commit=commit)
         logger.info("Expired subscription id=%s", sub.id)
+        if self.provisioning_service:
+            await self.provisioning_service.suspend_subscription(sub.account_id, commit=commit)
         return sub
 
     async def get_active_subscription(self, account_id: uuid.UUID) -> Subscription | None:

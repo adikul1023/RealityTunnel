@@ -10,6 +10,7 @@ from app.services.payment.provider import (
 )
 from app.services.payment.razorpay import RazorpayProvider
 from app.services.payment.service import PaymentService
+from app.services.payment.webhook_service import WebhookService
 
 __all__ = [
     "PaymentProvider",
@@ -19,4 +20,6 @@ __all__ = [
     "PaymentRefundDTO",
     "RazorpayProvider",
     "PaymentService",
+    "WebhookService",
 ]
+

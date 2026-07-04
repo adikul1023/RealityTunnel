@@ -36,6 +36,10 @@ from app.services import (
     MarzbanProvisioningProvider,
     ProvisioningService,
     CredentialService,
+    SubscriptionService,
+    RazorpayProvider,
+    PaymentService,
+    WebhookService,
 )
 from app.models.admin_user import AdminUser
 
@@ -306,8 +310,11 @@ async def get_provisioning_service(
     session: AsyncSession = Depends(get_db),
     provider: MarzbanProvisioningProvider = Depends(get_marzban_provider),
 ) -> ProvisioningService:
-    """Yield ProvisioningService instance wired to current database session and Marzban provider."""
-    return ProvisioningService(session, provider)
+    """Yield ProvisioningService instance wired to current database session, Marzban provider, and CredentialService."""
+    prov_svc = ProvisioningService(session, provider)
+    cred_svc = CredentialService(session, prov_svc)
+    prov_svc.credential_service = cred_svc
+    return prov_svc
 
 
 async def get_credential_service(
@@ -315,5 +322,43 @@ async def get_credential_service(
     provisioning_service: ProvisioningService = Depends(get_provisioning_service),
 ) -> CredentialService:
     """Yield CredentialService instance for VPN credential lifecycle and config generation."""
+    if provisioning_service.credential_service:
+        return provisioning_service.credential_service
     return CredentialService(session, provisioning_service)
+
+
+async def get_subscription_service(
+    session: AsyncSession = Depends(get_db),
+    provisioning_service: ProvisioningService = Depends(get_provisioning_service),
+) -> SubscriptionService:
+    """Yield SubscriptionService wired to current database session and ProvisioningService."""
+    return SubscriptionService(session, provisioning_service=provisioning_service)
+
+
+_razorpay_provider: RazorpayProvider | None = None
+
+
+def get_razorpay_provider() -> RazorpayProvider:
+    """Yield singleton Razorpay payment provider."""
+    global _razorpay_provider
+    if _razorpay_provider is None:
+        _razorpay_provider = RazorpayProvider()
+    return _razorpay_provider
+
+
+async def get_payment_service(
+    session: AsyncSession = Depends(get_db),
+    provider: RazorpayProvider = Depends(get_razorpay_provider),
+    subscription_service: SubscriptionService = Depends(get_subscription_service),
+) -> PaymentService:
+    """Yield PaymentService wired to current session, gateway provider, and SubscriptionService."""
+    return PaymentService(session, provider, subscription_service=subscription_service)
+
+
+async def get_webhook_service(
+    payment_service: PaymentService = Depends(get_payment_service),
+) -> WebhookService:
+    """Yield WebhookService wired to PaymentService."""
+    return WebhookService(payment_service)
+
 
