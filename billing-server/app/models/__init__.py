@@ -9,6 +9,7 @@ from app.models.subscription_plan import SubscriptionPlan, FREE, PRO, FAMILY, PL
 from app.models.connection_signal import ConnectionSignal, ConnectionEventType
 from app.models.admin_user import AdminUser
 from app.models.subscription import Subscription
+from app.models.provisioning import ProvisioningState, ProvisioningProfile
 
 __all__ = [
     "SubscriptionStatus",
@@ -26,4 +27,7 @@ __all__ = [
     "ConnectionEventType",
     "AdminUser",
     "Subscription",
+    "ProvisioningState",
+    "ProvisioningProfile",
 ]
+

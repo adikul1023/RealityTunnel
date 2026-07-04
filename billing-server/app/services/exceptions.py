@@ -212,3 +212,36 @@ class AdminServiceError(ServiceError):
 class AdminAccountNotFoundError(AdminServiceError):
     """Raised when an account lookup by account_id finds no matching row."""
     pass
+
+
+# ── VPN Provisioning Domain (Phase 2.2) ─────────────────────────────────────
+
+
+class ProvisioningServiceError(ServiceError):
+    """Base exception for VPN provisioning orchestration and provider integration."""
+    pass
+
+
+class ProvisioningProviderError(ProvisioningServiceError):
+    """Raised when the remote provisioning provider returns an API or business error."""
+    pass
+
+
+class ProvisioningConflictError(ProvisioningServiceError):
+    """Raised when a provisioning operation conflicts with existing remote or local state."""
+    pass
+
+
+class ProvisioningUnavailableError(ProvisioningServiceError):
+    """Raised when the remote provisioning provider is unreachable or offline."""
+    pass
+
+
+class ProvisioningSynchronizationError(ProvisioningServiceError):
+    """Raised when state synchronization or reconciliation with the remote provider fails."""
+    pass
+
+
+class ProvisioningTimeoutError(ProvisioningServiceError):
+    """Raised when an HTTP or network request to the remote provisioning provider times out."""
+    pass

@@ -9,6 +9,7 @@ from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.connection_signal_repository import ConnectionSignalRepository
 from app.repositories.admin_user_repository import AdminUserRepository
 from app.repositories.subscription_repository import SubscriptionRepository
+from app.repositories.provisioning_repository import ProvisioningRepository
 
 __all__ = [
     "BaseRepository",
@@ -18,4 +19,6 @@ __all__ = [
     "ConnectionSignalRepository",
     "AdminUserRepository",
     "SubscriptionRepository",
+    "ProvisioningRepository",
 ]
+

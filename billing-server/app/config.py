@@ -60,6 +60,17 @@ class Settings(BaseSettings):
     admin_jwt_issuer: str = "RealityTunnel Admin"
     admin_jwt_audience: str = "RealityTunnel Admin Panel"
 
+    # ── VPN Provisioning (Marzban Integration) ─────────────────────────────
+    marzban_base_url: str = "http://localhost:8000"
+    marzban_api_token: str = ""
+    marzban_timeout_seconds: float = 10.0
+    marzban_max_retries: int = 3
+    marzban_create_user_path: str = "/api/user"
+    marzban_get_user_path: str = "/api/user/{username}"
+    marzban_update_user_path: str = "/api/user/{username}"
+    marzban_delete_user_path: str = "/api/user/{username}"
+    marzban_system_stats_path: str = "/api/system"
+
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":
         if self.environment.lower() == "production":
