@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -62,3 +62,32 @@ class ProvisioningRetryRepository(BaseRepository[ProvisioningRetryItem]):
             raise DatabaseOperationError(
                 "Database error querying provisioning retries by account ID"
             ) from exc
+
+    async def list_all(
+        self, limit: int = 50, offset: int = 0, status: RetryItemStatus | None = None
+    ) -> list[ProvisioningRetryItem]:
+        """Retrieve paginated list of retry items."""
+        try:
+            stmt = select(ProvisioningRetryItem).order_by(ProvisioningRetryItem.created_at.desc()).limit(limit).offset(offset)
+            if status is not None:
+                stmt = stmt.where(ProvisioningRetryItem.status == status)
+            result = await self.session.execute(stmt)
+            return list(result.scalars().all())
+        except SQLAlchemyError as exc:
+            raise DatabaseOperationError(
+                "Database error listing provisioning retries"
+            ) from exc
+
+    async def count_all(self, status: RetryItemStatus | None = None) -> int:
+        """Count total retry items, optionally filtered by status."""
+        try:
+            stmt = select(func.count()).select_from(ProvisioningRetryItem)
+            if status is not None:
+                stmt = stmt.where(ProvisioningRetryItem.status == status)
+            result = await self.session.execute(stmt)
+            return int(result.scalar_one() or 0)
+        except SQLAlchemyError as exc:
+            raise DatabaseOperationError(
+                "Database error counting provisioning retries"
+            ) from exc
+

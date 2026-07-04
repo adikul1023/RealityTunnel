@@ -105,6 +105,21 @@ from app.services.billing_dtos import (
     PurchaseResponseDTO,
 )
 
+from app.services.admin_billing_service import AdminBillingService
+from app.services.admin_billing_dtos import (
+    AdminDashboardDTO,
+    AdminSubscriptionDTO,
+    AdminSubscriptionListDTO,
+    AdminPaymentDTO,
+    AdminPaymentListDTO,
+    AdminProvisioningDTO,
+    AdminProvisioningListDTO,
+    AdminRetryItemDTO,
+    AdminRetryQueueDTO,
+    AdminComponentHealthDTO,
+    AdminSystemHealthDTO,
+)
+
 __all__ = [
     "ServiceError",
     "AuthenticationServiceError",
@@ -194,5 +209,18 @@ __all__ = [
     "PaymentListDTO",
     "PurchaseRequestDTO",
     "PurchaseResponseDTO",
+    "AdminBillingService",
+    "AdminDashboardDTO",
+    "AdminSubscriptionDTO",
+    "AdminSubscriptionListDTO",
+    "AdminPaymentDTO",
+    "AdminPaymentListDTO",
+    "AdminProvisioningDTO",
+    "AdminProvisioningListDTO",
+    "AdminRetryItemDTO",
+    "AdminRetryQueueDTO",
+    "AdminComponentHealthDTO",
+    "AdminSystemHealthDTO",
 ]
+
 

@@ -3,13 +3,14 @@ account_repository.py — Persistence layer for Account entities.
 """
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import DatabaseOperationError
 from app.models import Account
 from app.repositories.base import BaseRepository
+
 
 
 class AccountRepository(BaseRepository[Account]):
@@ -65,3 +66,15 @@ class AccountRepository(BaseRepository[Account]):
             raise DatabaseOperationError(
                 "Database error listing accounts"
             ) from exc
+
+    async def count_all(self) -> int:
+        """Return total number of accounts."""
+        try:
+            stmt = select(func.count()).select_from(Account)
+            result = await self.session.execute(stmt)
+            return int(result.scalar_one() or 0)
+        except SQLAlchemyError as exc:
+            raise DatabaseOperationError(
+                "Database error counting accounts"
+            ) from exc
+

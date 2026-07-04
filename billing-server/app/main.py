@@ -13,9 +13,10 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.config import settings
 from app.database import engine, verify_db, AsyncSessionLocal
 from app.exceptions import DuplicateEntityError, EntityNotFoundError, RepositoryError
-from app.routers import auth, devices, health, admin_auth, admin, credentials, webhooks, billing
+from app.routers import auth, devices, health, admin_auth, admin, credentials, webhooks, billing, admin_billing
 
 from app.scheduler import JobScheduler
+
 
 
 
@@ -84,6 +85,8 @@ app.include_router(admin.router)
 app.include_router(credentials.router)
 app.include_router(webhooks.router)
 app.include_router(billing.router)
+app.include_router(admin_billing.router)
+
 
 
 
@@ -228,9 +231,10 @@ async def root():
     return {
         "service": "RealityTunnel Billing/Auth API",
         "version": settings.app_version,
-        "phase": "1.3.5 — Authentication & Refresh API Endpoints",
+        "phase": "2.8 — Administrative Billing & Operations API",
         "docs": "/docs",
     }
+
 
 
 @app.get("/version", summary="Version info", tags=["Meta"])

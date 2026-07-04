@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from sqlalchemy import select, or_, and_
+from sqlalchemy import select, or_, and_, func
 from sqlalchemy.exc import SQLAlchemyError
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import DatabaseOperationError
@@ -123,4 +124,41 @@ class SubscriptionRepository(BaseRepository[Subscription]):
             raise DatabaseOperationError(
                 "Database error querying expired grace subscriptions"
             ) from exc
+
+    async def list_all_paginated(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        status: SubscriptionLifecycleStatus | None = None,
+    ) -> list[Subscription]:
+        """
+        Retrieve a paginated list of all subscriptions across all accounts.
+        Optionally filter by lifecycle status.
+        """
+        try:
+            stmt = select(Subscription).order_by(Subscription.created_at.desc()).limit(limit).offset(offset)
+            if status is not None:
+                stmt = stmt.where(Subscription.status == status)
+            result = await self.session.execute(stmt)
+            return list(result.scalars().all())
+        except SQLAlchemyError as exc:
+            raise DatabaseOperationError(
+                "Database error querying paginated subscriptions"
+            ) from exc
+
+    async def count_all(self, status: SubscriptionLifecycleStatus | None = None) -> int:
+        """
+        Count total subscriptions across all accounts, optionally filtered by lifecycle status.
+        """
+        try:
+            stmt = select(func.count()).select_from(Subscription)
+            if status is not None:
+                stmt = stmt.where(Subscription.status == status)
+            result = await self.session.execute(stmt)
+            return int(result.scalar_one() or 0)
+        except SQLAlchemyError as exc:
+            raise DatabaseOperationError(
+                "Database error counting subscriptions"
+            ) from exc
+
 

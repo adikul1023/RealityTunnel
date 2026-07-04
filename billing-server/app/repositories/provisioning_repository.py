@@ -4,13 +4,15 @@ provisioning_repository.py — Persistence layer for ProvisioningProfile entitie
 from __future__ import annotations
 
 import uuid
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import DatabaseOperationError
 from app.models import ProvisioningProfile
+from app.models.provisioning import ProvisioningState
 from app.repositories.base import BaseRepository
+
 
 
 class ProvisioningRepository(BaseRepository[ProvisioningProfile]):
@@ -99,4 +101,41 @@ class ProvisioningRepository(BaseRepository[ProvisioningProfile]):
             raise DatabaseOperationError(
                 "Database error querying active or suspended provisioning profiles"
             ) from exc
+
+    async def list_all_paginated(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        state: ProvisioningState | None = None,
+    ) -> list[ProvisioningProfile]:
+        """
+        Retrieve a paginated list of all provisioning profiles across all accounts.
+        Optionally filter by provisioning state.
+        """
+        try:
+            stmt = select(ProvisioningProfile).order_by(ProvisioningProfile.created_at.desc()).limit(limit).offset(offset)
+            if state is not None:
+                stmt = stmt.where(ProvisioningProfile.provisioning_state == state)
+            result = await self.session.execute(stmt)
+            return list(result.scalars().all())
+        except SQLAlchemyError as exc:
+            raise DatabaseOperationError(
+                "Database error querying paginated provisioning profiles"
+            ) from exc
+
+    async def count_all(self, state: ProvisioningState | None = None) -> int:
+        """
+        Count total provisioning profiles across all accounts, optionally filtered by state.
+        """
+        try:
+            stmt = select(func.count()).select_from(ProvisioningProfile)
+            if state is not None:
+                stmt = stmt.where(ProvisioningProfile.provisioning_state == state)
+            result = await self.session.execute(stmt)
+            return int(result.scalar_one() or 0)
+        except SQLAlchemyError as exc:
+            raise DatabaseOperationError(
+                "Database error counting provisioning profiles"
+            ) from exc
+
 

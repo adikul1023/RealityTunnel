@@ -3,7 +3,7 @@ admin_user_repository.py — Persistence layer for AdminUser entities.
 """
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,3 +31,15 @@ class AdminUserRepository(BaseRepository[AdminUser]):
             raise DatabaseOperationError(
                 "Database error querying AdminUser by username"
             ) from exc
+
+    async def count_active(self) -> int:
+        """Return total number of active admin users."""
+        try:
+            stmt = select(func.count()).select_from(AdminUser).where(AdminUser.is_active == True)
+            result = await self.session.execute(stmt)
+            return int(result.scalar_one() or 0)
+        except SQLAlchemyError as exc:
+            raise DatabaseOperationError(
+                "Database error counting active admin users"
+            ) from exc
+

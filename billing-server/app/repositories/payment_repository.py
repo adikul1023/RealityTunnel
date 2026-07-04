@@ -10,7 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import DatabaseOperationError
 from app.models import Payment
+from app.models.payment import PaymentStatus
 from app.repositories.base import BaseRepository
+
 
 
 class PaymentRepository(BaseRepository[Payment]):
@@ -150,4 +152,89 @@ class PaymentRepository(BaseRepository[Payment]):
             raise DatabaseOperationError(
                 "Database error querying stale pending payments"
             ) from exc
+
+    async def list_all_paginated(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        status: PaymentStatus | None = None,
+    ) -> list[Payment]:
+        """
+        Retrieve a paginated list of all payments across all accounts.
+        Optionally filter by payment status.
+        """
+        try:
+            stmt = select(Payment).order_by(Payment.created_at.desc()).limit(limit).offset(offset)
+            if status is not None:
+                stmt = stmt.where(Payment.status == status)
+            result = await self.session.execute(stmt)
+            return list(result.scalars().all())
+        except SQLAlchemyError as exc:
+            raise DatabaseOperationError(
+                "Database error querying paginated payments"
+            ) from exc
+
+    async def count_all(self, status: PaymentStatus | None = None) -> int:
+        """
+        Count total payments across all accounts, optionally filtered by status.
+        """
+        try:
+            stmt = select(func.count()).select_from(Payment)
+            if status is not None:
+                stmt = stmt.where(Payment.status == status)
+            result = await self.session.execute(stmt)
+            return int(result.scalar_one() or 0)
+        except SQLAlchemyError as exc:
+            raise DatabaseOperationError(
+                "Database error counting payments"
+            ) from exc
+
+    async def sum_amount_by_date_range(
+        self,
+        start_time: datetime,
+        end_time: datetime,
+        status: PaymentStatus = PaymentStatus.PAID,
+    ) -> int:
+        """
+        Sum total payment amount in minor units for payments created within a date range.
+        """
+        try:
+            stmt = (
+                select(func.sum(Payment.amount_minor_units))
+                .where(Payment.status == status)
+                .where(Payment.created_at >= start_time)
+                .where(Payment.created_at <= end_time)
+            )
+            result = await self.session.execute(stmt)
+            return int(result.scalar_one() or 0)
+        except SQLAlchemyError as exc:
+            raise DatabaseOperationError(
+                "Database error summing payments by date range"
+            ) from exc
+
+    async def count_by_date_range(
+        self,
+        start_time: datetime,
+        end_time: datetime,
+        status: PaymentStatus | None = None,
+    ) -> int:
+        """
+        Count total payments created within a date range.
+        """
+        try:
+            stmt = (
+                select(func.count())
+                .select_from(Payment)
+                .where(Payment.created_at >= start_time)
+                .where(Payment.created_at <= end_time)
+            )
+            if status is not None:
+                stmt = stmt.where(Payment.status == status)
+            result = await self.session.execute(stmt)
+            return int(result.scalar_one() or 0)
+        except SQLAlchemyError as exc:
+            raise DatabaseOperationError(
+                "Database error counting payments by date range"
+            ) from exc
+
 

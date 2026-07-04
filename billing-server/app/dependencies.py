@@ -42,8 +42,10 @@ from app.services import (
     SubscriptionPlanService,
     BillingService,
     RazorpayProvider,
+    AdminBillingService,
 )
 from app.models.admin_user import AdminUser
+
 
 
 logger = logging.getLogger(__name__)
@@ -378,6 +380,17 @@ async def get_billing_service(
 ) -> BillingService:
     """Yield BillingService wired to SubscriptionService, PaymentService, and SubscriptionPlanService."""
     return BillingService(subscription_service, payment_service, plan_service)
+
+
+async def get_admin_billing_service(
+    session: AsyncSession = Depends(get_db),
+    subscription_service: SubscriptionService = Depends(get_subscription_service),
+    payment_service: PaymentService = Depends(get_payment_service),
+    provisioning_service: ProvisioningService = Depends(get_provisioning_service),
+) -> AdminBillingService:
+    """Yield AdminBillingService wired to session and domain services."""
+    return AdminBillingService(session, subscription_service, payment_service, provisioning_service)
+
 
 
 
