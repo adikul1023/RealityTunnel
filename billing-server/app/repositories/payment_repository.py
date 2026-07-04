@@ -4,7 +4,7 @@ payment_repository.py — Persistence layer for Payment entities (Phase 2.3).
 from __future__ import annotations
 
 import uuid
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -92,6 +92,41 @@ class PaymentRepository(BaseRepository[Payment]):
             raise DatabaseOperationError(
                 "Database error querying payments for account"
             ) from exc
+
+    async def list_by_account_id_paginated(
+        self, account_id: uuid.UUID, limit: int, offset: int
+    ) -> list[Payment]:
+        """
+        Retrieve a paginated list of payments for an account, ordered by creation time descending.
+        """
+        try:
+            stmt = (
+                select(Payment)
+                .where(Payment.account_id == account_id)
+                .order_by(Payment.created_at.desc())
+                .limit(limit)
+                .offset(offset)
+            )
+            result = await self.session.execute(stmt)
+            return list(result.scalars().all())
+        except SQLAlchemyError as exc:
+            raise DatabaseOperationError(
+                "Database error querying paginated payments for account"
+            ) from exc
+
+    async def count_by_account_id(self, account_id: uuid.UUID) -> int:
+        """
+        Count total number of payments for an account.
+        """
+        try:
+            stmt = select(func.count()).select_from(Payment).where(Payment.account_id == account_id)
+            result = await self.session.execute(stmt)
+            return int(result.scalar() or 0)
+        except SQLAlchemyError as exc:
+            raise DatabaseOperationError(
+                "Database error counting payments for account"
+            ) from exc
+
 
     async def get_stale_pending_payments(
         self, cutoff_time: datetime, *, for_update: bool = False

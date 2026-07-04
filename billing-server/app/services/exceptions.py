@@ -255,9 +255,25 @@ class PaymentServiceError(ServiceError):
     pass
 
 
+class PaymentNotFoundError(PaymentServiceError):
+    """Raised when a payment cannot be found or does not belong to the account."""
+    pass
+
+
+class PaymentOrderError(PaymentServiceError):
+    """Raised when creating a payment order fails."""
+    pass
+
+
+class PaymentGatewayUnavailableError(PaymentServiceError):
+    """Raised when the payment gateway is unreachable or offline."""
+    pass
+
+
 class PaymentProviderError(PaymentServiceError):
     """Raised when the payment gateway provider returns an API or business error."""
     pass
+
 
 
 class PaymentVerificationError(PaymentServiceError):

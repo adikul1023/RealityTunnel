@@ -13,8 +13,10 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.config import settings
 from app.database import engine, verify_db, AsyncSessionLocal
 from app.exceptions import DuplicateEntityError, EntityNotFoundError, RepositoryError
-from app.routers import auth, devices, health, admin_auth, admin, credentials, webhooks
+from app.routers import auth, devices, health, admin_auth, admin, credentials, webhooks, billing
+
 from app.scheduler import JobScheduler
+
 
 
 from app.services.exceptions import (
@@ -43,6 +45,7 @@ from app.services.exceptions import (
     AdminNotActiveError,
     InvalidAdminTokenError,
     AdminTokenExpiredError,
+    PaymentNotFoundError,
     MFANotImplementedYet,
 )
 
@@ -80,6 +83,8 @@ app.include_router(admin_auth.router)
 app.include_router(admin.router)
 app.include_router(credentials.router)
 app.include_router(webhooks.router)
+app.include_router(billing.router)
+
 
 
 
@@ -115,6 +120,14 @@ async def device_not_found_exception_handler(request: Request, exc: Exception) -
         status_code=status.HTTP_404_NOT_FOUND,
         content={"detail": "Device not found"},
     )
+
+
+async def payment_not_found_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
+        content={"detail": "Payment not found"},
+    )
+
 
 
 async def device_inactive_exception_handler(request: Request, exc: InactiveDeviceError) -> JSONResponse:
@@ -197,7 +210,9 @@ for exc_class in auth_exceptions:
 app.add_exception_handler(MFANotImplementedYet, mfa_not_implemented_exception_handler)
 app.add_exception_handler(DeviceNotFoundError, device_not_found_exception_handler)
 app.add_exception_handler(DeviceOwnershipError, device_not_found_exception_handler)
+app.add_exception_handler(PaymentNotFoundError, payment_not_found_exception_handler)
 app.add_exception_handler(InactiveDeviceError, device_inactive_exception_handler)
+
 app.add_exception_handler(DeviceLimitExceededError, device_limit_exceeded_exception_handler)
 app.add_exception_handler(DeviceServiceError, device_service_exception_handler)
 app.add_exception_handler(UnknownPlanError, unknown_plan_exception_handler)

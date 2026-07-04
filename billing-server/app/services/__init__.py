@@ -95,6 +95,15 @@ from app.services.payment import (
 )
 from app.services.credential_service import CredentialService
 from app.services.lifecycle_job_service import LifecycleJobService
+from app.services.billing_service import BillingService
+from app.services.billing_dtos import (
+    SubscriptionDTO,
+    PlanDTO,
+    PaymentDTO,
+    PaymentListDTO,
+    PurchaseRequestDTO,
+    PurchaseResponseDTO,
+)
 
 __all__ = [
     "ServiceError",
@@ -178,10 +187,12 @@ __all__ = [
     "WebhookService",
     "CredentialService",
     "LifecycleJobService",
+    "BillingService",
+    "SubscriptionDTO",
+    "PlanDTO",
+    "PaymentDTO",
+    "PaymentListDTO",
+    "PurchaseRequestDTO",
+    "PurchaseResponseDTO",
 ]
-
-
-
-
-
 

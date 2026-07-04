@@ -25,6 +25,9 @@ class SubscriptionPlan:
     max_devices: int
     max_concurrent_ips: int
     data_quota_bytes: int
+    price_minor_units: int = 0
+    currency: str = "INR"
+
 
 
 # ── Code-Defined Registry ────────────────────────────────────────────────────
@@ -34,6 +37,7 @@ FREE: Final[SubscriptionPlan] = SubscriptionPlan(
     max_devices=2,
     max_concurrent_ips=2,
     data_quota_bytes=10 * 1024**3,  # 10 GB
+    price_minor_units=0,
 )
 
 PRO: Final[SubscriptionPlan] = SubscriptionPlan(
@@ -42,6 +46,7 @@ PRO: Final[SubscriptionPlan] = SubscriptionPlan(
     max_devices=5,
     max_concurrent_ips=5,
     data_quota_bytes=100 * 1024**3,  # 100 GB
+    price_minor_units=49900,  # 499 INR
 )
 
 FAMILY: Final[SubscriptionPlan] = SubscriptionPlan(
@@ -50,7 +55,9 @@ FAMILY: Final[SubscriptionPlan] = SubscriptionPlan(
     max_devices=15,
     max_concurrent_ips=15,
     data_quota_bytes=500 * 1024**3,  # 500 GB
+    price_minor_units=99900,  # 999 INR
 )
+
 
 # Registry dictionary mapping plan_id (lowercase) to SubscriptionPlan instance
 PLANS_REGISTRY: Final[dict[str, SubscriptionPlan]] = {

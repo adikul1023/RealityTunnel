@@ -17,6 +17,7 @@ from app.services.subscription_service import SubscriptionService
 from app.services.payment.provider import PaymentProvider
 from app.services.exceptions import (
     PaymentServiceError,
+    PaymentNotFoundError,
     PaymentVerificationError,
     PaymentWebhookError,
     DuplicateWebhookError,
@@ -275,6 +276,44 @@ class PaymentService:
         if not payment:
             raise EntityNotFoundError(f"Payment with ID {payment_id} not found.")
         return payment
+
+    async def list_account_payments(
+        self, account_id: uuid.UUID, limit: int = 20, offset: int = 0
+    ) -> tuple[list[Payment], int]:
+        """
+        List paginated payment history for an account, newest first.
+        Enforces maximum page size of 100.
+        """
+        limit = min(max(1, limit), 100)
+        offset = max(0, offset)
+        payments = await self.payment_repo.list_by_account_id_paginated(account_id, limit, offset)
+        total = await self.payment_repo.count_by_account_id(account_id)
+        return payments, total
+
+    async def get_account_payment(
+        self, account_id: uuid.UUID, payment_identifier: str
+    ) -> Payment:
+        """
+        Retrieve a payment by provider order ID, provider payment ID, or internal UUID.
+        Enforces Anti-IDOR: raises EntityNotFoundError (mapped to 404) if payment does not exist
+        or belongs to a different account.
+        """
+        payment = await self.payment_repo.get_by_provider_order_id(payment_identifier)
+        if not payment:
+            payment = await self.payment_repo.get_by_provider_payment_id(payment_identifier)
+        if not payment:
+            try:
+                payment_uuid = uuid.UUID(payment_identifier)
+                payment = await self.payment_repo.get_by_id(payment_uuid)
+            except (ValueError, TypeError, AttributeError):
+                pass
+
+        if not payment or payment.account_id != account_id:
+            logger.warning("Anti-IDOR: Account %s attempted access or lookup of missing payment identifier %s", account_id, payment_identifier)
+            raise PaymentNotFoundError(f"Payment '{payment_identifier}' not found.")
+        return payment
+
+
 
     async def process_webhook(
         self,

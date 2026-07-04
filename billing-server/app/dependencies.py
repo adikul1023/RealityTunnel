@@ -37,11 +37,14 @@ from app.services import (
     ProvisioningService,
     CredentialService,
     SubscriptionService,
-    RazorpayProvider,
     PaymentService,
     WebhookService,
+    SubscriptionPlanService,
+    BillingService,
+    RazorpayProvider,
 )
 from app.models.admin_user import AdminUser
+
 
 logger = logging.getLogger(__name__)
 
@@ -361,5 +364,20 @@ async def get_webhook_service(
 ) -> WebhookService:
     """Yield WebhookService wired to PaymentService."""
     return WebhookService(payment_service)
+
+
+def get_plan_service() -> SubscriptionPlanService:
+    """Yield SubscriptionPlanService."""
+    return SubscriptionPlanService()
+
+
+async def get_billing_service(
+    subscription_service: SubscriptionService = Depends(get_subscription_service),
+    payment_service: PaymentService = Depends(get_payment_service),
+    plan_service: SubscriptionPlanService = Depends(get_plan_service),
+) -> BillingService:
+    """Yield BillingService wired to SubscriptionService, PaymentService, and SubscriptionPlanService."""
+    return BillingService(subscription_service, payment_service, plan_service)
+
 
 

@@ -192,3 +192,26 @@ class SubscriptionService:
         """
         now = datetime.now(timezone.utc)
         return await self.repository.get_active_for_account(account_id, now)
+
+    async def update_auto_renew(self, account_id: uuid.UUID, auto_renew: bool, *, commit: bool = True) -> Subscription:
+        """
+        Update auto_renew status for an account's active subscription.
+        Idempotent: returns cleanly without DB writes if already set to requested state.
+        """
+        now = datetime.now(timezone.utc)
+        sub = await self.repository.get_active_for_account(account_id, now, for_update=True)
+        if not sub:
+            raise SubscriptionNotFoundError("No active subscription found for account.")
+
+        if sub.status == SubscriptionLifecycleStatus.CANCELLED:
+            raise InvalidSubscriptionStateError("Cannot update auto-renew on a cancelled subscription.")
+
+        if sub.auto_renew == auto_renew:
+            logger.info("Subscription id=%s already has auto_renew=%s. Idempotent return.", sub.id, auto_renew)
+            return sub
+
+        sub.auto_renew = auto_renew
+        await self.repository.update(sub, commit=commit)
+        logger.info("Updated subscription id=%s auto_renew=%s", sub.id, auto_renew)
+        return sub
+

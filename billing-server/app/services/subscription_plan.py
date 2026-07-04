@@ -36,6 +36,11 @@ class SubscriptionPlanService:
             raise UnknownPlanError(f"Unknown subscription plan ID: '{clean_id}'")
         return plan
 
+    def list_plans(self) -> list[SubscriptionPlan]:
+        """Return all registered subscription plans."""
+        return list(PLANS_REGISTRY.values())
+
+
     def get_max_devices(self, account: Account) -> int:
         """Return the maximum allowed registered devices for the given account's plan."""
         plan = self.get_plan(account.plan_id)
