@@ -24,6 +24,10 @@ from app.services.exceptions import (
     InactiveDeviceError,
     SubscriptionServiceError,
     UnknownPlanError,
+    SubscriptionNotFoundError,
+    InvalidSubscriptionStateError,
+    SubscriptionAlreadyActiveError,
+    SubscriptionExpiredError,
     DeviceLimitExceededError,
     ConnectionSignalServiceError,
     AdminSecurityError,
@@ -54,6 +58,7 @@ from app.services.admin_auth import (
     AdminAuthReason,
 )
 from app.services.admin_account import AdminAccountService
+from app.services.subscription_service import SubscriptionService
 
 __all__ = [
     "ServiceError",
@@ -77,6 +82,10 @@ __all__ = [
     "InactiveDeviceError",
     "SubscriptionServiceError",
     "UnknownPlanError",
+    "SubscriptionNotFoundError",
+    "InvalidSubscriptionStateError",
+    "SubscriptionAlreadyActiveError",
+    "SubscriptionExpiredError",
     "DeviceLimitExceededError",
     "ConnectionSignalServiceError",
     "AdminSecurityError",
@@ -100,5 +109,6 @@ __all__ = [
     "AdminAuthResult",
     "AdminAuthReason",
     "AdminAccountService",
+    "SubscriptionService",
 ]
 

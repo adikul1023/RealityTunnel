@@ -16,6 +16,7 @@ from app.models.base import SubscriptionStatus, TimestampMixin
 if TYPE_CHECKING:
     from app.models.device import Device
     from app.models.refresh_token import RefreshToken
+    from app.models.subscription import Subscription
 
 
 class Account(Base, TimestampMixin):
@@ -75,6 +76,12 @@ class Account(Base, TimestampMixin):
     )
     refresh_tokens: Mapped[list[RefreshToken]] = relationship(
         "RefreshToken",
+        back_populates="account",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    subscriptions: Mapped[list[Subscription]] = relationship(
+        "Subscription",
         back_populates="account",
         cascade="all, delete-orphan",
         passive_deletes=True,

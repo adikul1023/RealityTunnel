@@ -8,6 +8,7 @@ from app.repositories.device_repository import DeviceRepository
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.connection_signal_repository import ConnectionSignalRepository
 from app.repositories.admin_user_repository import AdminUserRepository
+from app.repositories.subscription_repository import SubscriptionRepository
 
 __all__ = [
     "BaseRepository",
@@ -16,4 +17,5 @@ __all__ = [
     "RefreshTokenRepository",
     "ConnectionSignalRepository",
     "AdminUserRepository",
+    "SubscriptionRepository",
 ]

@@ -1,0 +1,80 @@
+"""
+subscription_repository.py — Persistence layer for Subscription entities (Phase 2.1).
+"""
+from __future__ import annotations
+
+import uuid
+from datetime import datetime
+from sqlalchemy import select, or_, and_
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.exceptions import DatabaseOperationError
+from app.models import Subscription, SubscriptionLifecycleStatus
+from app.repositories.base import BaseRepository
+
+
+class SubscriptionRepository(BaseRepository[Subscription]):
+    """
+    Repository for Subscription model queries and CRUD operations.
+    Manages subscription lifecycle persistence and active contract lookups.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        super().__init__(Subscription, session)
+
+    async def get_by_account_id(self, account_id: uuid.UUID) -> list[Subscription]:
+        """
+        List all subscriptions for an account, ordered by creation time descending.
+        """
+        try:
+            stmt = (
+                select(Subscription)
+                .where(Subscription.account_id == account_id)
+                .order_by(Subscription.created_at.desc())
+            )
+            result = await self.session.execute(stmt)
+            return list(result.scalars().all())
+        except SQLAlchemyError as exc:
+            raise DatabaseOperationError(
+                "Database error querying subscriptions for account"
+            ) from exc
+
+    async def get_active_for_account(
+        self, account_id: uuid.UUID, now: datetime, *, for_update: bool = False
+    ) -> Subscription | None:
+        """
+        Retrieve the current active, trial, or unexpired grace subscription for an account.
+        If for_update=True, acquires row-level exclusive lock (SELECT ... FOR UPDATE).
+        """
+        try:
+            stmt = (
+                select(Subscription)
+                .where(Subscription.account_id == account_id)
+                .where(
+                    Subscription.status.in_([
+                        SubscriptionLifecycleStatus.TRIAL,
+                        SubscriptionLifecycleStatus.ACTIVE,
+                        SubscriptionLifecycleStatus.GRACE,
+                    ])
+                )
+                .where(
+                    or_(
+                        Subscription.expires_at > now,
+                        and_(
+                            Subscription.status == SubscriptionLifecycleStatus.GRACE,
+                            Subscription.grace_expires_at.is_not(None),
+                            Subscription.grace_expires_at > now,
+                        ),
+                    )
+                )
+                .order_by(Subscription.created_at.desc())
+            )
+            if for_update:
+                stmt = stmt.with_for_update()
+            result = await self.session.execute(stmt)
+            return result.scalars().first()
+        except SQLAlchemyError as exc:
+            raise DatabaseOperationError(
+                "Database error querying active subscription for account"
+            ) from exc

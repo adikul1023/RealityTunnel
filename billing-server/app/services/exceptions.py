@@ -129,6 +129,26 @@ class UnknownPlanError(SubscriptionServiceError):
     pass
 
 
+class SubscriptionNotFoundError(SubscriptionServiceError):
+    """Raised when a queried subscription entity does not exist."""
+    pass
+
+
+class InvalidSubscriptionStateError(SubscriptionServiceError):
+    """Raised when attempting an invalid state transition on a subscription."""
+    pass
+
+
+class SubscriptionAlreadyActiveError(SubscriptionServiceError):
+    """Raised when attempting to create or activate a subscription for an account that already has an active subscription."""
+    pass
+
+
+class SubscriptionExpiredError(SubscriptionServiceError):
+    """Raised when attempting an operation on an expired subscription."""
+    pass
+
+
 class DeviceLimitExceededError(DeviceServiceError):
     """
     Raised when an account attempts to register a new device beyond its subscription plan limit.

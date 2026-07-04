@@ -20,6 +20,17 @@ class SubscriptionStatus(str, enum.Enum):
     PENDING = "PENDING"
 
 
+class SubscriptionLifecycleStatus(str, enum.Enum):
+    """
+    PostgreSQL ENUM for specific subscription lifecycle states (Phase 2.1).
+    """
+    TRIAL = "TRIAL"
+    ACTIVE = "ACTIVE"
+    GRACE = "GRACE"
+    EXPIRED = "EXPIRED"
+    CANCELLED = "CANCELLED"
+
+
 class TimestampMixin:
     """
     Mixin that provides automatic created_at and updated_at timestamps
