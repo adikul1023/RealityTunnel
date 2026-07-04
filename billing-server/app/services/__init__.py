@@ -50,6 +50,11 @@ from app.services.exceptions import (
     DuplicateWebhookError,
     PaymentTimeoutError,
     PaymentRefundError,
+    CredentialServiceError,
+    CredentialNotFoundError,
+    CredentialAlreadyRevokedError,
+    CredentialAlreadyActiveError,
+    CredentialRotationFailedError,
 )
 from app.services.authentication import (
     AuthenticationService,
@@ -87,6 +92,7 @@ from app.services.payment import (
     RazorpayProvider,
     PaymentService,
 )
+from app.services.credential_service import CredentialService
 
 __all__ = [
     "ServiceError",
@@ -136,6 +142,11 @@ __all__ = [
     "DuplicateWebhookError",
     "PaymentTimeoutError",
     "PaymentRefundError",
+    "CredentialServiceError",
+    "CredentialNotFoundError",
+    "CredentialAlreadyRevokedError",
+    "CredentialAlreadyActiveError",
+    "CredentialRotationFailedError",
     "AuthenticationService",
     "AuthenticationResult",
     "AuthenticationReason",
@@ -162,7 +173,9 @@ __all__ = [
     "PaymentRefundDTO",
     "RazorpayProvider",
     "PaymentService",
+    "CredentialService",
 ]
+
 
 
 

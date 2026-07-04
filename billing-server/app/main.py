@@ -13,7 +13,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.config import settings
 from app.database import engine, verify_db
 from app.exceptions import DuplicateEntityError, EntityNotFoundError, RepositoryError
-from app.routers import auth, devices, health, admin_auth, admin
+from app.routers import auth, devices, health, admin_auth, admin, credentials
 from app.services.exceptions import (
     AuthenticationServiceError,
     AccountNotActiveError,
@@ -70,6 +70,8 @@ app.include_router(auth.router)
 app.include_router(devices.router)
 app.include_router(admin_auth.router)
 app.include_router(admin.router)
+app.include_router(credentials.router)
+
 
 
 # ── Exception Handlers ───────────────────────────────────────────────────────

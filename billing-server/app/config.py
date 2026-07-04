@@ -69,6 +69,7 @@ class Settings(BaseSettings):
     marzban_get_user_path: str = "/api/user/{username}"
     marzban_update_user_path: str = "/api/user/{username}"
     marzban_delete_user_path: str = "/api/user/{username}"
+    marzban_reset_user_path: str = "/api/user/{username}/reset"
     marzban_system_stats_path: str = "/api/system"
 
     # ── Payment Gateway (Razorpay Integration) ─────────────────────────────

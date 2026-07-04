@@ -284,3 +284,32 @@ class PaymentRefundError(PaymentServiceError):
     """Raised when attempting to refund a payment fails or is rejected by the provider."""
     pass
 
+
+# ── Phase 2.4 — VPN Credential Lifecycle Exceptions ─────────────────────────
+
+
+class CredentialServiceError(ServiceError):
+    """Base exception for VPN credential lifecycle and client config operations."""
+    pass
+
+
+class CredentialNotFoundError(CredentialServiceError):
+    """Raised when active VPN credentials cannot be found for an account."""
+    pass
+
+
+class CredentialAlreadyRevokedError(CredentialServiceError):
+    """Raised when attempting to revoke credentials that are already suspended/revoked."""
+    pass
+
+
+class CredentialAlreadyActiveError(CredentialServiceError):
+    """Raised when attempting to restore credentials that are already active."""
+    pass
+
+
+class CredentialRotationFailedError(CredentialServiceError):
+    """Raised when regenerating or rotating credentials fails in the provider."""
+    pass
+
+

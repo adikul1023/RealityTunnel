@@ -22,7 +22,7 @@ from app.services.exceptions import (
     ProvisioningSynchronizationError,
     ProvisioningTimeoutError,
 )
-from app.services.provisioning.provider import ProvisioningProvider
+from app.services.provisioning.provider import ProvisioningProvider, ProvisionedUserDTO
 
 logger = logging.getLogger(__name__)
 
@@ -298,3 +298,69 @@ class ProvisioningService:
         except Exception as exc:
             await self.session.rollback()
             raise self._translate_exception(exc, "synchronize") from exc
+
+    async def get_provisioned_user(self, account_id: uuid.UUID) -> tuple[ProvisioningProfile, ProvisionedUserDTO]:
+        """
+        Retrieve canonical provisioning profile and latest remote user DTO (including links).
+        """
+        try:
+            profile = await self.provisioning_repo.get_by_account_id(account_id)
+            if not profile:
+                raise EntityNotFoundError(f"Provisioning profile for account {account_id} not found.")
+
+            try:
+                user_dto = await self.provider.get_user(profile.remote_user_id)
+            except Exception as exc:
+                raise ProvisioningSynchronizationError(
+                    f"Failed to fetch remote user '{profile.remote_user_id}': {str(exc)}"
+                ) from exc
+
+            if not user_dto:
+                raise ProvisioningSynchronizationError(
+                    f"Remote user '{profile.remote_user_id}' not found in provisioning provider."
+                )
+
+            return profile, user_dto
+
+        except (EntityNotFoundError, DatabaseOperationError, ProvisioningServiceError):
+            raise
+        except Exception as exc:
+            raise self._translate_exception(exc, "get_provisioned_user") from exc
+
+    async def rotate_user_credentials(self, account_id: uuid.UUID) -> tuple[ProvisioningProfile, ProvisionedUserDTO]:
+        """
+        Atomically reset/rotate remote user credentials and update synchronization timestamp.
+        Acquires row-level lock (SELECT ... FOR UPDATE) on the provisioning profile.
+        """
+        try:
+            profile = await self.provisioning_repo.get_by_account_id(account_id, for_update=True)
+            if not profile:
+                raise EntityNotFoundError(f"Provisioning profile for account {account_id} not found.")
+
+            try:
+                user_dto = await self.provider.reset_user_credentials(profile.remote_user_id)
+            except Exception as exc:
+                profile.last_error = str(exc)
+                await self.session.commit()
+                raise ProvisioningSynchronizationError(
+                    f"Failed to reset credentials for remote user '{profile.remote_user_id}': {str(exc)}"
+                ) from exc
+
+            profile.last_sync_at = datetime.now(timezone.utc)
+            profile.last_error = None
+
+            if user_dto.status.lower() in ("disabled", "suspended", "inactive"):
+                profile.provisioning_state = ProvisioningState.SUSPENDED
+            elif user_dto.status.lower() == "active":
+                profile.provisioning_state = ProvisioningState.ACTIVE
+
+            await self.session.commit()
+            await self.session.refresh(profile)
+            return profile, user_dto
+
+        except (EntityNotFoundError, DatabaseOperationError, ProvisioningServiceError):
+            raise
+        except Exception as exc:
+            await self.session.rollback()
+            raise self._translate_exception(exc, "rotate_user_credentials") from exc
+

@@ -272,6 +272,20 @@ class MarzbanProvisioningProvider(ProvisioningProvider):
             raise ProvisioningProviderError(f"Cannot sync user: remote user '{username}' not found in Marzban")
         return user_dto
 
+    async def reset_user_credentials(self, username: str) -> ProvisionedUserDTO:
+        """Reset/rotate user credentials (UUID and VLESS links) in Marzban."""
+        path = settings.marzban_reset_user_path.format(username=username)
+        logger.info("Resetting remote user credentials in Marzban username=%s", username)
+        response = await self._request_with_retry("POST", path, expected_statuses=(200,))
+        if response.status_code == 404:
+            raise ProvisioningProviderError(f"Remote user not found in Marzban: {username}")
+
+        try:
+            data = response.json()
+            return self._parse_user_dto(data, username)
+        except Exception as exc:
+            raise ProvisioningProviderError("Failed to parse JSON response from Marzban reset_user_credentials") from exc
+
     async def health_check(self) -> bool:
         """Check connection health against Marzban system stats endpoint."""
         path = settings.marzban_system_stats_path

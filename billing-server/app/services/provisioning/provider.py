@@ -79,6 +79,12 @@ class ProvisioningProvider(ABC):
         pass
 
     @abstractmethod
+    async def reset_user_credentials(self, username: str) -> ProvisionedUserDTO:
+        """Reset/rotate credentials (UUID, links) for an existing remote VPN user."""
+        pass
+
+    @abstractmethod
     async def health_check(self) -> bool:
         """Check connection health and readiness of the remote provisioning service."""
         pass
+

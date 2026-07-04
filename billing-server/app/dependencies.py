@@ -22,6 +22,7 @@ from app.repositories import (
     ConnectionSignalRepository,
     AdminUserRepository,
 )
+from app.config import settings
 from app.security.jwt_service import JWTService
 from app.security.admin_password import AdminPasswordService
 from app.security.admin_jwt import AdminJWTService
@@ -32,6 +33,9 @@ from app.services import (
     ConnectionSignalService,
     AdminAuthenticationService,
     AdminAccountService,
+    MarzbanProvisioningProvider,
+    ProvisioningService,
+    CredentialService,
 )
 from app.models.admin_user import AdminUser
 
@@ -285,3 +289,31 @@ async def require_super_admin(
             detail="Super-admin privilege required for this operation",
         )
     return admin
+
+
+_marzban_provider: MarzbanProvisioningProvider | None = None
+
+
+def get_marzban_provider() -> MarzbanProvisioningProvider:
+    """Yield singleton Marzban provisioning provider configured with app settings."""
+    global _marzban_provider
+    if _marzban_provider is None:
+        _marzban_provider = MarzbanProvisioningProvider()
+    return _marzban_provider
+
+
+async def get_provisioning_service(
+    session: AsyncSession = Depends(get_db),
+    provider: MarzbanProvisioningProvider = Depends(get_marzban_provider),
+) -> ProvisioningService:
+    """Yield ProvisioningService instance wired to current database session and Marzban provider."""
+    return ProvisioningService(session, provider)
+
+
+async def get_credential_service(
+    session: AsyncSession = Depends(get_db),
+    provisioning_service: ProvisioningService = Depends(get_provisioning_service),
+) -> CredentialService:
+    """Yield CredentialService instance for VPN credential lifecycle and config generation."""
+    return CredentialService(session, provisioning_service)
+
