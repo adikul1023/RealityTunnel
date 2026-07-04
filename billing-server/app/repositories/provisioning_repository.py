@@ -57,3 +57,46 @@ class ProvisioningRepository(BaseRepository[ProvisioningProfile]):
             raise DatabaseOperationError(
                 "Database error querying provisioning profile by remote user ID"
             ) from exc
+
+    async def get_suspended_profiles(
+        self, *, for_update: bool = False
+    ) -> list[ProvisioningProfile]:
+        """
+        Retrieve all provisioning profiles in SUSPENDED state.
+        If for_update=True, acquires row-level exclusive lock (SELECT ... FOR UPDATE).
+        """
+        try:
+            from app.models.provisioning import ProvisioningState
+            stmt = select(ProvisioningProfile).where(
+                ProvisioningProfile.provisioning_state == ProvisioningState.SUSPENDED
+            )
+            if for_update:
+                stmt = stmt.with_for_update()
+            result = await self.session.execute(stmt)
+            return list(result.scalars().all())
+        except SQLAlchemyError as exc:
+            raise DatabaseOperationError(
+                "Database error querying suspended provisioning profiles"
+            ) from exc
+
+    async def get_all_active_or_suspended(
+        self, *, for_update: bool = False
+    ) -> list[ProvisioningProfile]:
+        """
+        Retrieve all provisioning profiles not in TERMINATED state.
+        If for_update=True, acquires row-level exclusive lock (SELECT ... FOR UPDATE).
+        """
+        try:
+            from app.models.provisioning import ProvisioningState
+            stmt = select(ProvisioningProfile).where(
+                ProvisioningProfile.provisioning_state != ProvisioningState.TERMINATED
+            )
+            if for_update:
+                stmt = stmt.with_for_update()
+            result = await self.session.execute(stmt)
+            return list(result.scalars().all())
+        except SQLAlchemyError as exc:
+            raise DatabaseOperationError(
+                "Database error querying active or suspended provisioning profiles"
+            ) from exc
+

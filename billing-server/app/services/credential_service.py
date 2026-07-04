@@ -204,7 +204,7 @@ class CredentialService:
             logger.error("Failed credential rotation for account_id=%s", account_id)
             raise CredentialRotationFailedError(f"Credential rotation failed: {str(exc)}") from exc
 
-    async def revoke_credentials(self, account_id: uuid.UUID) -> None:
+    async def revoke_credentials(self, account_id: uuid.UUID, *, commit: bool = True) -> None:
         """
         Revoke active credentials by suspending the remote provisioning profile.
         Idempotency / State Check: raises CredentialAlreadyRevokedError if already suspended.
@@ -217,12 +217,12 @@ class CredentialService:
             raise CredentialAlreadyRevokedError(f"Credentials for account {account_id} are already revoked/suspended")
 
         try:
-            await self.provisioning_service.suspend_subscription(account_id)
+            await self.provisioning_service.suspend_subscription(account_id, commit=commit)
             logger.info("Successfully revoked credentials for account_id=%s", account_id)
         except Exception as exc:
             raise CredentialServiceError(f"Failed to revoke credentials: {str(exc)}") from exc
 
-    async def restore_credentials(self, account_id: uuid.UUID) -> None:
+    async def restore_credentials(self, account_id: uuid.UUID, *, commit: bool = True) -> None:
         """
         Restore previously revoked credentials by reactivating the remote provisioning profile.
         Idempotency / State Check: raises CredentialAlreadyActiveError if already active.
@@ -235,7 +235,7 @@ class CredentialService:
             raise CredentialAlreadyActiveError(f"Credentials for account {account_id} are already active")
 
         try:
-            await self.provisioning_service.reactivate_subscription(account_id)
+            await self.provisioning_service.reactivate_subscription(account_id, commit=commit)
             logger.info("Successfully restored credentials for account_id=%s", account_id)
         except Exception as exc:
             raise CredentialServiceError(f"Failed to restore credentials: {str(exc)}") from exc

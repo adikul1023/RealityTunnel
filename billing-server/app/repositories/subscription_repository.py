@@ -78,3 +78,49 @@ class SubscriptionRepository(BaseRepository[Subscription]):
             raise DatabaseOperationError(
                 "Database error querying active subscription for account"
             ) from exc
+
+    async def get_expired_active_subscriptions(
+        self, now: datetime, *, for_update: bool = False
+    ) -> list[Subscription]:
+        """
+        Retrieve all active subscriptions whose expiration timestamp has passed.
+        If for_update=True, acquires row-level exclusive lock (SELECT ... FOR UPDATE).
+        """
+        try:
+            stmt = (
+                select(Subscription)
+                .where(Subscription.status == SubscriptionLifecycleStatus.ACTIVE)
+                .where(Subscription.expires_at <= now)
+            )
+            if for_update:
+                stmt = stmt.with_for_update()
+            result = await self.session.execute(stmt)
+            return list(result.scalars().all())
+        except SQLAlchemyError as exc:
+            raise DatabaseOperationError(
+                "Database error querying expired active subscriptions"
+            ) from exc
+
+    async def get_expired_grace_subscriptions(
+        self, now: datetime, *, for_update: bool = False
+    ) -> list[Subscription]:
+        """
+        Retrieve all grace subscriptions whose grace period timestamp has elapsed.
+        If for_update=True, acquires row-level exclusive lock (SELECT ... FOR UPDATE).
+        """
+        try:
+            stmt = (
+                select(Subscription)
+                .where(Subscription.status == SubscriptionLifecycleStatus.GRACE)
+                .where(Subscription.grace_expires_at.is_not(None))
+                .where(Subscription.grace_expires_at <= now)
+            )
+            if for_update:
+                stmt = stmt.with_for_update()
+            result = await self.session.execute(stmt)
+            return list(result.scalars().all())
+        except SQLAlchemyError as exc:
+            raise DatabaseOperationError(
+                "Database error querying expired grace subscriptions"
+            ) from exc
+

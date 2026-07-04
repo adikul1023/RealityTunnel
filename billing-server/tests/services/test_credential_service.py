@@ -140,7 +140,7 @@ async def test_revoke_credentials_success(
     mock_provisioning_service.provisioning_repo.get_by_account_id = AsyncMock(return_value=sample_profile)
 
     await service.revoke_credentials(sample_profile.account_id)
-    mock_provisioning_service.suspend_subscription.assert_called_once_with(sample_profile.account_id)
+    mock_provisioning_service.suspend_subscription.assert_called_once_with(sample_profile.account_id, commit=True)
 
 
 @pytest.mark.asyncio
@@ -166,7 +166,8 @@ async def test_restore_credentials_success(
     mock_provisioning_service.provisioning_repo.get_by_account_id = AsyncMock(return_value=sample_profile)
 
     await service.restore_credentials(sample_profile.account_id)
-    mock_provisioning_service.reactivate_subscription.assert_called_once_with(sample_profile.account_id)
+    mock_provisioning_service.reactivate_subscription.assert_called_once_with(sample_profile.account_id, commit=True)
+
 
 
 @pytest.mark.asyncio

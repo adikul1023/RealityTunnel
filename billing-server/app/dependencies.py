@@ -342,8 +342,9 @@ def get_razorpay_provider() -> RazorpayProvider:
     """Yield singleton Razorpay payment provider."""
     global _razorpay_provider
     if _razorpay_provider is None:
-        _razorpay_provider = RazorpayProvider()
+        _razorpay_provider = RazorpayProvider(settings)
     return _razorpay_provider
+
 
 
 async def get_payment_service(

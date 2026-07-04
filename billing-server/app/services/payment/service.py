@@ -241,6 +241,8 @@ class PaymentService:
     async def cancel_payment(
         self,
         payment_id: uuid.UUID,
+        *,
+        commit: bool = True,
     ) -> Payment:
         """
         Cancel a pending or created payment before capture.
@@ -256,13 +258,18 @@ class PaymentService:
             return payment
 
         payment.status = PaymentStatus.CANCELLED
-        await self.payment_repo.update(payment)
+        await self.payment_repo.update(payment, commit=commit)
         logger.info("Cancelled payment id=%s", payment.id)
         return payment
+
+    async def check_provider_health(self) -> bool:
+        """Check health and readiness of the underlying payment gateway provider."""
+        return await self.provider.health_check()
 
     async def get_payment(self, payment_id: uuid.UUID) -> Payment:
         """
         Retrieve payment details by internal UUID.
+
         """
         payment = await self.payment_repo.get_by_id(payment_id)
         if not payment:

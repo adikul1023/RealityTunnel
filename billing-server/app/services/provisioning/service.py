@@ -7,13 +7,13 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import EntityNotFoundError, DatabaseOperationError
-from app.models import ProvisioningProfile, ProvisioningState
-from app.repositories import AccountRepository, ProvisioningRepository
+from app.models import ProvisioningProfile, ProvisioningState, ProvisioningRetryItem, RetryItemStatus
+from app.repositories import AccountRepository, ProvisioningRepository, ProvisioningRetryRepository
 from app.services.exceptions import (
     ProvisioningServiceError,
     ProvisioningProviderError,
@@ -39,6 +39,7 @@ class ProvisioningService:
         self.credential_service = credential_service
         self.account_repo = AccountRepository(session)
         self.provisioning_repo = ProvisioningRepository(session)
+        self.retry_repo = ProvisioningRetryRepository(session)
 
     def _translate_exception(self, exc: Exception, action: str) -> ProvisioningServiceError:
         """Ensure no external or HTTP exceptions leak out of ProvisioningService."""
@@ -56,6 +57,48 @@ class ProvisioningService:
             return exc
         logger.error("Unhandled exception during provisioning action=%s: %s", action, str(exc))
         return ProvisioningServiceError(f"Provisioning error during {action}: {str(exc)}")
+
+    async def check_provider_health(self) -> bool:
+        """Check health and readiness of the remote provisioning provider."""
+        return await self.provider.health_check()
+
+    async def _maybe_enqueue_retry(
+        self,
+        account_id: uuid.UUID,
+        plan_id: str,
+        expire_at: datetime | None,
+        exc: Exception,
+    ) -> None:
+        """
+        Check if an exception represents a transient failure (timeout, 500/502/503/504)
+        and enqueue an item in the retry queue if not already pending.
+        """
+        is_transient = False
+        if isinstance(exc, (ProvisioningTimeoutError, ProvisioningUnavailableError)):
+            is_transient = True
+        elif isinstance(exc, ProvisioningProviderError):
+            err_str = str(exc).lower()
+            if any(code in err_str for code in ("500", "502", "503", "504", "timeout", "unreachable", "connection", "gateway")):
+                is_transient = True
+
+        if is_transient:
+            try:
+                now = datetime.now(timezone.utc)
+                pending = await self.retry_repo.get_pending_retries(now + timedelta(days=365))
+                if not any(item.account_id == account_id and item.status == RetryItemStatus.PENDING for item in pending):
+                    retry_item = ProvisioningRetryItem(
+                        account_id=account_id,
+                        plan_id=plan_id,
+                        expires_at=expire_at or (now + timedelta(days=30)),
+                        attempt_count=0,
+                        next_retry_at=now + timedelta(seconds=30),
+                        last_error=str(exc)[:499],
+                        status=RetryItemStatus.PENDING,
+                    )
+                    await self.retry_repo.create(retry_item, commit=True)
+                    logger.info("Enqueued transient provisioning failure for retry account_id=%s", account_id)
+            except Exception as e:
+                logger.error("Failed to enqueue provisioning retry record: %s", str(e))
 
     async def provision_subscription(
         self,
@@ -146,7 +189,9 @@ class ProvisioningService:
         except Exception as exc:
             if commit:
                 await self.session.rollback()
-            raise self._translate_exception(exc, "provision_subscription") from exc
+            translated_exc = self._translate_exception(exc, "provision_subscription")
+            await self._maybe_enqueue_retry(account_id, plan_id, expire_at, translated_exc)
+            raise translated_exc from exc
 
     async def extend_subscription(
         self,

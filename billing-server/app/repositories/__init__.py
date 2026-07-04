@@ -11,6 +11,8 @@ from app.repositories.admin_user_repository import AdminUserRepository
 from app.repositories.subscription_repository import SubscriptionRepository
 from app.repositories.provisioning_repository import ProvisioningRepository
 from app.repositories.payment_repository import PaymentRepository
+from app.repositories.provisioning_retry_repository import ProvisioningRetryRepository
+from app.repositories.system_health_repository import SystemHealthRepository
 
 __all__ = [
     "BaseRepository",
@@ -22,6 +24,9 @@ __all__ = [
     "SubscriptionRepository",
     "ProvisioningRepository",
     "PaymentRepository",
+    "ProvisioningRetryRepository",
+    "SystemHealthRepository",
 ]
+
 
 

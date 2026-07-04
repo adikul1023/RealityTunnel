@@ -11,9 +11,11 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import settings
-from app.database import engine, verify_db
+from app.database import engine, verify_db, AsyncSessionLocal
 from app.exceptions import DuplicateEntityError, EntityNotFoundError, RepositoryError
 from app.routers import auth, devices, health, admin_auth, admin, credentials, webhooks
+from app.scheduler import JobScheduler
+
 
 from app.services.exceptions import (
     AuthenticationServiceError,
@@ -52,9 +54,14 @@ async def lifespan(app: FastAPI):
     """Manage startup / shutdown lifecycle."""
     logger.info("Billing server starting up…")
     logger.info("Database URL: %s", settings.database_url_safe)
+    scheduler = JobScheduler(AsyncSessionLocal)
+    scheduler.start()
+    app.state.scheduler = scheduler
     yield
     logger.info("Billing server shutting down…")
+    await scheduler.stop()
     await engine.dispose()
+
 
 
 app = FastAPI(

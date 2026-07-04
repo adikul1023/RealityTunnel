@@ -92,3 +92,27 @@ class PaymentRepository(BaseRepository[Payment]):
             raise DatabaseOperationError(
                 "Database error querying payments for account"
             ) from exc
+
+    async def get_stale_pending_payments(
+        self, cutoff_time: datetime, *, for_update: bool = False
+    ) -> list[Payment]:
+        """
+        Retrieve all pending or created payments created before cutoff_time.
+        If for_update=True, acquires row-level exclusive lock (SELECT ... FOR UPDATE).
+        """
+        try:
+            from app.models.payment import PaymentStatus
+            stmt = (
+                select(Payment)
+                .where(Payment.status.in_([PaymentStatus.CREATED, PaymentStatus.PENDING]))
+                .where(Payment.created_at <= cutoff_time)
+            )
+            if for_update:
+                stmt = stmt.with_for_update()
+            result = await self.session.execute(stmt)
+            return list(result.scalars().all())
+        except SQLAlchemyError as exc:
+            raise DatabaseOperationError(
+                "Database error querying stale pending payments"
+            ) from exc
+

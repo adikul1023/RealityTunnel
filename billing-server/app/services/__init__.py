@@ -94,6 +94,7 @@ from app.services.payment import (
     WebhookService,
 )
 from app.services.credential_service import CredentialService
+from app.services.lifecycle_job_service import LifecycleJobService
 
 __all__ = [
     "ServiceError",
@@ -176,7 +177,9 @@ __all__ = [
     "PaymentService",
     "WebhookService",
     "CredentialService",
+    "LifecycleJobService",
 ]
+
 
 
 
