@@ -133,7 +133,7 @@ alembic history
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `APP_VERSION` | `0.1.0` | Reported in `/version` |
+| `APP_VERSION` | `1.0.0` | Reported in `/version` |
 | `ENVIRONMENT` | `development` | `development` \| `staging` \| `production` |
 | `DEBUG` | `false` | Enable SQLAlchemy echo |
 | `LOG_LEVEL` | `INFO` | Python logging level |
@@ -149,29 +149,39 @@ alembic history
 
 ---
 
+## Production Documentation & Guides
+
+For production deployment, security hardening, environment variables, and troubleshooting, refer to our official documentation suite:
+
+- [Production Deployment Guide](file:///d:/My%20projects/VPN/OverREALITY/billing-server/docs/deployment_guide.md)
+- [Environment Variables Reference](file:///d:/My%20projects/VPN/OverREALITY/billing-server/docs/environment_variables.md)
+- [Production Checklist](file:///d:/My%20projects/VPN/OverREALITY/billing-server/docs/production_checklist.md)
+- [Troubleshooting & Recovery](file:///d:/My%20projects/VPN/OverREALITY/billing-server/docs/troubleshooting.md)
+- [System Architecture](file:///d:/My%20projects/VPN/OverREALITY/billing-server/docs/architecture.md)
+
+---
+
 ## Project structure
 
 ```
 billing-server/
 ├── app/
-│   ├── __init__.py
 │   ├── main.py            # FastAPI app, lifespan, root routes
 │   ├── config.py          # pydantic-settings (env vars)
 │   ├── database.py        # SQLAlchemy engine, session, Base
-│   ├── logging_config.py  # Centralised logging setup
-│   └── routers/
-│       ├── __init__.py
-│       └── health.py      # GET /health
-├── alembic/
-│   ├── env.py             # Async Alembic env
-│   ├── script.py.mako     # Migration template
-│   └── versions/          # Generated migration files
-├── alembic.ini
-├── docker-compose.yml
-├── Dockerfile
-├── requirements.txt
-├── .env.example
-└── README.md
+│   ├── security.py        # Auth & Ed25519 JWT security
+│   ├── observability/     # Metrics, structured logging, tracing
+│   ├── performance/       # Profiler, cache, pooling optimization
+│   ├── recovery/          # Disaster recovery, backups, restore
+│   ├── repositories/      # Data access layer
+│   ├── routers/           # API routes & health inspection
+│   └── services/          # Business logic layer
+├── deployment/            # Automated deployment, staging, rollback, upgrade scripts
+├── docs/                  # Production documentation suite
+├── scripts/               # Changelog and SBOM generators
+├── tests/                 # Unit, integration, and smoke test suites
+├── docker-compose.prod.yml # Hardened production compose configuration
+└── Dockerfile             # Multi-stage production Docker build
 ```
 
 ---
@@ -182,4 +192,5 @@ billing-server/
 - [x] `GET /health` returns `{"status": "ok"}` with PostgreSQL reachable
 - [x] Alembic initialized and configured for async
 - [x] `.env.example` documents all variables
+- [x] Production Docker hardening, CI/CD, and release tooling verified
 - [x] Git commit pushed to `origin/main`

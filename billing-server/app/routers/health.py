@@ -38,6 +38,9 @@ class HealthResponse(BaseModel):
     status: str
     database: dict[str, Any] | str | None = None
     version: str | None = None
+    git_commit: str | None = None
+    build_date: str | None = None
+    docker_image: str | None = None
     components: dict[str, ComponentStatus] | None = None
     fingerprint: dict[str, Any] | None = None
     scheduler: dict[str, Any] | None = None
@@ -127,6 +130,9 @@ async def health_check(
         "status": status_str,
         "database": db_status,
         "version": settings.app_version,
+        "git_commit": getattr(settings, "git_commit", "unknown"),
+        "build_date": getattr(settings, "build_date", "unknown"),
+        "docker_image": getattr(settings, "docker_image", "billing-server-billing-api:latest"),
         "components": components,
     }
 

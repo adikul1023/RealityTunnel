@@ -27,7 +27,10 @@ class Settings(BaseSettings):
     )
 
     # ── Application [Public Config / Development Only] ───────────────────────
-    app_version: str = "0.1.0"                # [Public Config]
+    app_version: str = "1.0.0"                # [Public Config]
+    git_commit: str = "unknown"               # [Public Config]
+    build_date: str = "unknown"               # [Public Config]
+    docker_image: str = "billing-server-billing-api:latest"  # [Public Config]
     environment: str = "development"          # [Development Only / Profile]: development | testing | staging | production
     debug: bool = False                       # [Development Only]: Must be False in production
     log_level: str = "INFO"                   # [Operational Parameter]

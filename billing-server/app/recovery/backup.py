@@ -223,7 +223,7 @@ class BackupService:
             "created_at": datetime.now(timezone.utc).isoformat(),
             "postgres_revision": postgres_revision,
             "git_commit_hash": self._get_git_commit_hash(),
-            "application_version": getattr(settings, "app_version", "0.1.0"),
+            "application_version": getattr(settings, "app_version", "1.0.0"),
             "configuration_fingerprint": compute_configuration_fingerprint(),
             "checksums": {
                 db_file.name: db_hash,

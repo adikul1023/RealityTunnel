@@ -1,0 +1,105 @@
+services:
+  # ── PostgreSQL Production Database ──────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-billing_prod}
+      POSTGRES_USER: ${POSTGRES_USER:-billing}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required for production}
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    networks:
+      - internal_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-billing} -d ${POSTGRES_DB:-billing_prod}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: "1G"
+        reservations:
+          cpus: "0.25"
+          memory: "256M"
+
+  # ── Billing & Authentication Production API ─────────────────────────────────
+  billing-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+      args:
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+        VERSION: ${APP_VERSION:-1.0.0}
+    image: ${DOCKER_IMAGE:-billing-server-billing-api:latest}
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "false"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      APP_VERSION: ${APP_VERSION:-1.0.0}
+      GIT_COMMIT: ${GIT_COMMIT:-unknown}
+      BUILD_DATE: ${BUILD_DATE:-unknown}
+      DOCKER_IMAGE: ${DOCKER_IMAGE:-billing-server-billing-api:latest}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-billing_prod}
+      POSTGRES_USER: ${POSTGRES_USER:-billing}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required for production}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required for production}
+      MASTER_TOKEN_HASH: ${MASTER_TOKEN_HASH:-}
+      API_KEY: ${API_KEY:-}
+    volumes:
+      - backup_data_prod:/app/backups
+      - brain_data_prod:/app/brain
+    ports:
+      - "${PORT:-8080}:8080"
+    networks:
+      - internal_net
+      - ingress_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: "1.5G"
+        reservations:
+          cpus: "0.5"
+          memory: "512M"
+
+networks:
+  internal_net:
+    internal: true
+  ingress_net:
+    driver: bridge
+
+volumes:
+  postgres_data_prod:
+  backup_data_prod:
+  brain_data_prod:
