@@ -69,6 +69,16 @@ class MetricsRegistry:
         self.register_metric("csrf_rejections_total", "counter", "Total CSRF validation rejections (HTTP 403).")
         self.register_metric("tls_validation_failures_total", "counter", "Total TLS/HTTPS validation failures.")
 
+        self.register_metric("db_query_seconds", "summary", "Database query execution latency in seconds.")
+        self.register_metric("db_pool_usage", "gauge", "Active database connections currently in use.")
+        self.register_metric("cache_hits_total", "counter", "Total successful cache hits.")
+        self.register_metric("cache_misses_total", "counter", "Total cache misses.")
+        self.register_metric("cache_hit_ratio", "gauge", "Ratio of cache hits to total cache requests (0.0 - 1.0).")
+        self.register_metric("endpoint_latency_seconds", "summary", "HTTP endpoint latency observation in seconds.")
+        self.register_metric("scheduler_duration_seconds", "summary", "Background scheduler loop duration in seconds.")
+        self.register_metric("memory_usage_bytes", "gauge", "Current process resident set size memory allocation in bytes.")
+        self.register_metric("cpu_usage_percent", "gauge", "Current CPU utilization percentage.")
+
     def register_metric(self, name: str, metric_type: str, help_text: str) -> None:
         with self._lock:
             self._descriptions[name] = (metric_type, help_text)

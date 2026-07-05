@@ -18,6 +18,7 @@ from app.config import settings
 from app.observability.context import bind_context, reset_context
 from app.observability.metrics import metrics_registry
 from app.observability.tracing import get_tracer
+from app.performance.profiler import profiler
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +80,7 @@ class RequestObservabilityMiddleware(BaseHTTPMiddleware):
             metric_labels = {"method": method, "route": route_label, "status": status_str}
             metrics_registry.inc_counter("http_requests_total", 1.0, metric_labels)
             metrics_registry.observe("http_request_duration_ms", duration_ms, labels)
+            profiler.record_latency("endpoint", duration_ms / 1000.0)
 
             if status_code >= 400:
                 metrics_registry.inc_counter("http_errors_total", 1.0, metric_labels)

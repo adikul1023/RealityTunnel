@@ -12,8 +12,11 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import DeclarativeBase
 
+import time
 from app.config import settings
 from app.observability.metrics import metrics_registry
+from app.performance.pooling import get_engine_pool_kwargs
+from app.performance.profiler import profiler
 
 logger = logging.getLogger(__name__)
 
@@ -22,15 +25,22 @@ logger = logging.getLogger(__name__)
 engine = create_async_engine(
     settings.database_url,
     echo=settings.debug,          # SQL logging in debug mode
-    pool_pre_ping=True,           # validate connections before use
-    pool_size=5,
-    max_overflow=10,
+    **get_engine_pool_kwargs(),
 )
+
+
+@event.listens_for(engine.sync_engine, "before_cursor_execute")
+def receive_before_cursor_execute(conn, cursor, statement, parameters, context, execmany):
+    if context:
+        context._query_start_time = time.perf_counter()
 
 
 @event.listens_for(engine.sync_engine, "after_cursor_execute")
 def receive_after_cursor_execute(conn, cursor, statement, parameters, context, execmany):
     metrics_registry.inc_counter("db_queries_total")
+    if context and hasattr(context, "_query_start_time"):
+        duration = time.perf_counter() - context._query_start_time
+        profiler.record_latency("query", duration)
 
 
 @event.listens_for(engine.sync_engine, "rollback")

@@ -82,6 +82,10 @@ async def lifespan(app: FastAPI):
     app.state.scheduler = scheduler
     app.state.secret_rotation = secret_rotation_service
     app.state.audit = audit_service
+    from app.performance.cache import get_cache
+    from app.performance.profiler import profiler
+    app.state.cache = get_cache()
+    app.state.profiler = profiler
     yield
     logger.info("Billing server shutting down…")
     await scheduler.stop()

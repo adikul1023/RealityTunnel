@@ -133,8 +133,19 @@ class Settings(BaseSettings):
     security_corp: str = "same-origin"        # [Operational Parameter]
     security_coep: str = "require-corp"       # [Operational Parameter]
     max_payload_size_bytes: int = 1048576     # [Operational Parameter] 1 MB default
-    csrf_protection_enabled: bool = True      # [Operational Parameter]
     csrf_allowed_origins: str = "http://localhost:8080,http://127.0.0.1:8080" # [Internal Config] comma-separated
+
+    # ── Phase 3.6 — Performance, Scalability & Load Testing Settings ─────────
+    db_pool_size: int = 5                     # [Operational Parameter]
+    db_max_overflow: int = 10                 # [Operational Parameter]
+    db_pool_timeout: float = 30.0             # [Operational Parameter]
+    db_pool_recycle: int = 1800               # [Operational Parameter] 30 minutes
+    db_pool_pre_ping: bool = True             # [Operational Parameter]
+    cache_enabled: bool = True                # [Operational Parameter]
+    cache_backend: str = "memory"             # [Operational Parameter] memory | redis
+    cache_ttl_seconds: int = 300              # [Operational Parameter] 5 minutes default
+    profiler_enabled: bool = True             # [Operational Parameter]
+    slow_query_threshold_ms: float = 200.0    # [Operational Parameter]
 
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":

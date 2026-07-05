@@ -46,6 +46,7 @@ class HealthResponse(BaseModel):
     metrics_summary: dict[str, Any] | None = None
     backups: dict[str, Any] | None = None
     security: dict[str, Any] | None = None
+    performance: dict[str, Any] | None = None
 
 
 @router.get(
@@ -206,6 +207,28 @@ async def health_check(
                 "rotation_status": "error",
                 "audit_queue_status": {"error": str(exc)},
             }
+
+        try:
+            from app.performance.pooling import get_pool_status
+            from app.performance.profiler import profiler
+            from app.performance.cache import get_cache
+            pool_status = get_pool_status()
+            cache_status = await get_cache().get_stats()
+            endpoint_pcts = profiler.get_category_percentiles("endpoint")
+            res_usage = profiler.get_resource_usage()
+            response_kwargs["performance"] = {
+                "database_pool_usage": pool_status.get("checked_out", 0),
+                "database_pool_status": pool_status,
+                "cache_statistics": cache_status,
+                "average_endpoint_latency_ms": endpoint_pcts.get("avg", 0.0),
+                "p95_latency_ms": endpoint_pcts.get("p95", 0.0),
+                "scheduler_utilization": response_kwargs.get("scheduler", {}),
+                "memory_usage_bytes": res_usage.get("memory_usage_bytes", 0),
+                "cpu_usage_percent": res_usage.get("cpu_usage_percent", 0.0),
+            }
+        except Exception as exc:
+            logger.warning("Failed to retrieve performance health: %s", exc)
+            response_kwargs["performance"] = {"error": str(exc)}
 
     response = HealthResponse(**response_kwargs)
 
