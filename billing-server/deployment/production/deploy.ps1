@@ -7,8 +7,15 @@ $ErrorActionPreference = "Stop"
 Write-Host "── Starting RealityTunnel Production Deployment ──" -ForegroundColor Cyan
 
 # 1. Verify environment variables
-if (-not $env:POSTGRES_PASSWORD -or -not $env:JWT_SECRET) {
-    Write-Host "ERROR: Required production environment variables (POSTGRES_PASSWORD, JWT_SECRET) are not set!" -ForegroundColor Red
+# NOTE (Finding H-1): JWT_SECRET was previously checked here but is dead configuration -
+# it has no corresponding field in app/config.py::Settings and is never read by the
+# application. Actual JWT signing uses Ed25519 PEM keypairs loaded from disk
+# (dev_keys/ed25519_private.pem, dev_keys/admin/admin_ed25519_private.pem), which are
+# validated at application startup by app.core.startup_validator.validate_startup_configuration()
+# and will refuse to boot in production if missing or invalid. Only POSTGRES_PASSWORD is
+# actually required by this script's own pre-flight guard.
+if (-not $env:POSTGRES_PASSWORD) {
+    Write-Host "ERROR: Required production environment variable POSTGRES_PASSWORD is not set!" -ForegroundColor Red
     exit 1
 }
 

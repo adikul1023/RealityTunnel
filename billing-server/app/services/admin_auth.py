@@ -106,7 +106,7 @@ class AdminAuthenticationService:
         try:
             await self.admin_repo.update(admin, last_login_at=datetime.now(timezone.utc))
         except Exception as exc:
-            logger.error("Failed to update last_login_at for admin account")
+            logger.error("Failed to update last_login_at for admin account: %s", exc, exc_info=True)
             # We log but do not abort successful authentication if timestamp update fails
 
         token = self.jwt_service.issue_admin_token(

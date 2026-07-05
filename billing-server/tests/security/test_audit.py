@@ -7,7 +7,8 @@ from app.security_hardening.exceptions import SecurityHardeningError
 from app.observability.metrics import metrics_registry
 
 
-def test_audit_event_immutability_and_zero_secret_redaction():
+@pytest.mark.asyncio
+async def test_audit_event_immutability_and_zero_secret_redaction():
     """Verify audit event creation, deep secret scrubbing, and immutability protection."""
     srv = AuditService()
     initial_cnt = metrics_registry.get_summary().get("audit_events_total", 0)
@@ -24,7 +25,7 @@ def test_audit_event_immutability_and_zero_secret_redaction():
         },
     }
 
-    event = srv.record_event(
+    event = await srv.record_event(
         event_type="admin_login",
         actor_id="admin_user_id",
         target_id="system",
@@ -53,6 +54,6 @@ def test_audit_event_immutability_and_zero_secret_redaction():
         srv.modify_or_delete_event(event.event_id)
 
     # Verify queue status
-    status = srv.get_queue_status()
+    status = await srv.get_queue_status()
     assert status["immutable"] is True
     assert status["total_events_recorded"] >= 1

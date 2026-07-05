@@ -1,15 +1,15 @@
 """
-audit.py — Immutable security audit logging service (Phase 3.5).
+audit.py — Immutable security audit logging service (Phase 3.5, updated Phase 3.0.5).
 
 Records security-critical events (admin actions, logins, payments, device lifecycle)
 with mandatory zero-secret redaction and immutability guarantees.
+Now uses durable database storage via AuditEventRepository.
 """
 from __future__ import annotations
 
 import copy
 import logging
 import re
-import threading
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -18,6 +18,7 @@ from typing import Any
 from app.core.redaction import redact_data, redact_string
 from app.observability.metrics import metrics_registry
 from app.security_hardening.exceptions import SecurityHardeningError
+from app.database import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -83,17 +84,14 @@ class AuditEvent:
 
 class AuditService:
     """
-    Thread-safe, append-only immutable audit log service.
+    Thread-safe, append-only immutable audit log service with durable database storage.
     Enforces strict event categorization and zero-secret data retention.
     """
 
-    def __init__(self, max_records: int = 10000) -> None:
-        self._lock = threading.RLock()
-        self._events: list[AuditEvent] = []
-        self._max_records = max_records
-        self._total_recorded = 0
+    def __init__(self) -> None:
+        pass  # No longer needs in-memory storage
 
-    def record_event(
+    async def record_event(
         self,
         event_type: str,
         actor_id: str,
@@ -102,7 +100,8 @@ class AuditService:
         ip_hash: str | None = None,
     ) -> AuditEvent:
         """
-        Record a new security audit event. All details are deeply scrubbed of credentials.
+        Record a new security audit event to durable database storage.
+        All details are deeply scrubbed of credentials before persistence.
         """
         if event_type not in SUPPORTED_AUDIT_EVENT_TYPES:
             # Allow custom but log warning, or default to admin_action if unknown
@@ -115,22 +114,30 @@ class AuditService:
         if not isinstance(scrubbed_details, dict):
             scrubbed_details = {"value": scrubbed_details}
 
-        event = AuditEvent(
-            event_id=str(uuid.uuid4()),
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            event_type=event_type,
-            actor_id=str(actor_id),
-            target_id=str(target_id),
-            details=scrubbed_details,
-            ip_hash=ip_hash,
-        )
+        # Persist to database
+        from app.repositories.audit_event_repository import AuditEventRepository
+        
+        async with AsyncSessionLocal() as session:
+            repo = AuditEventRepository(session)
+            db_event = await repo.create(
+                event_type=event_type,
+                actor_id=str(actor_id),
+                target_id=str(target_id),
+                details=scrubbed_details,
+                ip_hash=ip_hash,
+            )
+            await session.commit()
 
-        with self._lock:
-            self._events.append(event)
-            self._total_recorded += 1
-            if len(self._events) > self._max_records:
-                # Prune oldest while maintaining append-only immutability of preserved window
-                self._events.pop(0)
+        # Convert to immutable dataclass for return
+        event = AuditEvent(
+            event_id=db_event.event_id,
+            timestamp=db_event.timestamp.isoformat(),
+            event_type=db_event.event_type,
+            actor_id=db_event.actor_id,
+            target_id=db_event.target_id,
+            details=db_event.details,
+            ip_hash=db_event.ip_hash,
+        )
 
         metrics_registry.inc_counter("audit_events_total")
         logger.info(
@@ -142,20 +149,42 @@ class AuditService:
         )
         return event
 
-    def list_events(
-        self, event_type: str | None = None, limit: int = 100, offset: int = 0
+    async def list_events(
+        self,
+        event_type: str | None = None,
+        actor_id: str | None = None,
+        target_id: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> list[dict[str, Any]]:
         """
-        Retrieve a paginated, read-only list of audit event records.
+        Retrieve a paginated, read-only list of audit event records from database.
+        Returns events in reverse chronological order (newest first).
         """
-        with self._lock:
-            filtered = [
-                e for e in self._events
-                if event_type is None or e.event_type == event_type
-            ]
-            # Return in reverse chronological order (newest first)
-            slice_events = list(reversed(filtered))[offset : offset + limit]
-            return [e.to_dict() for e in slice_events]
+        from app.repositories.audit_event_repository import AuditEventRepository
+        
+        async with AsyncSessionLocal() as session:
+            repo = AuditEventRepository(session)
+            db_events = await repo.list_events(
+                event_type=event_type,
+                actor_id=actor_id,
+                target_id=target_id,
+                limit=limit,
+                offset=offset,
+            )
+        
+        return [
+            {
+                "event_id": e.event_id,
+                "timestamp": e.timestamp.isoformat(),
+                "event_type": e.event_type,
+                "actor_id": e.actor_id,
+                "target_id": e.target_id,
+                "details": e.details,
+                "ip_hash": e.ip_hash,
+            }
+            for e in db_events
+        ]
 
     def modify_or_delete_event(self, *args: Any, **kwargs: Any) -> None:
         """
@@ -163,18 +192,15 @@ class AuditService:
         """
         raise SecurityHardeningError("Audit log is immutable; events cannot be modified or deleted.")
 
-    def get_queue_status(self) -> dict[str, Any]:
+    async def get_queue_status(self) -> dict[str, Any]:
         """
         Return audit queue status and persistence statistics for admin /health inspection.
         """
-        with self._lock:
-            return {
-                "total_events_recorded": self._total_recorded,
-                "in_memory_count": len(self._events),
-                "max_capacity": self._max_records,
-                "status": "ok",
-                "immutable": True,
-            }
+        from app.repositories.audit_event_repository import AuditEventRepository
+        
+        async with AsyncSessionLocal() as session:
+            repo = AuditEventRepository(session)
+            return await repo.get_queue_status()
 
 
 # Global singleton instance

@@ -464,9 +464,10 @@ async def test_admin_retry_queue_endpoints(
 ):
     """Test retry queue inspection, immediate retry execution, and discard."""
     acc = await account_factory(account_id="RT-ADM-RETRY-1")
+    acc2 = await account_factory(account_id="RT-ADM-RETRY-2")
     await _create_sample_provisioning(db_session, acc.id, ProvisioningState.FAILED)
     item1 = await _create_sample_retry_item(db_session, acc.id, RetryItemStatus.PENDING)
-    item2 = await _create_sample_retry_item(db_session, acc.id, RetryItemStatus.PENDING)
+    item2 = await _create_sample_retry_item(db_session, acc2.id, RetryItemStatus.PENDING)
 
     headers, _ = await admin_auth_headers_factory(
         is_super_admin=False, username="retry_ro_admin"

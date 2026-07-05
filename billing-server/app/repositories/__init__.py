@@ -13,6 +13,7 @@ from app.repositories.provisioning_repository import ProvisioningRepository
 from app.repositories.payment_repository import PaymentRepository
 from app.repositories.provisioning_retry_repository import ProvisioningRetryRepository
 from app.repositories.system_health_repository import SystemHealthRepository
+from app.repositories.audit_event_repository import AuditEventRepository
 
 __all__ = [
     "BaseRepository",
@@ -26,6 +27,7 @@ __all__ = [
     "PaymentRepository",
     "ProvisioningRetryRepository",
     "SystemHealthRepository",
+    "AuditEventRepository",
 ]
 
 

@@ -14,7 +14,9 @@ Covers:
   - Startup validator report and fail-fast exception raising
 """
 import logging
+import os
 import pytest
+from contextlib import contextmanager
 from unittest.mock import patch, MagicMock
 from pathlib import Path
 
@@ -22,9 +24,49 @@ from app.config import Settings
 from app.core.profiles import EnvironmentProfile, parse_environment_profile
 from app.core.feature_flags import FeatureFlags
 from app.core.redaction import redact_string, redact_data, is_sensitive_key, RedactingFormatter, REDACTED_STR
-from app.core.secret_registry import secret_registry, SecretDefinition
+from app.core.secret_registry import secret_registry, SecretDefinition, _validate_strong_secret
 from app.core.fingerprint import compute_configuration_fingerprint
-from app.core.startup_validator import validate_startup_configuration, ConfigurationError, ConfigurationReport
+from app.core.startup_validator import (
+    validate_startup_configuration,
+    ConfigurationError,
+    ConfigurationReport,
+    collect_missing_ed25519_key_files,
+)
+
+_VALID_PEM = "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----"
+
+
+@contextmanager
+def _production_validator_test_context(**secret_overrides: str | None):
+    """
+    Patch disk PEM file guard and prime secret_registry definition values for production
+    validator tests (Finding C-3 validation reads definition.value, not get() mocks).
+    """
+    primed_values: dict[str, str | None] = {
+        "jwt_private_key": _VALID_PEM,
+        "jwt_public_key": _VALID_PEM,
+        "admin_jwt_private_key": _VALID_PEM,
+        "admin_jwt_public_key": _VALID_PEM,
+    }
+    primed_values.update(secret_overrides)
+
+    original_load = secret_registry.load_from_settings
+
+    def priming_load(settings: Settings) -> None:
+        original_load(settings)
+        for name, value in primed_values.items():
+            defn = secret_registry.get_definition(name)
+            if defn is not None:
+                defn.value = value
+
+    with (
+        patch(
+            "app.core.startup_validator.collect_missing_ed25519_key_files",
+            return_value=[],
+        ),
+        patch.object(secret_registry, "load_from_settings", side_effect=priming_load),
+    ):
+        yield
 
 
 # ── 1. Environment Profiles Tests ─────────────────────────────────────────────
@@ -192,8 +234,7 @@ def test_missing_and_invalid_jwt_keys_in_production():
     )
     flags = FeatureFlags(payments_enabled=False, provisioning_enabled=False)
 
-    # Mock secret registry get to simulate missing customer JWT keys
-    with patch.object(secret_registry, "get", side_effect=lambda k: None if "jwt" in k else "dummy"):
+    with _production_validator_test_context(jwt_private_key=None, jwt_public_key=None):
         with pytest.raises(ConfigurationError, match="Customer JWT Ed25519 signing keypair missing or invalid"):
             validate_startup_configuration(settings, flags)
 
@@ -209,15 +250,10 @@ def test_missing_admin_key_in_production():
     )
     flags = FeatureFlags(payments_enabled=False, provisioning_enabled=False)
 
-    # Mock secret registry get to simulate valid customer JWT but missing admin JWT keys
-    def mock_get(key: str):
-        if key in ("jwt_private_key", "jwt_public_key"):
-            return "BEGIN PRIVATE KEY\n...\nEND PRIVATE KEY"
-        if key in ("admin_jwt_private_key", "admin_jwt_public_key"):
-            return None
-        return "dummy"
-
-    with patch.object(secret_registry, "get", side_effect=mock_get):
+    with _production_validator_test_context(
+        admin_jwt_private_key=None,
+        admin_jwt_public_key=None,
+    ):
         with pytest.raises(ConfigurationError, match="Admin JWT Ed25519 signing keypair missing or invalid"):
             validate_startup_configuration(settings, flags)
 
@@ -245,7 +281,7 @@ def test_production_placeholder_rejection():
     )
     flags = FeatureFlags(payments_enabled=False, provisioning_enabled=False)
 
-    with patch.object(secret_registry, "get", return_value="BEGIN KEY\n...\nEND KEY"):
+    with _production_validator_test_context():
         with pytest.raises(ConfigurationError, match="secret_key is default, short"):
             validate_startup_configuration(settings, flags)
 
@@ -261,7 +297,7 @@ def test_production_debug_mode_rejection():
     )
     flags = FeatureFlags(payments_enabled=False, provisioning_enabled=False)
 
-    with patch.object(secret_registry, "get", return_value="BEGIN KEY\n...\nEND KEY"):
+    with _production_validator_test_context():
         with pytest.raises(ConfigurationError, match="debug mode must be False in production"):
             validate_startup_configuration(settings, flags)
 
@@ -277,7 +313,7 @@ def test_production_localhost_callback_rejection():
     )
     flags = FeatureFlags(payments_enabled=False, provisioning_enabled=True)
 
-    with patch.object(secret_registry, "get", return_value="BEGIN KEY\n...\nEND KEY"):
+    with _production_validator_test_context():
         with pytest.raises(ConfigurationError, match="localhost or non-HTTPS gateway URLs prohibited"):
             validate_startup_configuration(settings, flags)
 
@@ -295,8 +331,42 @@ def test_production_test_keys_rejection():
     )
     flags = FeatureFlags(payments_enabled=True, provisioning_enabled=False, webhooks_enabled=False)
 
-    with patch.object(secret_registry, "get", return_value="BEGIN KEY\n...\nEND KEY"):
+    with _production_validator_test_context():
         with pytest.raises(ConfigurationError, match="test payment or webhook keys detected"):
+            validate_startup_configuration(settings, flags)
+
+
+def test_missing_ed25519_key_files_on_disk_in_production(tmp_path: Path):
+    """
+    Regression test for Finding H-1.
+
+    Production boot must fail loudly when Ed25519 PEM files are absent on disk,
+    with explicit paths — JWT signing does not use JWT_SECRET.
+    """
+    settings = Settings(
+        environment="production",
+        debug=False,
+        secret_key="A_very_strong_random_secret_key_1234567890",
+        postgres_host="localhost",
+        postgres_user="u",
+        postgres_db="db",
+        postgres_password="p",
+        database_url="postgresql+asyncpg://u:p@localhost/db",
+        marzban_base_url="https://vpn.example.com",
+    )
+    flags = FeatureFlags(payments_enabled=False, provisioning_enabled=False)
+
+    missing = collect_missing_ed25519_key_files(project_root=tmp_path)
+    assert "dev_keys/ed25519_private.pem" in missing
+
+    with patch(
+        "app.core.startup_validator.collect_missing_ed25519_key_files",
+        return_value=missing,
+    ):
+        with pytest.raises(
+            ConfigurationError,
+            match=r"Ed25519 JWT signing key PEM file\(s\) missing or empty on disk",
+        ):
             validate_startup_configuration(settings, flags)
 
 
@@ -321,6 +391,131 @@ def test_startup_validator_report():
         # Verify zero secrets in string output
         assert "Staging_strong" not in report_str
 
+
+def test_registry_rejects_weak_registered_secret_in_production():
+    """
+    Finding C-3: secret_registry validation must reject weak/placeholder values in production
+    and name the failing secret without leaking its value.
+    """
+    settings = Settings(
+        environment="production",
+        debug=False,
+        secret_key="A_very_strong_random_secret_key_1234567890",
+        postgres_host="localhost",
+        postgres_user="u",
+        postgres_db="db",
+        postgres_password="p",
+        database_url="postgresql+asyncpg://u:p@localhost/db",
+        marzban_base_url="https://vpn.example.com",
+    )
+    flags = FeatureFlags(payments_enabled=False, provisioning_enabled=False)
+
+    secret_registry.register(
+        name="audit_test_weak_secret",
+        description="Temporary secret for C-3 regression test.",
+        required_in_production=True,
+        rotation_recommendation="N/A",
+        validation_function=_validate_strong_secret,
+    )
+    try:
+        with _production_validator_test_context():
+            secret_registry.get_definition("audit_test_weak_secret").value = "CHANGE_ME_dev-only"
+            with pytest.raises(
+                ConfigurationError,
+                match=r"Production secret validation failed for 'audit_test_weak_secret'",
+            ) as exc_info:
+                validate_startup_configuration(settings, flags)
+            assert "CHANGE_ME" not in str(exc_info.value)
+    finally:
+        secret_registry._secrets.pop("audit_test_weak_secret", None)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="Permission check is POSIX-only")
+def test_insecure_private_key_permissions_fail_in_production(tmp_path: Path):
+    """
+    Finding H-6: private key PEM files with group/other permissions (e.g. 0644) must fail
+    the Secure Key Permissions production guard on POSIX systems.
+    """
+    from app.core.startup_validator import _check_private_key_file_permissions
+    
+    dev_keys = tmp_path / "dev_keys"
+    admin_keys = dev_keys / "admin"
+    admin_keys.mkdir(parents=True)
+    pem_body = "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----"
+    for rel in ("ed25519_private.pem", "ed25519_public.pem"):
+        (dev_keys / rel).write_text(pem_body, encoding="utf-8")
+    for rel in ("admin_ed25519_private.pem", "admin_ed25519_public.pem"):
+        (admin_keys / rel).write_text(pem_body, encoding="utf-8")
+
+    # Set insecure permissions (0644 has group/other read permissions)
+    insecure_private = dev_keys / "ed25519_private.pem"
+    insecure_private.chmod(0o644)
+
+    # Test the permission check function directly
+    all_secure, insecure_paths = _check_private_key_file_permissions(project_root=tmp_path)
+    assert all_secure is False
+    assert "dev_keys/ed25519_private.pem" in insecure_paths
+    
+    # Set secure permissions (0600 has no group/other permissions)
+    insecure_private.chmod(0o600)
+    all_secure, insecure_paths = _check_private_key_file_permissions(project_root=tmp_path)
+    assert all_secure is True
+    assert len(insecure_paths) == 0
+
+
+@pytest.mark.skipif(os.name != "posix", reason="Integration test requires POSIX for permission checks")
+def test_insecure_private_key_permissions_startup_validation_integration(tmp_path: Path):
+    """
+    Finding H-6: Integration test that validates the permission check is wired into
+    validate_startup_configuration() and fails appropriately on POSIX systems.
+    
+    This test executes the real startup validation path with actual insecure file permissions.
+    """
+    from app.core.startup_validator import validate_startup_configuration, ConfigurationError
+    
+    # Create the key directory structure
+    dev_keys = tmp_path / "dev_keys"
+    admin_keys = dev_keys / "admin"
+    admin_keys.mkdir(parents=True)
+    pem_body = "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----"
+    
+    # Create all required key files
+    for rel in ("ed25519_private.pem", "ed25519_public.pem"):
+        (dev_keys / rel).write_text(pem_body, encoding="utf-8")
+    for rel in ("admin_ed25519_private.pem", "admin_ed25519_public.pem"):
+        (admin_keys / rel).write_text(pem_body, encoding="utf-8")
+
+    # Set insecure permissions on private key (0644 has group/other read)
+    insecure_private = dev_keys / "ed25519_private.pem"
+    insecure_private.chmod(0o644)
+
+    settings = Settings(
+        environment="production",
+        debug=False,
+        secret_key="X9k2mP5vR8nQ3wT7yA4bC6dE1fG9hJ2kL5mN8pQ3rS6tV0xY4zA7bC9dE2fG5hJ8k",
+        postgres_host="localhost",
+        postgres_user="u",
+        postgres_db="db",
+        postgres_password="p",
+        database_url="postgresql+asyncpg://u:p@localhost/db",
+        marzban_base_url="https://vpn.example.com",
+    )
+    flags = FeatureFlags(payments_enabled=False, provisioning_enabled=False)
+
+    # Patch project_root to use tmp_path and bypass missing key file check
+    with (
+        patch("app.core.startup_validator._project_root", return_value=tmp_path),
+        patch("app.core.startup_validator.collect_missing_ed25519_key_files", return_value=[]),
+        _production_validator_test_context(),
+    ):
+        # This should fail due to insecure permissions on POSIX systems
+        with pytest.raises(
+            ConfigurationError,
+            match=r"insecure private key file permissions",
+        ) as exc_info:
+            validate_startup_configuration(settings, flags)
+        assert "dev_keys/ed25519_private.pem" in str(exc_info.value)
+        assert pem_body not in str(exc_info.value)
 
 # ── 6. Health & Admin Endpoint Fingerprint Exposure Tests ─────────────────────
 

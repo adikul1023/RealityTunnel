@@ -33,7 +33,7 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Yield an isolated async database session."""
     from sqlalchemy import text
     async with AsyncSessionLocal() as session:
-        await session.execute(text("TRUNCATE TABLE accounts, connection_signals, admin_users CASCADE"))
+        await session.execute(text("TRUNCATE TABLE accounts, connection_signals, admin_users, audit_events CASCADE"))
         await session.commit()
         yield session
         await session.close()

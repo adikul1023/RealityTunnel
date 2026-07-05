@@ -28,6 +28,7 @@ from app.models.connection_signal import ConnectionEventType
 from app.rate_limit import require_rate_limit
 from app.services import DeviceService, ConnectionSignalService
 from app.services.exceptions import InactiveDeviceError
+from app.security_hardening.audit import audit_service
 from app.routers.device_models import (
     DeviceListResponse,
     DeviceResponse,
@@ -112,6 +113,12 @@ async def register_device(
         success=True,
         device_guid=request.device_guid,
         http_request=http_request,
+    )
+    await audit_service.record_event(
+        event_type="device_register",
+        actor_id=str(current_account.id),
+        target_id=request.device_guid,
+        details={"action": "register_device", "friendly_name": request.friendly_name},
     )
     return DeviceResponse.model_validate(device)
 
@@ -240,6 +247,12 @@ async def deactivate_device(
             device_guid=device_guid,
             http_request=http_request,
         )
+        await audit_service.record_event(
+            event_type="device_deactivate",
+            actor_id=str(current_account.id),
+            target_id=device_guid,
+            details={"action": "deactivate_device", "status": "already_inactive"},
+        )
         return SuccessResponse(success=True, message="Device deactivated successfully")
     except Exception:
         logger.info("Deactivate device failed")
@@ -261,6 +274,12 @@ async def deactivate_device(
         success=True,
         device_guid=device_guid,
         http_request=http_request,
+    )
+    await audit_service.record_event(
+        event_type="device_deactivate",
+        actor_id=str(current_account.id),
+        target_id=device_guid,
+        details={"action": "deactivate_device"},
     )
     return SuccessResponse(success=True, message="Device deactivated successfully")
 
@@ -298,6 +317,12 @@ async def reactivate_device(
             device_guid=device_guid,
             http_request=http_request,
         )
+        await audit_service.record_event(
+            event_type="device_reactivate",
+            actor_id=str(current_account.id),
+            target_id=device_guid,
+            details={"action": "reactivate_device", "status": "already_active"},
+        )
         return DeviceResponse.model_validate(device)
     except Exception:
         logger.info("Reactivate device failed")
@@ -319,5 +344,11 @@ async def reactivate_device(
         success=True,
         device_guid=device_guid,
         http_request=http_request,
+    )
+    await audit_service.record_event(
+        event_type="device_reactivate",
+        actor_id=str(current_account.id),
+        target_id=device_guid,
+        details={"action": "reactivate_device"},
     )
     return DeviceResponse.model_validate(device)

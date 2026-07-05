@@ -40,6 +40,7 @@ from app.services.exceptions import (
     ServiceError,
 )
 from app.exceptions import EntityNotFoundError
+from app.security_hardening.audit import audit_service
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +128,15 @@ async def activate_subscription(
 ) -> AdminSubscriptionDTO:
     """Administratively force activate a subscription."""
     try:
-        return await service.activate_subscription(id)
+        result = await service.activate_subscription(id)
+        # Audit log: subscription activation
+        await audit_service.record_event(
+            event_type="subscription_change",
+            actor_id=str(_admin.id),
+            target_id=id,
+            details={"action": "activate_subscription", "subscription_id": id},
+        )
+        return result
     except Exception as exc:
         _handle_error(exc, "activate_subscription")
 
@@ -145,7 +154,14 @@ async def grace_subscription(
 ) -> AdminSubscriptionDTO:
     """Administratively put a subscription into a grace period."""
     try:
-        return await service.grace_subscription(id, grace_duration_days=body.grace_duration_days)
+        result = await service.grace_subscription(id, grace_duration_days=body.grace_duration_days)
+        await audit_service.record_event(
+            event_type="subscription_change",
+            actor_id=str(_admin.id),
+            target_id=id,
+            details={"action": "grace_subscription", "subscription_id": id, "grace_duration_days": body.grace_duration_days},
+        )
+        return result
     except Exception as exc:
         _handle_error(exc, "grace_subscription")
 
@@ -162,7 +178,14 @@ async def expire_subscription(
 ) -> AdminSubscriptionDTO:
     """Administratively expire a subscription."""
     try:
-        return await service.expire_subscription(id)
+        result = await service.expire_subscription(id)
+        await audit_service.record_event(
+            event_type="subscription_change",
+            actor_id=str(_admin.id),
+            target_id=id,
+            details={"action": "expire_subscription", "subscription_id": id},
+        )
+        return result
     except Exception as exc:
         _handle_error(exc, "expire_subscription")
 
@@ -179,7 +202,14 @@ async def cancel_subscription(
 ) -> AdminSubscriptionDTO:
     """Administratively cancel a subscription."""
     try:
-        return await service.cancel_subscription(id)
+        result = await service.cancel_subscription(id)
+        await audit_service.record_event(
+            event_type="subscription_change",
+            actor_id=str(_admin.id),
+            target_id=id,
+            details={"action": "cancel_subscription", "subscription_id": id},
+        )
+        return result
     except Exception as exc:
         _handle_error(exc, "cancel_subscription")
 
@@ -197,7 +227,14 @@ async def renew_subscription(
 ) -> AdminSubscriptionDTO:
     """Administratively renew or extend subscription expiration."""
     try:
-        return await service.renew_subscription(id, new_expires_at=body.new_expires_at)
+        result = await service.renew_subscription(id, new_expires_at=body.new_expires_at)
+        await audit_service.record_event(
+            event_type="subscription_change",
+            actor_id=str(_admin.id),
+            target_id=id,
+            details={"action": "renew_subscription", "subscription_id": id},
+        )
+        return result
     except Exception as exc:
         _handle_error(exc, "renew_subscription")
 
@@ -252,7 +289,14 @@ async def reconcile_payment(
 ) -> AdminPaymentDTO:
     """Reconcile payment state with remote payment gateway."""
     try:
-        return await service.reconcile_payment(id)
+        result = await service.reconcile_payment(id)
+        await audit_service.record_event(
+            event_type="payment_event",
+            actor_id=str(_admin.id),
+            target_id=id,
+            details={"action": "reconcile_payment", "payment_id": id},
+        )
+        return result
     except Exception as exc:
         _handle_error(exc, "reconcile_payment")
 
@@ -270,7 +314,14 @@ async def resolve_payment(
 ) -> AdminPaymentDTO:
     """Manually resolve a failed or stuck payment."""
     try:
-        return await service.resolve_payment(id, reason=body.reason)
+        result = await service.resolve_payment(id, reason=body.reason)
+        await audit_service.record_event(
+            event_type="payment_event",
+            actor_id=str(_admin.id),
+            target_id=id,
+            details={"action": "resolve_payment", "payment_id": id, "reason": body.reason},
+        )
+        return result
     except Exception as exc:
         _handle_error(exc, "resolve_payment")
 
@@ -308,7 +359,14 @@ async def sync_provisioning(
 ) -> AdminProvisioningDTO:
     """Synchronize VPN profile with remote Marzban server."""
     try:
-        return await service.sync_provisioning(id)
+        result = await service.sync_provisioning(id)
+        await audit_service.record_event(
+            event_type="admin_action",
+            actor_id=str(_admin.id),
+            target_id=id,
+            details={"action": "sync_provisioning", "profile_id": id},
+        )
+        return result
     except Exception as exc:
         _handle_error(exc, "sync_provisioning")
 
@@ -325,7 +383,14 @@ async def retry_provisioning(
 ) -> AdminProvisioningDTO:
     """Retry provisioning an account on VPN gateway."""
     try:
-        return await service.retry_provisioning(id)
+        result = await service.retry_provisioning(id)
+        await audit_service.record_event(
+            event_type="admin_action",
+            actor_id=str(_admin.id),
+            target_id=id,
+            details={"action": "retry_provisioning", "profile_id": id},
+        )
+        return result
     except Exception as exc:
         _handle_error(exc, "retry_provisioning")
 
@@ -342,7 +407,14 @@ async def suspend_provisioning(
 ) -> AdminProvisioningDTO:
     """Suspend user on remote VPN server."""
     try:
-        return await service.suspend_provisioning(id)
+        result = await service.suspend_provisioning(id)
+        await audit_service.record_event(
+            event_type="admin_action",
+            actor_id=str(_admin.id),
+            target_id=id,
+            details={"action": "suspend_provisioning", "profile_id": id},
+        )
+        return result
     except Exception as exc:
         _handle_error(exc, "suspend_provisioning")
 
@@ -359,7 +431,14 @@ async def restore_provisioning(
 ) -> AdminProvisioningDTO:
     """Restore suspended user on remote VPN server."""
     try:
-        return await service.restore_provisioning(id)
+        result = await service.restore_provisioning(id)
+        await audit_service.record_event(
+            event_type="admin_action",
+            actor_id=str(_admin.id),
+            target_id=id,
+            details={"action": "restore_provisioning", "profile_id": id},
+        )
+        return result
     except Exception as exc:
         _handle_error(exc, "restore_provisioning")
 
@@ -376,7 +455,14 @@ async def terminate_provisioning(
 ) -> AdminProvisioningDTO | None:
     """Terminate and delete user on remote VPN server."""
     try:
-        return await service.terminate_provisioning(id)
+        result = await service.terminate_provisioning(id)
+        await audit_service.record_event(
+            event_type="admin_action",
+            actor_id=str(_admin.id),
+            target_id=id,
+            details={"action": "terminate_provisioning", "profile_id": id},
+        )
+        return result
     except Exception as exc:
         _handle_error(exc, "terminate_provisioning")
 
@@ -411,7 +497,14 @@ async def retry_now(
 ) -> AdminRetryItemDTO:
     """Force immediate retry execution for a pending retry queue item."""
     try:
-        return await service.retry_now(id)
+        result = await service.retry_now(id)
+        await audit_service.record_event(
+            event_type="admin_action",
+            actor_id=str(_admin.id),
+            target_id=id,
+            details={"action": "retry_now", "retry_id": id},
+        )
+        return result
     except Exception as exc:
         _handle_error(exc, "retry_now")
 
@@ -428,7 +521,14 @@ async def discard_retry(
 ) -> AdminRetryItemDTO:
     """Discard a pending retry queue item."""
     try:
-        return await service.discard_retry(id)
+        result = await service.discard_retry(id)
+        await audit_service.record_event(
+            event_type="admin_action",
+            actor_id=str(_admin.id),
+            target_id=id,
+            details={"action": "discard_retry", "retry_id": id},
+        )
+        return result
     except Exception as exc:
         _handle_error(exc, "discard_retry")
 

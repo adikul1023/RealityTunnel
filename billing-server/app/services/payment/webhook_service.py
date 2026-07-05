@@ -3,6 +3,7 @@ from typing import Any
 from app.models.payment import Payment
 from app.services.payment.service import PaymentService
 from app.services.exceptions import PaymentWebhookError
+from app.security_hardening.audit import audit_service
 
 
 logger = logging.getLogger(__name__)
@@ -42,22 +43,43 @@ class WebhookService:
                 raise PaymentWebhookError("Webhook payload for captured payment missing order ID")
             if not dto.provider_payment_id:
                 raise PaymentWebhookError("Webhook payload for captured payment missing payment ID")
-            return await self.payment_service.confirm_payment(
+            res = await self.payment_service.confirm_payment(
                 provider_order_id=dto.provider_order_id,
                 provider_payment_id=dto.provider_payment_id,
             )
+            await audit_service.record_event(
+                event_type="payment_webhook",
+                actor_id=str(res.account_id) if res and hasattr(res, "account_id") else "webhook",
+                target_id=str(res.id) if res and hasattr(res, "id") else str(dto.provider_order_id),
+                details={"action": "payment_captured", "event_type": dto.event_type},
+            )
+            return res
         elif dto.event_type in ("payment.failed",):
             if not dto.provider_order_id:
                 raise PaymentWebhookError("Webhook payload for failed payment missing order ID")
-            return await self.payment_service.fail_payment(
+            res = await self.payment_service.fail_payment(
                 provider_order_id=dto.provider_order_id,
                 reason="Webhook payment.failed event",
             )
+            await audit_service.record_event(
+                event_type="payment_webhook",
+                actor_id=str(res.account_id) if res and hasattr(res, "account_id") else "webhook",
+                target_id=str(res.id) if res and hasattr(res, "id") else str(dto.provider_order_id),
+                details={"action": "payment_failed", "event_type": dto.event_type},
+            )
+            return res
         elif dto.event_type in ("refund.processed",):
-            return await self.payment_service.process_refund_webhook(
+            res = await self.payment_service.process_refund_webhook(
                 provider_order_id=dto.provider_order_id,
                 provider_payment_id=dto.provider_payment_id,
             )
+            await audit_service.record_event(
+                event_type="payment_webhook",
+                actor_id=str(res.account_id) if res and hasattr(res, "account_id") else "webhook",
+                target_id=str(res.id) if res and hasattr(res, "id") else str(dto.provider_order_id),
+                details={"action": "payment_refunded", "event_type": dto.event_type},
+            )
+            return res
 
         logger.info("Ignored unhandled webhook event type: %s", dto.event_type)
         return None

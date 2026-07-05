@@ -11,7 +11,7 @@ from datetime import datetime, timezone, timedelta
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.exceptions import EntityNotFoundError, DatabaseOperationError
+from app.exceptions import EntityNotFoundError, DatabaseOperationError, DuplicateEntityError
 from app.models import ProvisioningProfile, ProvisioningState, ProvisioningRetryItem, RetryItemStatus
 from app.repositories import AccountRepository, ProvisioningRepository, ProvisioningRetryRepository
 from app.services.exceptions import (
@@ -84,19 +84,24 @@ class ProvisioningService:
         if is_transient:
             try:
                 now = datetime.now(timezone.utc)
-                pending = await self.retry_repo.get_pending_retries(now + timedelta(days=365))
-                if not any(item.account_id == account_id and item.status == RetryItemStatus.PENDING for item in pending):
-                    retry_item = ProvisioningRetryItem(
-                        account_id=account_id,
-                        plan_id=plan_id,
-                        expires_at=expire_at or (now + timedelta(days=30)),
-                        attempt_count=0,
-                        next_retry_at=now + timedelta(seconds=30),
-                        last_error=str(exc)[:499],
-                        status=RetryItemStatus.PENDING,
-                    )
-                    await self.retry_repo.create(retry_item, commit=True)
-                    logger.info("Enqueued transient provisioning failure for retry account_id=%s", account_id)
+                retry_item = ProvisioningRetryItem(
+                    account_id=account_id,
+                    plan_id=plan_id,
+                    expires_at=expire_at or (now + timedelta(days=30)),
+                    attempt_count=0,
+                    next_retry_at=now + timedelta(seconds=30),
+                    last_error=str(exc)[:499],
+                    status=RetryItemStatus.PENDING,
+                )
+                await self.retry_repo.create(retry_item, commit=True)
+                logger.info("Enqueued transient provisioning failure for retry account_id=%s", account_id)
+            except DuplicateEntityError:
+                # Race recovery (Finding M-10): partial unique index
+                # uq_provisioning_retry_one_pending_per_account rejects duplicate enqueues.
+                logger.info(
+                    "Provisioning retry already pending for account_id=%s; skipping duplicate enqueue",
+                    account_id,
+                )
             except Exception as e:
                 logger.error("Failed to enqueue provisioning retry record: %s", str(e))
 

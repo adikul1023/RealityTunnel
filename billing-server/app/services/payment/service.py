@@ -11,7 +11,8 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.exceptions import EntityNotFoundError
+from app.exceptions import EntityNotFoundError, DuplicateEntityError
+from app.database import advisory_xact_lock
 from app.models import Payment, PaymentProviderType, PaymentStatus
 from app.models.base import SubscriptionLifecycleStatus
 from app.repositories import PaymentRepository, SubscriptionRepository
@@ -61,6 +62,8 @@ class PaymentService:
         Create a new payment transaction and initiate an order on the payment gateway.
         Idempotent: if idempotency_key already exists, returns the existing payment record.
         """
+        await advisory_xact_lock(self.session, f"payment_idempotency:{idempotency_key}")
+
         existing = await self.payment_repo.get_by_idempotency_key(
             idempotency_key, for_update=True
         )
@@ -87,16 +90,31 @@ class PaymentService:
             notes=notes,
         )
 
-        payment = await self.payment_repo.create(
-            account_id=account_id,
-            subscription_id=subscription_id,
-            provider=PaymentProviderType.RAZORPAY,
-            provider_order_id=order_dto.provider_order_id,
-            amount_minor_units=order_dto.amount_minor_units,
-            currency=order_dto.currency,
-            status=PaymentStatus.CREATED,
-            idempotency_key=idempotency_key,
-        )
+        try:
+            payment = await self.payment_repo.create(
+                account_id=account_id,
+                subscription_id=subscription_id,
+                provider=PaymentProviderType.RAZORPAY,
+                provider_order_id=order_dto.provider_order_id,
+                amount_minor_units=order_dto.amount_minor_units,
+                currency=order_dto.currency,
+                status=PaymentStatus.CREATED,
+                idempotency_key=idempotency_key,
+            )
+        except DuplicateEntityError:
+            # Race recovery (Finding M-1): loser of the idempotency_key unique-index race
+            # re-fetches the winner's row instead of surfacing a raw 500.
+            existing = await self.payment_repo.get_by_idempotency_key(
+                idempotency_key, for_update=True
+            )
+            if existing:
+                logger.info(
+                    "Returning existing payment id=%s after idempotency race for key=%s",
+                    existing.id,
+                    idempotency_key,
+                )
+                return existing
+            raise
         logger.info(
             "Created new payment id=%s order_id=%s status=%s",
             payment.id,

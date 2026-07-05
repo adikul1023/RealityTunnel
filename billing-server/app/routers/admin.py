@@ -41,6 +41,7 @@ from app.services.admin_account import AdminAccountService
 from app.services.connection_signal import ConnectionSignalService
 from app.services.device import DeviceService
 from app.services.exceptions import AdminAccountNotFoundError, AdminServiceError
+from app.security_hardening.audit import audit_service
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +144,13 @@ async def suspend_account(
     """
     try:
         account = await admin_account_service.suspend_account(account_id)
+        # Audit log: account suspension
+        await audit_service.record_event(
+            event_type="admin_action",
+            actor_id=str(current_admin.id),
+            target_id=account_id,
+            details={"action": "suspend_account", "account_id": account_id, "new_status": account.status.value},
+        )
     except AdminAccountNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
     except AdminServiceError:
@@ -172,6 +180,13 @@ async def activate_account(
     """
     try:
         account = await admin_account_service.activate_account(account_id)
+        # Audit log: account activation
+        await audit_service.record_event(
+            event_type="admin_action",
+            actor_id=str(current_admin.id),
+            target_id=account_id,
+            details={"action": "activate_account", "account_id": account_id, "new_status": account.status.value},
+        )
     except AdminAccountNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
     except AdminServiceError:
@@ -204,6 +219,13 @@ async def extend_subscription(
     """
     try:
         account = await admin_account_service.extend_subscription(account_id, body.days)
+        # Audit log: subscription extension
+        await audit_service.record_event(
+            event_type="subscription_change",
+            actor_id=str(current_admin.id),
+            target_id=account_id,
+            details={"action": "extend_subscription", "account_id": account_id, "days": body.days, "new_status": account.status.value},
+        )
     except AdminAccountNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
     except AdminServiceError as exc:
@@ -282,6 +304,13 @@ async def logout_all(
     """
     try:
         revoked_count = await admin_account_service.logout_all(account_id)
+        # Audit log: forced logout all sessions
+        await audit_service.record_event(
+            event_type="admin_action",
+            actor_id=str(current_admin.id),
+            target_id=account_id,
+            details={"action": "logout_all", "account_id": account_id, "revoked_count": revoked_count},
+        )
     except AdminAccountNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
     except AdminServiceError:

@@ -6,8 +6,9 @@ Strictly decoupled from customer authentication routes and dependencies.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.dependencies import get_admin_auth_service, get_current_admin
 from app.models.admin_user import AdminUser
@@ -18,6 +19,7 @@ from app.routers.admin_models import (
     AdminProfileResponse,
 )
 from app.services.admin_auth import AdminAuthenticationService
+from app.security_hardening.audit import audit_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["Admin Authentication"])
@@ -39,15 +41,28 @@ router = APIRouter(prefix="/api/admin", tags=["Admin Authentication"])
 )
 async def login(
     request: AdminLoginRequest,
+    http_request: Request,
     admin_auth_service: AdminAuthenticationService = Depends(get_admin_auth_service),
 ) -> AdminLoginResponse:
     """
     Authenticate an administrative username and password pair.
     On success, issues a short-lived Ed25519 signed Admin Access JWT.
     """
+    # Hash client IP for audit logging (never store raw IPs)
+    client_ip = http_request.client.host if http_request.client else "unknown"
+    ip_hash = hashlib.sha256(client_ip.encode()).hexdigest()[:16]
+    
     result = await admin_auth_service.authenticate(request.username, request.password)
     if not result.success or result.admin_user is None or result.access_token is None:
         logger.info("Admin login failed")
+        # Audit log: failed login attempt
+        await audit_service.record_event(
+            event_type="admin_login",
+            actor_id=request.username,
+            target_id="system",
+            details={"action": "login_attempt", "status": "failed", "reason": "invalid_credentials"},
+            ip_hash=ip_hash,
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication failed: invalid credentials or inactive account",
@@ -55,6 +70,16 @@ async def login(
 
     logger.info("Admin login succeeded")
     role = "super_admin" if result.admin_user.is_super_admin else "admin"
+    
+    # Audit log: successful login
+    await audit_service.record_event(
+        event_type="admin_login",
+        actor_id=str(result.admin_user.id),
+        target_id="system",
+        details={"action": "login_success", "username": result.admin_user.username, "role": role},
+        ip_hash=ip_hash,
+    )
+    
     return AdminLoginResponse(
         access_token=result.access_token,
         username=result.admin_user.username,

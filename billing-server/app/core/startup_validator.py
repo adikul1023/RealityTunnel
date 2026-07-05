@@ -19,9 +19,106 @@ from app.config import Settings, get_settings
 from app.core.feature_flags import FeatureFlags
 from app.core.fingerprint import compute_configuration_fingerprint
 from app.core.profiles import EnvironmentProfile, parse_environment_profile
-from app.core.secret_registry import secret_registry
+from app.core.secret_registry import SecretDefinition, secret_registry
 
 logger = logging.getLogger(__name__)
+
+# Ed25519 PEM paths used by jwt_service.py and admin_jwt.py (not env vars — must exist on disk).
+_ED25519_KEY_REL_PATHS: tuple[tuple[str, str], ...] = (
+    ("customer JWT private key", "dev_keys/ed25519_private.pem"),
+    ("customer JWT public key", "dev_keys/ed25519_public.pem"),
+    ("admin JWT private key", "dev_keys/admin/admin_ed25519_private.pem"),
+    ("admin JWT public key", "dev_keys/admin/admin_ed25519_public.pem"),
+)
+
+_PRIVATE_KEY_REL_PATHS: tuple[str, ...] = (
+    "dev_keys/ed25519_private.pem",
+    "dev_keys/admin/admin_ed25519_private.pem",
+)
+
+
+def _project_root() -> Path:
+    return Path(__file__).resolve().parent.parent.parent
+
+
+def collect_missing_ed25519_key_files(project_root: Path | None = None) -> list[str]:
+    """
+    Return relative paths of Ed25519 PEM files that are absent or empty on disk.
+    Used by production startup validation (Finding H-1): JWT signing reads these files,
+    not JWT_SECRET or any other environment variable.
+    """
+    root = project_root or _project_root()
+    missing: list[str] = []
+    for _label, rel_path in _ED25519_KEY_REL_PATHS:
+        key_path = root / rel_path
+        if not key_path.is_file() or key_path.stat().st_size == 0:
+            missing.append(rel_path)
+    return missing
+
+
+def _is_secret_required(
+    definition: SecretDefinition,
+    profile: EnvironmentProfile,
+    flags: FeatureFlags,
+) -> bool:
+    """Return True when a registry secret must pass validation for the current profile/flags."""
+    if not profile.is_production:
+        return False
+    if definition.required_in_production:
+        return True
+    if definition.name == "marzban_api_token" and flags.provisioning_enabled:
+        return True
+    if definition.name in ("razorpay_key_id", "razorpay_key_secret") and flags.payments_enabled:
+        return True
+    if (
+        definition.name == "razorpay_webhook_secret"
+        and flags.payments_enabled
+        and flags.webhooks_enabled
+    ):
+        return True
+    return False
+
+
+def _validate_required_secrets(
+    profile: EnvironmentProfile,
+    flags: FeatureFlags,
+    checks: dict[str, bool],
+    errors: list[str],
+) -> None:
+    """
+    Finding C-3: iterate the central secret registry and enforce each required secret's
+    validation_function. Never include secret values in error messages — names only.
+    """
+    if not profile.is_production:
+        return
+    for definition in secret_registry.get_all_definitions():
+        if not _is_secret_required(definition, profile, flags):
+            continue
+        valid = definition.validation_function(definition.value)
+        checks[f"Secret: {definition.name}"] = valid
+        if not valid:
+            errors.append(
+                f"Production secret validation failed for '{definition.name}' "
+                f"(required; value must meet security requirements)."
+            )
+
+
+def _check_private_key_file_permissions(
+    project_root: Path | None = None,
+) -> tuple[bool, list[str]]:
+    """
+    Finding H-6: private key PEM files must not grant group/other access (mode & 0o077 == 0).
+    Returns (all_secure, list of insecure relative paths).
+    """
+    root = project_root or _project_root()
+    insecure: list[str] = []
+    for rel_path in _PRIVATE_KEY_REL_PATHS:
+        key_path = root / rel_path
+        if not key_path.is_file():
+            continue
+        if os.stat(key_path).st_mode & 0o077:
+            insecure.append(rel_path)
+    return len(insecure) == 0, insecure
 
 
 class ConfigurationError(RuntimeError):
@@ -166,8 +263,7 @@ def validate_startup_configuration(
 
     # 6. Writable Directories Check
     try:
-        project_root = Path(__file__).resolve().parent.parent.parent
-        dev_keys_dir = project_root / "dev_keys"
+        dev_keys_dir = _project_root() / "dev_keys"
         dev_keys_dir.mkdir(parents=True, exist_ok=True)
         test_file = dev_keys_dir / ".write_test"
         test_file.write_text("ok", encoding="utf-8")
@@ -179,6 +275,20 @@ def validate_startup_configuration(
 
     # 7. Production Guards (Strict Phase 3.1.5 enforcement)
     if profile.is_production:
+        # Secret registry validation (Finding C-3 — dead validation wired up)
+        _validate_required_secrets(profile, flags, checks, errors)
+
+        # Ed25519 PEM key files on disk (Finding H-1 — replaces dead JWT_SECRET env var)
+        missing_key_files = collect_missing_ed25519_key_files()
+        key_files_on_disk = len(missing_key_files) == 0
+        prod_checks["Ed25519 Key Files on Disk"] = key_files_on_disk
+        if not key_files_on_disk:
+            errors.append(
+                "Production Guard Failure: Ed25519 JWT signing key PEM file(s) missing or empty "
+                f"on disk (provision under dev_keys/ before startup; there is no JWT_SECRET env "
+                f"var): {', '.join(missing_key_files)}"
+            )
+
         # Debug mode check
         no_debug = not settings.debug
         prod_checks["No Debug Mode"] = no_debug
@@ -219,18 +329,15 @@ def validate_startup_configuration(
         if not (no_localhost and https_ok):
             errors.append("Production Guard Failure: localhost or non-HTTPS gateway URLs prohibited in production.")
 
-        # Key file permissions check on POSIX
+        # Key file permissions check on POSIX (Finding H-6)
         if os.name == "posix":
-            try:
-                for key_name in ("jwt_private_key", "admin_jwt_private_key"):
-                    def_obj = secret_registry.get_definition(key_name)
-                    if def_obj and def_obj.value:
-                        # We verify if file permissions are secure if file exists
-                        pass
-                prod_checks["Secure Key Permissions"] = True
-            except Exception:
-                prod_checks["Secure Key Permissions"] = False
-                errors.append("Production Guard Failure: insecure private key file permissions.")
+            perm_ok, insecure_key_paths = _check_private_key_file_permissions()
+            prod_checks["Secure Key Permissions"] = perm_ok
+            if not perm_ok:
+                errors.append(
+                    "Production Guard Failure: insecure private key file permissions "
+                    f"(mode must not grant group/other access): {', '.join(insecure_key_paths)}"
+                )
 
     fingerprint = compute_configuration_fingerprint(settings, flags)
     status = "error" if errors else "ok"

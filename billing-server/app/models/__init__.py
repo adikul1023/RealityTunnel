@@ -13,6 +13,7 @@ from app.models.provisioning import ProvisioningState, ProvisioningProfile
 from app.models.payment import PaymentStatus, PaymentProviderType, Payment
 from app.models.provisioning_retry import ProvisioningRetryItem, RetryItemStatus
 from app.models.system_health import SystemHealthStatus
+from app.models.audit_event import AuditEvent
 
 __all__ = [
     "SubscriptionStatus",
@@ -38,6 +39,7 @@ __all__ = [
     "ProvisioningRetryItem",
     "RetryItemStatus",
     "SystemHealthStatus",
+    "AuditEvent",
 ]
 
 

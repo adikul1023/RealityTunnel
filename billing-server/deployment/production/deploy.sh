@@ -5,8 +5,15 @@ set -eo pipefail
 echo "── Starting RealityTunnel Production Deployment ──"
 
 # 1. Verify environment variables
-if [ -z "$POSTGRES_PASSWORD" ] or [ -z "$JWT_SECRET" ]; then
-    echo "ERROR: Required production environment variables (POSTGRES_PASSWORD, JWT_SECRET) are not set!"
+# NOTE (Finding H-1): JWT_SECRET was previously checked here but is dead configuration —
+# it has no corresponding field in app/config.py::Settings and is never read by the
+# application. Actual JWT signing uses Ed25519 PEM keypairs loaded from disk
+# (dev_keys/ed25519_private.pem, dev_keys/admin/admin_ed25519_private.pem), which are
+# validated at application startup by app.core.startup_validator.validate_startup_configuration()
+# and will refuse to boot in production if missing or invalid. Only POSTGRES_PASSWORD is
+# actually required by this script's own pre-flight guard.
+if [ -z "$POSTGRES_PASSWORD" ]; then
+    echo "ERROR: Required production environment variable POSTGRES_PASSWORD is not set!"
     exit 1
 fi
 

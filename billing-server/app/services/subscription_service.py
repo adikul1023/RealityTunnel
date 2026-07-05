@@ -9,7 +9,7 @@ from typing import Any
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.exceptions import EntityNotFoundError, DatabaseOperationError
+from app.exceptions import EntityNotFoundError, DatabaseOperationError, DuplicateEntityError
 from app.models import Subscription, SubscriptionLifecycleStatus
 from app.models.subscription_plan import PLANS_REGISTRY
 from app.repositories import AccountRepository, SubscriptionRepository
@@ -65,15 +65,26 @@ class SubscriptionService:
                 f"Account {account_id} already has an active subscription (id={existing_active.id})."
             )
 
-        subscription = await self.repository.create(
-            account_id=account_id,
-            plan_id=clean_plan_id,
-            status=status,
-            starts_at=starts_at,
-            expires_at=expires_at,
-            auto_renew=auto_renew,
-            commit=commit,
-        )
+        try:
+            subscription = await self.repository.create(
+                account_id=account_id,
+                plan_id=clean_plan_id,
+                status=status,
+                starts_at=starts_at,
+                expires_at=expires_at,
+                auto_renew=auto_renew,
+                commit=commit,
+            )
+        except DuplicateEntityError as exc:
+            # Race recovery (Finding C-2): concurrent create_subscription calls can both pass
+            # the pre-insert existence check; the partial unique index uq_subscriptions_one_active_per_account
+            # rejects the loser — translate that into the domain error callers expect.
+            existing_active = await self.repository.get_active_for_account(account_id, now, for_update=True)
+            if existing_active:
+                raise SubscriptionAlreadyActiveError(
+                    f"Account {account_id} already has an active subscription (id={existing_active.id})."
+                ) from exc
+            raise
         logger.info("Created new subscription id=%s for plan=%s status=%s", subscription.id, clean_plan_id, status.value)
         if self.provisioning_service and status == SubscriptionLifecycleStatus.ACTIVE:
             await self.provisioning_service.provision_subscription(account_id, clean_plan_id, expires_at, commit=commit)

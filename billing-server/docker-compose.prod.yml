@@ -12,7 +12,11 @@ services:
     networks:
       - internal_net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-billing} -d ${POSTGRES_DB:-billing_prod}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-billing} -d ${POSTGRES_DB:-billing_prod}",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -59,9 +63,11 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-billing_prod}
       POSTGRES_USER: ${POSTGRES_USER:-billing}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required for production}
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required for production}
-      MASTER_TOKEN_HASH: ${MASTER_TOKEN_HASH:-}
-      API_KEY: ${API_KEY:-}
+      # NOTE (Finding H-1): JWT_SECRET, MASTER_TOKEN_HASH, and API_KEY were previously
+      # declared here but are dead configuration — none of them correspond to a field in
+      # app/config.py::Settings, and none are read by the application at runtime. Actual
+      # JWT signing uses Ed25519 PEM keypairs mounted/provisioned on disk under dev_keys/,
+      # which app.core.startup_validator enforces the presence and validity of at boot.
     volumes:
       - backup_data_prod:/app/backups
       - brain_data_prod:/app/brain
@@ -74,7 +80,11 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/health')\""]
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "import urllib.request; urllib.request.urlopen(''http://localhost:8080/health'')"',
+        ]
       interval: 15s
       timeout: 5s
       retries: 5

@@ -4,7 +4,7 @@ Async SQLAlchemy 2.x database engine and session factory.
 import logging
 from typing import AsyncGenerator
 
-from sqlalchemy import event, text
+from sqlalchemy import event, text, text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -81,3 +81,15 @@ async def verify_db() -> bool:
     async with AsyncSessionLocal() as session:
         await session.execute(text("SELECT 1"))
     return True
+
+
+async def advisory_xact_lock(session: AsyncSession, lock_key: str) -> None:
+    """
+    Acquire a transaction-scoped PostgreSQL advisory lock derived from lock_key via hashtext().
+    Released automatically on commit or rollback. Used where SELECT ... FOR UPDATE cannot
+    prevent duplicate inserts because the target row does not exist yet.
+    """
+    await session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtext(:lock_key))"),
+        {"lock_key": lock_key},
+    )

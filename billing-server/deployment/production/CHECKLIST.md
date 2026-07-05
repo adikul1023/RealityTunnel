@@ -5,8 +5,13 @@ Use this checklist before and after every production deployment of `realitytunne
 ## Pre-Deployment Verification
 
 - [ ] **1. Secret Configuration & Environment**
-  - [ ] `SECRET_KEY` and `JWT_SECRET` are securely generated and distinct from development/staging keys.
+  - [ ] `SECRET_KEY` is securely generated and distinct from development/staging keys.
   - [ ] `POSTGRES_PASSWORD` is set to a secure, randomly generated string.
+  - [ ] Customer and Admin Ed25519 JWT signing keypairs (`dev_keys/ed25519_private.pem` /
+        `ed25519_public.pem`, `dev_keys/admin/admin_ed25519_private.pem` / `admin_ed25519_public.pem`)
+        are securely provisioned on disk before startup. There is no `JWT_SECRET` environment
+        variable — JWT signing uses these Ed25519 PEM keypairs, and the application will refuse
+        to boot in production if they are missing or invalid.
   - [ ] `ENVIRONMENT` is explicitly set to `production`.
   - [ ] `DEBUG` is explicitly set to `false`.
   - [ ] `LOG_LEVEL` is set to `INFO` or `WARNING`.

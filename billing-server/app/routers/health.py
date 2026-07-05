@@ -198,7 +198,7 @@ async def health_check(
             from app.security_hardening.rotation import secret_rotation_service
             from app.security_hardening.audit import audit_service
             rot_status = secret_rotation_service.get_rotation_status()
-            audit_status = audit_service.get_queue_status()
+            audit_status = await audit_service.get_queue_status()
             response_kwargs["security"] = {
                 "current_signing_key_generation": rot_status.get("current_signing_key_generation"),
                 "active_secret_generations": rot_status.get("active_secret_generations"),

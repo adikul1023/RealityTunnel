@@ -24,6 +24,7 @@ from app.services.exceptions import (
     CredentialRotationFailedError,
     CredentialServiceError,
 )
+from app.security_hardening.audit import audit_service
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +129,12 @@ async def regenerate_credentials(
     try:
         logger.info("Regenerating credentials for account_id=%s", account.id)
         data = await service.regenerate_credentials(account.id)
+        await audit_service.record_event(
+            event_type="credential_change",
+            actor_id=str(account.id),
+            target_id=str(account.id),
+            details={"action": "regenerate_credentials"},
+        )
         return CredentialResponse(**data)
     except CredentialNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
@@ -153,6 +160,12 @@ async def revoke_credentials(
     try:
         logger.info("Revoking credentials for account_id=%s", account.id)
         await service.revoke_credentials(account.id)
+        await audit_service.record_event(
+            event_type="credential_change",
+            actor_id=str(account.id),
+            target_id=str(account.id),
+            details={"action": "revoke_credentials"},
+        )
         return CredentialStatusResponse(status="revoked")
     except CredentialNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
@@ -177,6 +190,12 @@ async def restore_credentials(
     try:
         logger.info("Restoring credentials for account_id=%s", account.id)
         await service.restore_credentials(account.id)
+        await audit_service.record_event(
+            event_type="credential_change",
+            actor_id=str(account.id),
+            target_id=str(account.id),
+            details={"action": "restore_credentials"},
+        )
         return CredentialStatusResponse(status="restored")
     except CredentialNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
