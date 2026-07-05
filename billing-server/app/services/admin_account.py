@@ -11,6 +11,7 @@ ARCHITECTURAL INVARIANTS:
 4. Raises AdminAccountNotFoundError (domain exception) when an account_id is unknown.
    The router translates this to HTTP 404.
 """
+
 from __future__ import annotations
 
 import logging
@@ -47,16 +48,25 @@ class AdminAccountService:
 
     # ── Private helpers ─────────────────────────────────────────────────────
 
-    async def _get_by_account_id(self, account_id_str: str) -> Account:
+    async def _get_by_account_id(
+        self, account_id_str: str, *, for_update: bool = False
+    ) -> Account:
         """
         Internal lookup by human-readable account_id string.
         Raises AdminAccountNotFoundError if not found, AdminServiceError on DB failure.
+        If for_update=True, acquires a row-level exclusive lock so the caller's subsequent
+        read-modify-write of this account happens atomically within a single transaction
+        (Finding H-4: prevents lost-update races under concurrent admin mutations).
         """
         try:
-            account = await self.account_repo.get_by_account_id(account_id_str)
+            account = await self.account_repo.get_by_account_id(
+                account_id_str, for_update=for_update
+            )
         except RepositoryError as exc:
             logger.error("Repository error during admin account lookup")
-            raise AdminServiceError("Database error during administrative account lookup") from exc
+            raise AdminServiceError(
+                "Database error during administrative account lookup"
+            ) from exc
 
         if account is None:
             raise AdminAccountNotFoundError(f"Account not found")
@@ -89,9 +99,11 @@ class AdminAccountService:
         Set account status to SUSPENDED.
         Idempotent: suspending an already suspended account is a no-op.
         """
-        account = await self._get_by_account_id(account_id_str)
+        account = await self._get_by_account_id(account_id_str, for_update=True)
         try:
-            account = await self.account_repo.update(account, status=SubscriptionStatus.SUSPENDED)
+            account = await self.account_repo.update(
+                account, status=SubscriptionStatus.SUSPENDED
+            )
         except RepositoryError as exc:
             logger.error("Repository error suspending account")
             raise AdminServiceError("Database error suspending account") from exc
@@ -103,9 +115,11 @@ class AdminAccountService:
         Set account status to ACTIVE.
         Idempotent: activating an already active account is a no-op.
         """
-        account = await self._get_by_account_id(account_id_str)
+        account = await self._get_by_account_id(account_id_str, for_update=True)
         try:
-            account = await self.account_repo.update(account, status=SubscriptionStatus.ACTIVE)
+            account = await self.account_repo.update(
+                account, status=SubscriptionStatus.ACTIVE
+            )
         except RepositoryError as exc:
             logger.error("Repository error activating account")
             raise AdminServiceError("Database error activating account") from exc
@@ -121,7 +135,10 @@ class AdminAccountService:
         if days < 1 or days > 3650:
             raise AdminServiceError("Extension days must be between 1 and 3650")
 
-        account = await self._get_by_account_id(account_id_str)
+        # Finding H-4: lock the row before reading subscription_expires_at so the
+        # read-modify-write below is atomic. Without this, two concurrent extensions can
+        # both read the same stale base expiry and one extension is silently lost.
+        account = await self._get_by_account_id(account_id_str, for_update=True)
 
         now = datetime.now(timezone.utc)
         current_expiry = account.subscription_expires_at
@@ -159,6 +176,8 @@ class AdminAccountService:
             count = await self.refresh_repo.revoke_all_for_account(account.id)
         except RepositoryError as exc:
             logger.error("Repository error revoking all sessions")
-            raise AdminServiceError("Database error revoking sessions for account") from exc
+            raise AdminServiceError(
+                "Database error revoking sessions for account"
+            ) from exc
         logger.info("Administrative logout-all executed.")
         return count
