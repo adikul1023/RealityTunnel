@@ -35,6 +35,44 @@ services:
           cpus: "0.25"
           memory: "256M"
 
+  # ── Redis (Finding H-3: shared, durable rate-limit storage across replicas) ──
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--maxmemory",
+        "256mb",
+        "--maxmemory-policy",
+        "allkeys-lru",
+      ]
+    volumes:
+      - redis_data_prod:/data
+    networks:
+      - internal_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: "384M"
+        reservations:
+          cpus: "0.1"
+          memory: "128M"
+
   # ── Billing & Authentication Production API ─────────────────────────────────
   billing-api:
     build:
@@ -68,6 +106,10 @@ services:
       # app/config.py::Settings, and none are read by the application at runtime. Actual
       # JWT signing uses Ed25519 PEM keypairs mounted/provisioned on disk under dev_keys/,
       # which app.core.startup_validator enforces the presence and validity of at boot.
+      RATE_LIMIT_BACKEND: ${RATE_LIMIT_BACKEND:-redis}
+      REDIS_URL: redis://redis:6379/0
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-}
     volumes:
       - backup_data_prod:/app/backups
       - brain_data_prod:/app/brain
@@ -78,6 +120,8 @@ services:
       - ingress_net
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test:
@@ -111,5 +155,6 @@ networks:
 
 volumes:
   postgres_data_prod:
+  redis_data_prod:
   backup_data_prod:
   brain_data_prod:

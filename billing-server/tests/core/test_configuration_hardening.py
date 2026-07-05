@@ -13,24 +13,35 @@ Covers:
   - Redaction utility (strings, data structures, and logging formatter)
   - Startup validator report and fail-fast exception raising
 """
+
 import logging
 import os
-import pytest
 from contextlib import contextmanager
-from unittest.mock import patch, MagicMock
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
+import pytest
 from app.config import Settings
-from app.core.profiles import EnvironmentProfile, parse_environment_profile
 from app.core.feature_flags import FeatureFlags
-from app.core.redaction import redact_string, redact_data, is_sensitive_key, RedactingFormatter, REDACTED_STR
-from app.core.secret_registry import secret_registry, SecretDefinition, _validate_strong_secret
 from app.core.fingerprint import compute_configuration_fingerprint
+from app.core.profiles import EnvironmentProfile, parse_environment_profile
+from app.core.redaction import (
+    REDACTED_STR,
+    RedactingFormatter,
+    is_sensitive_key,
+    redact_data,
+    redact_string,
+)
+from app.core.secret_registry import (
+    SecretDefinition,
+    _validate_strong_secret,
+    secret_registry,
+)
 from app.core.startup_validator import (
-    validate_startup_configuration,
     ConfigurationError,
     ConfigurationReport,
     collect_missing_ed25519_key_files,
+    validate_startup_configuration,
 )
 
 _VALID_PEM = "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----"
@@ -71,6 +82,7 @@ def _production_validator_test_context(**secret_overrides: str | None):
 
 # ── 1. Environment Profiles Tests ─────────────────────────────────────────────
 
+
 def test_environment_profiles():
     assert parse_environment_profile("development") == EnvironmentProfile.DEVELOPMENT
     assert parse_environment_profile("TESTING") == EnvironmentProfile.TESTING
@@ -91,6 +103,7 @@ def test_environment_profiles():
 
 
 # ── 2. Feature Flags Tests ───────────────────────────────────────────────────
+
 
 def test_feature_flag_parsing():
     env_mock = {
@@ -115,6 +128,7 @@ def test_feature_flag_parsing():
 
 
 # ── 3. Redaction Utility Tests ───────────────────────────────────────────────
+
 
 def test_redaction_utility():
     assert is_sensitive_key("user_password") is True
@@ -160,9 +174,13 @@ def test_redaction_utility():
     # Logging formatter test
     formatter = RedactingFormatter("%(message)s")
     record = logging.LogRecord(
-        name="test", level=logging.INFO, pathname="", lineno=0,
+        name="test",
+        level=logging.INFO,
+        pathname="",
+        lineno=0,
         msg="Connecting to postgresql://user:secretpass@localhost:5432/db",
-        args=(), exc_info=None,
+        args=(),
+        exc_info=None,
     )
     formatted_msg = formatter.format(record)
     assert "secretpass" not in formatted_msg
@@ -170,6 +188,7 @@ def test_redaction_utility():
 
 
 # ── 4. Configuration Fingerprint Tests ────────────────────────────────────────
+
 
 def test_fingerprint_generation():
     settings = Settings(
@@ -197,6 +216,7 @@ def test_fingerprint_generation():
 
 # ── 5. Startup Validator & Production Guard Tests ─────────────────────────────
 
+
 def test_startup_validator_success_development():
     settings = Settings(
         environment="development",
@@ -219,7 +239,9 @@ def test_missing_db_url():
         database_url="",
     )
     flags = FeatureFlags(payments_enabled=False, provisioning_enabled=False)
-    with pytest.raises(ConfigurationError, match="Database URL or connection credentials incomplete"):
+    with pytest.raises(
+        ConfigurationError, match="Database URL or connection credentials incomplete"
+    ):
         validate_startup_configuration(settings, flags)
 
 
@@ -228,14 +250,20 @@ def test_missing_and_invalid_jwt_keys_in_production():
         environment="production",
         debug=False,
         secret_key="A_very_strong_random_secret_key_1234567890",
-        postgres_host="localhost", postgres_user="u", postgres_db="db", postgres_password="p",
+        postgres_host="localhost",
+        postgres_user="u",
+        postgres_db="db",
+        postgres_password="p",
         database_url="postgresql+asyncpg://u:p@localhost/db",
         marzban_base_url="https://vpn.example.com",
     )
     flags = FeatureFlags(payments_enabled=False, provisioning_enabled=False)
 
     with _production_validator_test_context(jwt_private_key=None, jwt_public_key=None):
-        with pytest.raises(ConfigurationError, match="Customer JWT Ed25519 signing keypair missing or invalid"):
+        with pytest.raises(
+            ConfigurationError,
+            match="Customer JWT Ed25519 signing keypair missing or invalid",
+        ):
             validate_startup_configuration(settings, flags)
 
 
@@ -244,7 +272,10 @@ def test_missing_admin_key_in_production():
         environment="production",
         debug=False,
         secret_key="A_very_strong_random_secret_key_1234567890",
-        postgres_host="localhost", postgres_user="u", postgres_db="db", postgres_password="p",
+        postgres_host="localhost",
+        postgres_user="u",
+        postgres_db="db",
+        postgres_password="p",
         database_url="postgresql+asyncpg://u:p@localhost/db",
         marzban_base_url="https://vpn.example.com",
     )
@@ -254,18 +285,26 @@ def test_missing_admin_key_in_production():
         admin_jwt_private_key=None,
         admin_jwt_public_key=None,
     ):
-        with pytest.raises(ConfigurationError, match="Admin JWT Ed25519 signing keypair missing or invalid"):
+        with pytest.raises(
+            ConfigurationError,
+            match="Admin JWT Ed25519 signing keypair missing or invalid",
+        ):
             validate_startup_configuration(settings, flags)
 
 
 def test_production_placeholder_rejection():
     # 1. Test rejection of default secret_key placeholder by Settings model validator
-    with pytest.raises(RuntimeError, match="SECRET_KEY must be set to a strong random value"):
+    with pytest.raises(
+        RuntimeError, match="SECRET_KEY must be set to a strong random value"
+    ):
         Settings(
             environment="production",
             debug=False,
             secret_key="CHANGE_ME_BEFORE_PRODUCTION",
-            postgres_host="localhost", postgres_user="u", postgres_db="db", postgres_password="p",
+            postgres_host="localhost",
+            postgres_user="u",
+            postgres_db="db",
+            postgres_password="p",
             database_url="postgresql+asyncpg://u:p@localhost/db",
             marzban_base_url="https://vpn.example.com",
         )
@@ -275,7 +314,10 @@ def test_production_placeholder_rejection():
         environment="production",
         debug=False,
         secret_key="too_short_key_12345",
-        postgres_host="localhost", postgres_user="u", postgres_db="db", postgres_password="p",
+        postgres_host="localhost",
+        postgres_user="u",
+        postgres_db="db",
+        postgres_password="p",
         database_url="postgresql+asyncpg://u:p@localhost/db",
         marzban_base_url="https://vpn.example.com",
     )
@@ -291,14 +333,19 @@ def test_production_debug_mode_rejection():
         environment="production",
         debug=True,
         secret_key="A_very_strong_random_secret_key_1234567890",
-        postgres_host="localhost", postgres_user="u", postgres_db="db", postgres_password="p",
+        postgres_host="localhost",
+        postgres_user="u",
+        postgres_db="db",
+        postgres_password="p",
         database_url="postgresql+asyncpg://u:p@localhost/db",
         marzban_base_url="https://vpn.example.com",
     )
     flags = FeatureFlags(payments_enabled=False, provisioning_enabled=False)
 
     with _production_validator_test_context():
-        with pytest.raises(ConfigurationError, match="debug mode must be False in production"):
+        with pytest.raises(
+            ConfigurationError, match="debug mode must be False in production"
+        ):
             validate_startup_configuration(settings, flags)
 
 
@@ -307,14 +354,19 @@ def test_production_localhost_callback_rejection():
         environment="production",
         debug=False,
         secret_key="A_very_strong_random_secret_key_1234567890",
-        postgres_host="localhost", postgres_user="u", postgres_db="db", postgres_password="p",
+        postgres_host="localhost",
+        postgres_user="u",
+        postgres_db="db",
+        postgres_password="p",
         database_url="postgresql+asyncpg://u:p@localhost/db",
         marzban_base_url="http://localhost:8000",
     )
     flags = FeatureFlags(payments_enabled=False, provisioning_enabled=True)
 
     with _production_validator_test_context():
-        with pytest.raises(ConfigurationError, match="localhost or non-HTTPS gateway URLs prohibited"):
+        with pytest.raises(
+            ConfigurationError, match="localhost or non-HTTPS gateway URLs prohibited"
+        ):
             validate_startup_configuration(settings, flags)
 
 
@@ -323,17 +375,120 @@ def test_production_test_keys_rejection():
         environment="production",
         debug=False,
         secret_key="A_very_strong_random_secret_key_1234567890",
-        postgres_host="localhost", postgres_user="u", postgres_db="db", postgres_password="p",
+        postgres_host="localhost",
+        postgres_user="u",
+        postgres_db="db",
+        postgres_password="p",
         database_url="postgresql+asyncpg://u:p@localhost/db",
         marzban_base_url="https://vpn.example.com",
         razorpay_key_id="rzp_test_123456",
         razorpay_key_secret="some_secret_key_value_here",
     )
-    flags = FeatureFlags(payments_enabled=True, provisioning_enabled=False, webhooks_enabled=False)
+    flags = FeatureFlags(
+        payments_enabled=True, provisioning_enabled=False, webhooks_enabled=False
+    )
 
     with _production_validator_test_context():
-        with pytest.raises(ConfigurationError, match="test payment or webhook keys detected"):
+        with pytest.raises(
+            ConfigurationError, match="test payment or webhook keys detected"
+        ):
             validate_startup_configuration(settings, flags)
+
+
+def test_production_memory_rate_limit_backend_rejection():
+    """
+    Regression test for Finding H-3.
+
+    Production boot must fail loudly when rate_limit_backend is left at the default
+    'memory' — in-memory rate limiting is process-local, resets on every restart, and
+    does not enforce limits consistently across horizontally-scaled replicas.
+    """
+    settings = Settings(
+        environment="production",
+        debug=False,
+        secret_key="A_very_strong_random_secret_key_1234567890",
+        postgres_host="localhost",
+        postgres_user="u",
+        postgres_db="db",
+        postgres_password="p",
+        database_url="postgresql+asyncpg://u:p@localhost/db",
+        marzban_base_url="https://vpn.example.com",
+        rate_limit_backend="memory",
+    )
+    flags = FeatureFlags(payments_enabled=False, provisioning_enabled=False)
+
+    with _production_validator_test_context():
+        with pytest.raises(
+            ConfigurationError, match="rate_limit_backend must be 'redis' in production"
+        ):
+            validate_startup_configuration(settings, flags)
+
+
+def test_production_redis_rate_limit_backend_accepted():
+    """
+    Regression test for Finding H-3 (positive case).
+
+    Production boot must succeed (with respect to this specific guard) when
+    rate_limit_backend is explicitly set to 'redis'.
+    """
+    settings = Settings(
+        environment="production",
+        debug=False,
+        secret_key="A_very_strong_random_secret_key_1234567890",
+        postgres_host="localhost",
+        postgres_user="u",
+        postgres_db="db",
+        postgres_password="p",
+        database_url="postgresql+asyncpg://u:p@localhost/db",
+        marzban_base_url="https://vpn.example.com",
+        rate_limit_backend="redis",
+    )
+    flags = FeatureFlags(payments_enabled=False, provisioning_enabled=False)
+
+    _strong_val = "Xk9mQ2vPz8LnR4jH7tW1yB6cV3fD5gA0"
+    with _production_validator_test_context(
+        secret_key=_strong_val,
+        cookie_signing_key=_strong_val,
+        encryption_key=_strong_val,
+    ):
+        report = validate_startup_configuration(settings, flags)
+
+    assert report.status == "ok"
+    assert report.production_checks["Redis Rate Limit Backend"] is True
+
+
+def test_production_rate_limit_disabled_skips_backend_guard():
+    """
+    Regression test for Finding H-3 (edge case).
+
+    If rate limiting is explicitly disabled entirely, the backend choice is moot and must
+    not block production startup.
+    """
+    settings = Settings(
+        environment="production",
+        debug=False,
+        secret_key="A_very_strong_random_secret_key_1234567890",
+        postgres_host="localhost",
+        postgres_user="u",
+        postgres_db="db",
+        postgres_password="p",
+        database_url="postgresql+asyncpg://u:p@localhost/db",
+        marzban_base_url="https://vpn.example.com",
+        rate_limit_backend="memory",
+        rate_limit_enabled=False,
+    )
+    flags = FeatureFlags(payments_enabled=False, provisioning_enabled=False)
+
+    _strong_val = "Xk9mQ2vPz8LnR4jH7tW1yB6cV3fD5gA0"
+    with _production_validator_test_context(
+        secret_key=_strong_val,
+        cookie_signing_key=_strong_val,
+        encryption_key=_strong_val,
+    ):
+        report = validate_startup_configuration(settings, flags)
+
+    assert report.status == "ok"
+    assert report.production_checks["Redis Rate Limit Backend"] is True
 
 
 def test_missing_ed25519_key_files_on_disk_in_production(tmp_path: Path):
@@ -375,7 +530,10 @@ def test_startup_validator_report():
         environment="staging",
         debug=False,
         secret_key="Staging_strong_secret_key_value_9999",
-        postgres_host="localhost", postgres_user="u", postgres_db="db", postgres_password="p",
+        postgres_host="localhost",
+        postgres_user="u",
+        postgres_db="db",
+        postgres_password="p",
         database_url="postgresql+asyncpg://u:p@localhost/db",
         marzban_base_url="https://vpn.staging.com",
     )
@@ -419,7 +577,9 @@ def test_registry_rejects_weak_registered_secret_in_production():
     )
     try:
         with _production_validator_test_context():
-            secret_registry.get_definition("audit_test_weak_secret").value = "CHANGE_ME_dev-only"
+            secret_registry.get_definition(
+                "audit_test_weak_secret"
+            ).value = "CHANGE_ME_dev-only"
             with pytest.raises(
                 ConfigurationError,
                 match=r"Production secret validation failed for 'audit_test_weak_secret'",
@@ -437,7 +597,7 @@ def test_insecure_private_key_permissions_fail_in_production(tmp_path: Path):
     the Secure Key Permissions production guard on POSIX systems.
     """
     from app.core.startup_validator import _check_private_key_file_permissions
-    
+
     dev_keys = tmp_path / "dev_keys"
     admin_keys = dev_keys / "admin"
     admin_keys.mkdir(parents=True)
@@ -452,33 +612,44 @@ def test_insecure_private_key_permissions_fail_in_production(tmp_path: Path):
     insecure_private.chmod(0o644)
 
     # Test the permission check function directly
-    all_secure, insecure_paths = _check_private_key_file_permissions(project_root=tmp_path)
+    all_secure, insecure_paths = _check_private_key_file_permissions(
+        project_root=tmp_path
+    )
     assert all_secure is False
     assert "dev_keys/ed25519_private.pem" in insecure_paths
-    
+
     # Set secure permissions (0600 has no group/other permissions)
     insecure_private.chmod(0o600)
-    all_secure, insecure_paths = _check_private_key_file_permissions(project_root=tmp_path)
+    all_secure, insecure_paths = _check_private_key_file_permissions(
+        project_root=tmp_path
+    )
     assert all_secure is True
     assert len(insecure_paths) == 0
 
 
-@pytest.mark.skipif(os.name != "posix", reason="Integration test requires POSIX for permission checks")
-def test_insecure_private_key_permissions_startup_validation_integration(tmp_path: Path):
+@pytest.mark.skipif(
+    os.name != "posix", reason="Integration test requires POSIX for permission checks"
+)
+def test_insecure_private_key_permissions_startup_validation_integration(
+    tmp_path: Path,
+):
     """
     Finding H-6: Integration test that validates the permission check is wired into
     validate_startup_configuration() and fails appropriately on POSIX systems.
-    
+
     This test executes the real startup validation path with actual insecure file permissions.
     """
-    from app.core.startup_validator import validate_startup_configuration, ConfigurationError
-    
+    from app.core.startup_validator import (
+        ConfigurationError,
+        validate_startup_configuration,
+    )
+
     # Create the key directory structure
     dev_keys = tmp_path / "dev_keys"
     admin_keys = dev_keys / "admin"
     admin_keys.mkdir(parents=True)
     pem_body = "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----"
-    
+
     # Create all required key files
     for rel in ("ed25519_private.pem", "ed25519_public.pem"):
         (dev_keys / rel).write_text(pem_body, encoding="utf-8")
@@ -505,7 +676,10 @@ def test_insecure_private_key_permissions_startup_validation_integration(tmp_pat
     # Patch project_root to use tmp_path and bypass missing key file check
     with (
         patch("app.core.startup_validator._project_root", return_value=tmp_path),
-        patch("app.core.startup_validator.collect_missing_ed25519_key_files", return_value=[]),
+        patch(
+            "app.core.startup_validator.collect_missing_ed25519_key_files",
+            return_value=[],
+        ),
         _production_validator_test_context(),
     ):
         # This should fail due to insecure permissions on POSIX systems
@@ -517,7 +691,9 @@ def test_insecure_private_key_permissions_startup_validation_integration(tmp_pat
         assert "dev_keys/ed25519_private.pem" in str(exc_info.value)
         assert pem_body not in str(exc_info.value)
 
+
 # ── 6. Health & Admin Endpoint Fingerprint Exposure Tests ─────────────────────
+
 
 @pytest.mark.asyncio
 async def test_health_endpoint_fingerprint_exposure(async_client, admin_user_factory):
@@ -529,7 +705,9 @@ async def test_health_endpoint_fingerprint_exposure(async_client, admin_user_fac
 
     # 2. Authenticated Admin request -> fingerprint included
     password = "AdminPassword2026!"
-    await admin_user_factory(username="health_admin", password=password, is_super_admin=True)
+    await admin_user_factory(
+        username="health_admin", password=password, is_super_admin=True
+    )
     login_resp = await async_client.post(
         "/api/admin/login",
         json={"username": "health_admin", "password": password},
@@ -546,9 +724,13 @@ async def test_health_endpoint_fingerprint_exposure(async_client, admin_user_fac
 
 
 @pytest.mark.asyncio
-async def test_admin_system_health_endpoint_fingerprint(async_client, admin_user_factory):
+async def test_admin_system_health_endpoint_fingerprint(
+    async_client, admin_user_factory
+):
     password = "AdminPassword2026!"
-    await admin_user_factory(username="syshealth_admin", password=password, is_super_admin=True)
+    await admin_user_factory(
+        username="syshealth_admin", password=password, is_super_admin=True
+    )
     login_resp = await async_client.post(
         "/api/admin/login",
         json={"username": "syshealth_admin", "password": password},

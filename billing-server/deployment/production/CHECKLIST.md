@@ -18,8 +18,18 @@ Use this checklist before and after every production deployment of `realitytunne
 
 - [ ] **2. Infrastructure & Networking**
   - [ ] PostgreSQL 16+ server is accessible and configured with automated WAL archiving and daily snapshots.
+  - [ ] `RATE_LIMIT_BACKEND` is set to `redis` and a Redis instance is reachable at `REDIS_URL`
+        (see `docker-compose.prod.yml`'s `redis` service). The application will refuse to boot
+        in production with `RATE_LIMIT_BACKEND=memory` — in-memory rate limiting does not
+        enforce limits consistently across replicas and resets on every restart.
+  - [ ] If deployed behind a reverse proxy / load balancer, `TRUST_PROXY=true` and
+        `TRUSTED_PROXY_IPS` is set to the exact IP(s)/CIDR(s) of that proxy. `X-Forwarded-For`
+        and `X-Real-IP` are only trusted when the immediate connecting peer matches this
+        allow-list — never leave `TRUST_PROXY=true` with an empty `TRUSTED_PROXY_IPS`, and
+        never set `TRUST_PROXY=true` if the API is reachable directly from the internet
+        without a proxy in front of it.
   - [ ] TLS termination (Reverse Proxy / Load Balancer / Nginx / Cloudflare) is active and forcing HTTPS.
-  - [ ] Firewall rules restrict port `5432` (PostgreSQL) exclusively to internal Docker/VPC networks.
+  - [ ] Firewall rules restrict port `5432` (PostgreSQL) and Redis exclusively to internal Docker/VPC networks.
 
 - [ ] **3. Release Readiness**
   - [ ] CI/CD pipeline (`ci.yml`, `security.yml`, `docker.yml`) passed 100% green on `main`.

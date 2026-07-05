@@ -6,6 +6,7 @@ Enforces fail-fast startup validation before FastAPI accepts HTTP requests:
   - Enforces production guards (rejection of placeholders, debug mode, test keys, localhost callbacks).
   - Generates a structured startup Configuration Report with zero leaked secrets.
 """
+
 from __future__ import annotations
 
 import logging
@@ -68,7 +69,10 @@ def _is_secret_required(
         return True
     if definition.name == "marzban_api_token" and flags.provisioning_enabled:
         return True
-    if definition.name in ("razorpay_key_id", "razorpay_key_secret") and flags.payments_enabled:
+    if (
+        definition.name in ("razorpay_key_id", "razorpay_key_secret")
+        and flags.payments_enabled
+    ):
         return True
     if (
         definition.name == "razorpay_webhook_secret"
@@ -123,6 +127,7 @@ def _check_private_key_file_permissions(
 
 class ConfigurationError(RuntimeError):
     """Raised when startup configuration validation fails. Halts application boot immediately."""
+
     pass
 
 
@@ -148,14 +153,18 @@ class ConfigurationReport:
             lines.append(f"   {mark} {name}")
 
         if self.production_checks:
-            lines.append("──────────────────────────────────────────────────────────────")
+            lines.append(
+                "──────────────────────────────────────────────────────────────"
+            )
             lines.append(" Production Guards:")
             for name, ok in self.production_checks.items():
                 mark = "✓" if ok else "✗"
                 lines.append(f"   {mark} {name}")
 
         if self.warnings:
-            lines.append("──────────────────────────────────────────────────────────────")
+            lines.append(
+                "──────────────────────────────────────────────────────────────"
+            )
             lines.append(" Warnings:")
             for warn in self.warnings:
                 lines.append(f"   ! {warn}")
@@ -164,7 +173,9 @@ class ConfigurationReport:
         lines.append(f" Environment: {self.fingerprint.get('environment', 'unknown')}")
         lines.append(f" Version:     {self.fingerprint.get('version', 'unknown')}")
         lines.append(f" Commit:      {self.fingerprint.get('git_commit', 'unknown')}")
-        lines.append(f" Providers:   {', '.join(self.fingerprint.get('enabled_providers', [])) or 'None'}")
+        lines.append(
+            f" Providers:   {', '.join(self.fingerprint.get('enabled_providers', [])) or 'None'}"
+        )
         lines.append("══════════════════════════════════════════════════════════════\n")
         return "\n".join(lines)
 
@@ -214,30 +225,47 @@ def validate_startup_configuration(
     checks["JWT Keys"] = jwt_ok
     if not jwt_ok:
         if profile.is_production:
-            errors.append("Customer JWT Ed25519 signing keypair missing or invalid in production.")
+            errors.append(
+                "Customer JWT Ed25519 signing keypair missing or invalid in production."
+            )
         else:
-            warnings.append("Customer JWT keypair not found on disk; will be auto-generated in dev mode.")
+            warnings.append(
+                "Customer JWT keypair not found on disk; will be auto-generated in dev mode."
+            )
 
     # 3. Admin Keypair Check
     admin_priv = secret_registry.get("admin_jwt_private_key")
     admin_pub = secret_registry.get("admin_jwt_public_key")
-    admin_ok = bool(admin_priv and admin_pub and "BEGIN " in admin_priv and "BEGIN " in admin_pub)
+    admin_ok = bool(
+        admin_priv and admin_pub and "BEGIN " in admin_priv and "BEGIN " in admin_pub
+    )
     checks["Admin Keys"] = admin_ok
     if not admin_ok:
         if profile.is_production:
-            errors.append("Admin JWT Ed25519 signing keypair missing or invalid in production.")
+            errors.append(
+                "Admin JWT Ed25519 signing keypair missing or invalid in production."
+            )
         else:
-            warnings.append("Admin JWT keypair not found on disk; will be auto-generated in dev mode.")
+            warnings.append(
+                "Admin JWT keypair not found on disk; will be auto-generated in dev mode."
+            )
 
     # 4. Marzban Provisioning Gateway Check
     if flags.provisioning_enabled:
-        marz_ok = bool(settings.marzban_base_url and settings.marzban_base_url.startswith(("http://", "https://")))
+        marz_ok = bool(
+            settings.marzban_base_url
+            and settings.marzban_base_url.startswith(("http://", "https://"))
+        )
         checks["Marzban Gateway"] = marz_ok
         if not marz_ok:
             if profile.is_production:
-                errors.append("PROVISIONING_ENABLED is true but marzban_base_url is missing or malformed in production.")
+                errors.append(
+                    "PROVISIONING_ENABLED is true but marzban_base_url is missing or malformed in production."
+                )
             else:
-                warnings.append("PROVISIONING_ENABLED is true but marzban_base_url not configured in dev mode.")
+                warnings.append(
+                    "PROVISIONING_ENABLED is true but marzban_base_url not configured in dev mode."
+                )
     else:
         checks["Marzban Gateway (Disabled)"] = True
 
@@ -247,17 +275,25 @@ def validate_startup_configuration(
         checks["Razorpay Gateway"] = rzp_ok
         if not rzp_ok:
             if profile.is_production:
-                errors.append("PAYMENTS_ENABLED is true but Razorpay API credentials are incomplete in production.")
+                errors.append(
+                    "PAYMENTS_ENABLED is true but Razorpay API credentials are incomplete in production."
+                )
             else:
-                warnings.append("PAYMENTS_ENABLED is true but Razorpay API credentials not configured in dev mode.")
+                warnings.append(
+                    "PAYMENTS_ENABLED is true but Razorpay API credentials not configured in dev mode."
+                )
         if flags.webhooks_enabled:
             wh_ok = bool(settings.razorpay_webhook_secret)
             checks["Razorpay Webhooks"] = wh_ok
             if not wh_ok:
                 if profile.is_production:
-                    errors.append("WEBHOOKS_ENABLED is true but razorpay_webhook_secret is missing in production.")
+                    errors.append(
+                        "WEBHOOKS_ENABLED is true but razorpay_webhook_secret is missing in production."
+                    )
                 else:
-                    warnings.append("WEBHOOKS_ENABLED is true but razorpay_webhook_secret not configured in dev mode.")
+                    warnings.append(
+                        "WEBHOOKS_ENABLED is true but razorpay_webhook_secret not configured in dev mode."
+                    )
     else:
         checks["Razorpay Gateway (Disabled)"] = True
 
@@ -293,7 +329,9 @@ def validate_startup_configuration(
         no_debug = not settings.debug
         prod_checks["No Debug Mode"] = no_debug
         if not no_debug:
-            errors.append("Production Guard Failure: debug mode must be False in production.")
+            errors.append(
+                "Production Guard Failure: debug mode must be False in production."
+            )
 
         # Default / placeholder secret rejection
         secret_key_val = settings.secret_key or ""
@@ -307,7 +345,9 @@ def validate_startup_configuration(
         )
         prod_checks["Strong Secret Key"] = valid_secret_key
         if not valid_secret_key:
-            errors.append("Production Guard Failure: secret_key is default, short (<32 chars), or placeholder.")
+            errors.append(
+                "Production Guard Failure: secret_key is default, short (<32 chars), or placeholder."
+            )
 
         # Test payment & webhook keys rejection
         rzp_id = (settings.razorpay_key_id or "").lower()
@@ -315,11 +355,14 @@ def validate_startup_configuration(
         rzp_wh = (settings.razorpay_webhook_secret or "").lower()
         no_test_keys = not any(
             val.startswith("rzp_test") or "test_" in val or "placeholder" in val
-            for val in (rzp_id, rzp_sec, rzp_wh) if val
+            for val in (rzp_id, rzp_sec, rzp_wh)
+            if val
         )
         prod_checks["No Test Payment/Webhook Keys"] = no_test_keys
         if not no_test_keys:
-            errors.append("Production Guard Failure: test payment or webhook keys detected in production.")
+            errors.append(
+                "Production Guard Failure: test payment or webhook keys detected in production."
+            )
 
         # HTTPS / Localhost callback URL check
         marz_url = (settings.marzban_base_url or "").lower()
@@ -327,7 +370,9 @@ def validate_startup_configuration(
         https_ok = marz_url.startswith("https://") or not flags.provisioning_enabled
         prod_checks["HTTPS / No Localhost Gateways"] = bool(no_localhost and https_ok)
         if not (no_localhost and https_ok):
-            errors.append("Production Guard Failure: localhost or non-HTTPS gateway URLs prohibited in production.")
+            errors.append(
+                "Production Guard Failure: localhost or non-HTTPS gateway URLs prohibited in production."
+            )
 
         # Key file permissions check on POSIX (Finding H-6)
         if os.name == "posix":
@@ -338,6 +383,24 @@ def validate_startup_configuration(
                     "Production Guard Failure: insecure private key file permissions "
                     f"(mode must not grant group/other access): {', '.join(insecure_key_paths)}"
                 )
+
+        # Rate limit backend check (Finding H-3): in-memory rate limiting is process-local,
+        # resets on every restart, and does not enforce limits consistently across
+        # horizontally-scaled replicas. Production must use the Redis-backed store.
+        rate_limit_backend_val = (
+            (getattr(settings, "rate_limit_backend", "memory") or "memory")
+            .strip()
+            .lower()
+        )
+        rate_limit_backend_ok = (
+            not settings.rate_limit_enabled or rate_limit_backend_val == "redis"
+        )
+        prod_checks["Redis Rate Limit Backend"] = rate_limit_backend_ok
+        if not rate_limit_backend_ok:
+            errors.append(
+                "Production Guard Failure: rate_limit_backend must be 'redis' in production "
+                "(in-memory rate limiting does not work across replicas or survive restarts)."
+            )
 
     fingerprint = compute_configuration_fingerprint(settings, flags)
     status = "error" if errors else "ok"
@@ -350,7 +413,9 @@ def validate_startup_configuration(
     )
 
     if errors:
-        error_msg = f"Startup Configuration Validation Failed:\n" + "\n".join(f"  ✗ {e}" for e in errors)
+        error_msg = f"Startup Configuration Validation Failed:\n" + "\n".join(
+            f"  ✗ {e}" for e in errors
+        )
         logger.error("%s\n%s", error_msg, report.to_string())
         raise ConfigurationError(error_msg)
 
