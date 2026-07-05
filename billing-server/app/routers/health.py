@@ -45,6 +45,7 @@ class HealthResponse(BaseModel):
     provider_health: dict[str, Any] | None = None
     metrics_summary: dict[str, Any] | None = None
     backups: dict[str, Any] | None = None
+    security: dict[str, Any] | None = None
 
 
 @router.get(
@@ -184,6 +185,26 @@ async def health_check(
                 "last_successful_verification": None,
                 "last_failed_verification": None,
                 "error": str(exc),
+            }
+
+        try:
+            from app.security_hardening.rotation import secret_rotation_service
+            from app.security_hardening.audit import audit_service
+            rot_status = secret_rotation_service.get_rotation_status()
+            audit_status = audit_service.get_queue_status()
+            response_kwargs["security"] = {
+                "current_signing_key_generation": rot_status.get("current_signing_key_generation"),
+                "active_secret_generations": rot_status.get("active_secret_generations"),
+                "rotation_status": rot_status.get("rotation_status"),
+                "audit_queue_status": audit_status,
+            }
+        except Exception as exc:
+            logger.warning("Failed to retrieve security hardening health: %s", exc)
+            response_kwargs["security"] = {
+                "current_signing_key_generation": None,
+                "active_secret_generations": {},
+                "rotation_status": "error",
+                "audit_queue_status": {"error": str(exc)},
             }
 
     response = HealthResponse(**response_kwargs)

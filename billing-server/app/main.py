@@ -16,6 +16,18 @@ from app.exceptions import DuplicateEntityError, EntityNotFoundError, Repository
 from app.routers import auth, devices, health, admin_auth, admin, credentials, webhooks, billing, admin_billing, metrics, admin_recovery
 from app.observability.middleware import RequestObservabilityMiddleware, record_exception_metric
 from app.rate_limit import RateLimitMiddleware, RateLimitExceeded
+from app.security_hardening import (
+    SecurityHeadersMiddleware,
+    InputValidationMiddleware,
+    CSRFMiddleware,
+    secret_rotation_service,
+    audit_service,
+    SecurityHardeningError,
+    TLSValidationError,
+    CSRFValidationError,
+    InputValidationError,
+    SecretRotationError,
+)
 
 from app.scheduler import JobScheduler
 
@@ -68,6 +80,8 @@ async def lifespan(app: FastAPI):
     scheduler = JobScheduler(AsyncSessionLocal)
     scheduler.start()
     app.state.scheduler = scheduler
+    app.state.secret_rotation = secret_rotation_service
+    app.state.audit = audit_service
     yield
     logger.info("Billing server shutting down…")
     await scheduler.stop()
@@ -96,8 +110,11 @@ app.include_router(admin_billing.router)
 app.include_router(metrics.router)
 app.include_router(admin_recovery.router)
 
+app.add_middleware(CSRFMiddleware)
+app.add_middleware(InputValidationMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(RequestObservabilityMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 
@@ -261,6 +278,24 @@ app.add_exception_handler(DeviceServiceError, device_service_exception_handler)
 app.add_exception_handler(UnknownPlanError, unknown_plan_exception_handler)
 app.add_exception_handler(SubscriptionServiceError, device_service_exception_handler)
 app.add_exception_handler(DuplicateEntityError, duplicate_exception_handler)
+async def security_hardening_exception_handler(request: Request, exc: SecurityHardeningError) -> JSONResponse:
+    status_code = status.HTTP_400_BAD_REQUEST
+    if isinstance(exc, CSRFValidationError):
+        status_code = status.HTTP_403_FORBIDDEN
+    elif isinstance(exc, InputValidationError) and "exceeds maximum" in getattr(exc, "message", str(exc)):
+        status_code = status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+    _record_exc(request, exc, status_code)
+    return JSONResponse(
+        status_code=status_code,
+        content={"detail": getattr(exc, "message", str(exc)), "error_type": type(exc).__name__},
+    )
+
+
+app.add_exception_handler(SecurityHardeningError, security_hardening_exception_handler)
+app.add_exception_handler(TLSValidationError, security_hardening_exception_handler)
+app.add_exception_handler(CSRFValidationError, security_hardening_exception_handler)
+app.add_exception_handler(InputValidationError, security_hardening_exception_handler)
+app.add_exception_handler(SecretRotationError, security_hardening_exception_handler)
 app.add_exception_handler(ServiceError, general_exception_handler)
 app.add_exception_handler(RepositoryError, general_exception_handler)
 app.add_exception_handler(Exception, general_exception_handler)

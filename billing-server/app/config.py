@@ -121,6 +121,21 @@ class Settings(BaseSettings):
     backup_max_storage_mb: int = 1024         # [Operational Parameter]
     backup_compression_algorithm: str = "gzip" # [Operational Parameter]
 
+    # ── Phase 3.5 — Security Hardening & Production Defense Settings ──────────
+    security_headers_enabled: bool = True     # [Operational Parameter]
+    security_hsts: str = "max-age=31536000; includeSubDomains; preload" # [Operational Parameter]
+    security_csp: str = "default-src 'self'; frame-ancestors 'none'; form-action 'self'" # [Operational Parameter]
+    security_x_frame_options: str = "DENY"    # [Operational Parameter]
+    security_x_content_type_options: str = "nosniff" # [Operational Parameter]
+    security_referrer_policy: str = "strict-origin-when-cross-origin" # [Operational Parameter]
+    security_permissions_policy: str = "geolocation=(), microphone=(), camera=()" # [Operational Parameter]
+    security_coop: str = "same-origin"        # [Operational Parameter]
+    security_corp: str = "same-origin"        # [Operational Parameter]
+    security_coep: str = "require-corp"       # [Operational Parameter]
+    max_payload_size_bytes: int = 1048576     # [Operational Parameter] 1 MB default
+    csrf_protection_enabled: bool = True      # [Operational Parameter]
+    csrf_allowed_origins: str = "http://localhost:8080,http://127.0.0.1:8080" # [Internal Config] comma-separated
+
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":
         if self.environment.lower() == "production":

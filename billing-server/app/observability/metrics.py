@@ -61,8 +61,13 @@ class MetricsRegistry:
         self.register_metric("backup_success_total", "counter", "Total successful data backup operations.")
         self.register_metric("backup_failure_total", "counter", "Total failed data backup operations.")
         self.register_metric("backup_duration_seconds", "summary", "Duration of backup snapshot creation in seconds.")
-        self.register_metric("backup_size_bytes", "gauge", "Total storage size of latest backup archive in bytes.")
         self.register_metric("backup_verification_failures", "counter", "Total backup archive integrity verification failures.")
+
+        self.register_metric("security_headers_applied_total", "counter", "Total HTTP responses enriched with security headers.")
+        self.register_metric("audit_events_total", "counter", "Total immutable security audit events recorded.")
+        self.register_metric("secret_rotations_total", "counter", "Total cryptographic secret rotation operations executed.")
+        self.register_metric("csrf_rejections_total", "counter", "Total CSRF validation rejections (HTTP 403).")
+        self.register_metric("tls_validation_failures_total", "counter", "Total TLS/HTTPS validation failures.")
 
     def register_metric(self, name: str, metric_type: str, help_text: str) -> None:
         with self._lock:
