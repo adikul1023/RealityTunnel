@@ -3,31 +3,38 @@ test_payment_service.py — Comprehensive unit tests for Phase 2.3 Payment Domai
 Tests Razorpay provider HMAC verification, retries, timeouts, and PaymentService orchestration,
 webhook idempotency, row-level locking, and SubscriptionService entitlement activation without internet.
 """
+
 import hashlib
 import hmac
 import json
 import uuid
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
+
 import httpx
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.config import Settings
-from app.models import Account, Payment, PaymentStatus, Subscription, SubscriptionLifecycleStatus
+from app.models import (
+    Account,
+    Payment,
+    PaymentStatus,
+    Subscription,
+    SubscriptionLifecycleStatus,
+)
 from app.repositories import AccountRepository, SubscriptionRepository
 from app.services import (
-    PaymentService,
-    RazorpayProvider,
     PaymentOrderDTO,
-    PaymentVerificationDTO,
-    PaymentWebhookDTO,
-    PaymentRefundDTO,
     PaymentProviderError,
-    PaymentVerificationError,
-    PaymentTimeoutError,
+    PaymentRefundDTO,
     PaymentRefundError,
+    PaymentService,
+    PaymentTimeoutError,
+    PaymentVerificationDTO,
+    PaymentVerificationError,
+    PaymentWebhookDTO,
+    RazorpayProvider,
 )
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @pytest.fixture
@@ -149,7 +156,9 @@ async def test_razorpay_verify_webhook_valid_hmac(test_settings: Settings):
 async def test_razorpay_verify_webhook_invalid_hmac(test_settings: Settings):
     provider = RazorpayProvider(settings=test_settings)
     with pytest.raises(PaymentVerificationError):
-        await provider.verify_webhook('{"event": "payment.captured"}', "invalid_signature_hex")
+        await provider.verify_webhook(
+            '{"event": "payment.captured"}', "invalid_signature_hex"
+        )
 
 
 @pytest.mark.asyncio
@@ -173,7 +182,9 @@ async def test_create_payment_success_and_idempotency(
     service: PaymentService, test_account: Account, mock_provider: AsyncMock
 ):
     key = f"idem_{uuid.uuid4().hex}"
-    payment1 = await service.create_payment(test_account.id, 99900, "INR", key, plan_id="pro")
+    payment1 = await service.create_payment(
+        test_account.id, 99900, "INR", key, plan_id="pro"
+    )
 
     assert payment1.account_id == test_account.id
     assert payment1.status == PaymentStatus.CREATED
@@ -181,7 +192,9 @@ async def test_create_payment_success_and_idempotency(
     assert mock_provider.create_order.call_count == 1
 
     # Second call with same idempotency key returns existing payment without creating order again
-    payment2 = await service.create_payment(test_account.id, 99900, "INR", key, plan_id="pro")
+    payment2 = await service.create_payment(
+        test_account.id, 99900, "INR", key, plan_id="pro"
+    )
     assert payment2.id == payment1.id
     assert mock_provider.create_order.call_count == 1
 
@@ -191,7 +204,9 @@ async def test_confirm_payment_activates_new_subscription(
     service: PaymentService, test_account: Account, db_session: AsyncSession
 ):
     key = f"idem_{uuid.uuid4().hex}"
-    payment = await service.create_payment(test_account.id, 99900, "INR", key, plan_id="pro")
+    payment = await service.create_payment(
+        test_account.id, 99900, "INR", key, plan_id="pro"
+    )
     assert payment.subscription_id is None
 
     confirmed = await service.confirm_payment(
@@ -210,6 +225,51 @@ async def test_confirm_payment_activates_new_subscription(
     assert sub.account_id == test_account.id
     assert sub.status == SubscriptionLifecycleStatus.ACTIVE
     assert sub.plan_id == "pro"
+
+
+@pytest.mark.asyncio
+async def test_confirm_payment_rejects_captured_amount_mismatch(
+    service: PaymentService,
+    test_account: Account,
+    mock_provider: AsyncMock,
+    db_session: AsyncSession,
+):
+    """
+    Regression test for Finding C-1 (payment tampering) defense-in-depth check.
+
+    Simulates a webhook/confirmation flow where the amount actually captured at the gateway
+    (as fetched live via provider.fetch_payment) is LOWER than the amount the order was
+    originally created for. confirm_payment must reject this with PaymentVerificationError
+    and must NOT mark the payment as PAID or activate/create any subscription.
+    """
+    key = f"idem_{uuid.uuid4().hex}"
+    payment = await service.create_payment(
+        test_account.id, 99900, "INR", key, plan_id="pro"
+    )
+    assert payment.subscription_id is None
+
+    # Attacker/gateway anomaly: only 100 minor units were actually captured, not the 99900
+    # the order was created for.
+    mock_provider.fetch_payment.return_value = PaymentVerificationDTO(
+        is_valid=True,
+        provider_order_id="order_test_123456",
+        provider_payment_id="pay_test_789012",
+        status="captured",
+        amount_minor_units=100,
+        currency="INR",
+    )
+
+    with pytest.raises(PaymentVerificationError):
+        await service.confirm_payment(
+            provider_order_id="order_test_123456",
+            provider_payment_id="pay_test_789012",
+            plan_id="pro",
+        )
+
+    await db_session.refresh(payment)
+    assert payment.status == PaymentStatus.CREATED
+    assert payment.subscription_id is None
+    assert payment.paid_at is None
 
 
 @pytest.mark.asyncio
@@ -249,7 +309,9 @@ async def test_confirm_payment_idempotency_10_webhooks(
     await service.create_payment(test_account.id, 99900, "INR", key, plan_id="pro")
 
     # Simulate delivering the same webhook / confirming payment 10 times
-    first_confirm = await service.confirm_payment("order_test_123456", "pay_test_789012")
+    first_confirm = await service.confirm_payment(
+        "order_test_123456", "pay_test_789012"
+    )
     sub_id = first_confirm.subscription_id
 
     for _ in range(9):
@@ -260,14 +322,14 @@ async def test_confirm_payment_idempotency_10_webhooks(
 
 
 @pytest.mark.asyncio
-async def test_concurrency_row_locking(
-    service: PaymentService, test_account: Account
-):
+async def test_concurrency_row_locking(service: PaymentService, test_account: Account):
     key = f"idem_{uuid.uuid4().hex}"
     await service.create_payment(test_account.id, 99900, "INR", key, plan_id="pro")
 
     with patch.object(
-        service.payment_repo, "get_by_provider_order_id", wraps=service.payment_repo.get_by_provider_order_id
+        service.payment_repo,
+        "get_by_provider_order_id",
+        wraps=service.payment_repo.get_by_provider_order_id,
     ) as mock_get:
         await service.confirm_payment("order_test_123456", "pay_test_789012")
         mock_get.assert_called_with("order_test_123456", for_update=True)
@@ -283,9 +345,13 @@ async def test_fail_and_refund_payment(
     assert failed.status == PaymentStatus.FAILED
 
     # New order for refund test
-    mock_provider.create_order.return_value = PaymentOrderDTO("order_refund_999", 99900, "INR")
+    mock_provider.create_order.return_value = PaymentOrderDTO(
+        "order_refund_999", 99900, "INR"
+    )
     key2 = f"idem_{uuid.uuid4().hex}"
-    payment = await service.create_payment(test_account.id, 99900, "INR", key2, plan_id="pro")
+    payment = await service.create_payment(
+        test_account.id, 99900, "INR", key2, plan_id="pro"
+    )
     await service.confirm_payment("order_refund_999", "pay_refund_888")
 
     refunded = await service.refund_payment(payment.id, amount_minor_units=99900)

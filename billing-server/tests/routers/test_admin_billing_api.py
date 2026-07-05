@@ -12,6 +12,7 @@ Coverage:
 - Privilege enforcement: Read-only admin rejected (HTTP 403 Forbidden) on write operations
 - DTO hygiene audit: Zero sensitive credentials or secrets leaked in any response DTOs
 """
+
 from __future__ import annotations
 
 import secrets
@@ -21,26 +22,25 @@ from unittest.mock import AsyncMock
 
 import pytest
 import pytest_asyncio
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.dependencies import get_marzban_provider, get_razorpay_provider
 from app.main import app
 from app.models import (
-    SubscriptionLifecycleStatus,
     PaymentStatus,
     ProvisioningState,
     RetryItemStatus,
+    SubscriptionLifecycleStatus,
 )
 from app.models.payment import PaymentProviderType
 from app.repositories import (
-    SubscriptionRepository,
     PaymentRepository,
     ProvisioningRepository,
     ProvisioningRetryRepository,
+    SubscriptionRepository,
 )
 from app.security import hash_master_token
-from app.services.provisioning.provider import ProvisionedUserDTO
 from app.services.payment.provider import PaymentOrderDTO, PaymentVerificationDTO
+from app.services.provisioning.provider import ProvisionedUserDTO
+from sqlalchemy.ext.asyncio import AsyncSession
 
 pytestmark = pytest.mark.asyncio
 
@@ -65,7 +65,9 @@ def _assert_no_sensitive_fields(obj: any) -> None:
             _assert_no_sensitive_fields(item)
     elif isinstance(obj, dict):
         for key, value in obj.items():
-            assert key.lower() not in SENSITIVE_FIELDS, f"Sensitive field '{key}' leaked in admin DTO response"
+            assert key.lower() not in SENSITIVE_FIELDS, (
+                f"Sensitive field '{key}' leaked in admin DTO response"
+            )
             _assert_no_sensitive_fields(value)
 
 
@@ -83,7 +85,9 @@ async def mock_providers():
     )
     mock_marzban.create_user.return_value = mock_user_dto
     mock_marzban.update_user.return_value = mock_user_dto
-    mock_marzban.suspend_user.return_value = ProvisionedUserDTO(remote_user_id="test_vpn_user", status="disabled", links=[])
+    mock_marzban.suspend_user.return_value = ProvisionedUserDTO(
+        remote_user_id="test_vpn_user", status="disabled", links=[]
+    )
     mock_marzban.unsuspend_user.return_value = mock_user_dto
     mock_marzban.delete_user.return_value = True
     mock_marzban.get_user.return_value = mock_user_dto
@@ -97,11 +101,16 @@ async def mock_providers():
         amount_minor_units=49900,
         currency="INR",
     )
+    # amount_minor_units=None here deliberately: this fixture backs admin endpoints that
+    # exercise both real-gateway reconciliation (matching amount not required to test) and
+    # manual/fabricated payment-reference resolution (no real gateway amount exists to compare
+    # against). Amount-mismatch enforcement itself (Finding C-1 defense-in-depth) is covered by
+    # dedicated tests in tests/services/test_payment_service.py.
     mock_razorpay.fetch_payment.return_value = PaymentVerificationDTO(
         provider_payment_id="pay_test_123456",
         provider_order_id="order_test_123456",
         status="captured",
-        amount_minor_units=49900,
+        amount_minor_units=None,
         currency="INR",
         is_valid=True,
     )
@@ -117,6 +126,7 @@ async def mock_providers():
 
 
 # ── Helpers for test setup ──────────────────────────────────────────────────
+
 
 async def _create_sample_subscription(
     db_session: AsyncSession,
@@ -150,7 +160,9 @@ async def _create_sample_payment(
         subscription_id=subscription_id,
         provider=PaymentProviderType.RAZORPAY,
         provider_order_id=f"order_{secrets.token_hex(8)}",
-        provider_payment_id=f"pay_{secrets.token_hex(8)}" if status == PaymentStatus.PAID else None,
+        provider_payment_id=f"pay_{secrets.token_hex(8)}"
+        if status == PaymentStatus.PAID
+        else None,
         amount_minor_units=amount,
         currency="INR",
         status=status,
@@ -193,6 +205,7 @@ async def _create_sample_retry_item(
 
 # ── 1. Dashboard Metrics ────────────────────────────────────────────────────
 
+
 async def test_admin_billing_dashboard(
     async_client, account_factory, admin_auth_headers_factory, db_session
 ):
@@ -200,13 +213,23 @@ async def test_admin_billing_dashboard(
     acc1 = await account_factory(account_id="RT-ADM-DASH-1")
     acc2 = await account_factory(account_id="RT-ADM-DASH-2")
 
-    await _create_sample_subscription(db_session, acc1.id, SubscriptionLifecycleStatus.ACTIVE)
-    await _create_sample_subscription(db_session, acc2.id, SubscriptionLifecycleStatus.GRACE)
-    await _create_sample_payment(db_session, acc1.id, status=PaymentStatus.PAID, amount=49900)
-    await _create_sample_payment(db_session, acc2.id, status=PaymentStatus.PAID, amount=99900)
+    await _create_sample_subscription(
+        db_session, acc1.id, SubscriptionLifecycleStatus.ACTIVE
+    )
+    await _create_sample_subscription(
+        db_session, acc2.id, SubscriptionLifecycleStatus.GRACE
+    )
+    await _create_sample_payment(
+        db_session, acc1.id, status=PaymentStatus.PAID, amount=49900
+    )
+    await _create_sample_payment(
+        db_session, acc2.id, status=PaymentStatus.PAID, amount=99900
+    )
     await _create_sample_retry_item(db_session, acc2.id, RetryItemStatus.PENDING)
 
-    headers, _ = await admin_auth_headers_factory(is_super_admin=False, username="dash_admin")
+    headers, _ = await admin_auth_headers_factory(
+        is_super_admin=False, username="dash_admin"
+    )
     resp = await async_client.get("/api/admin/dashboard", headers=headers)
 
     assert resp.status_code == 200, resp.text
@@ -224,6 +247,7 @@ async def test_admin_billing_dashboard(
 
 # ── 2. Subscriptions Administration ─────────────────────────────────────────
 
+
 async def test_admin_subscriptions_list_and_get(
     async_client, account_factory, admin_auth_headers_factory, db_session
 ):
@@ -231,13 +255,21 @@ async def test_admin_subscriptions_list_and_get(
     acc1 = await account_factory(account_id="RT-ADM-SUB-1")
     acc2 = await account_factory(account_id="RT-ADM-SUB-2")
 
-    sub1 = await _create_sample_subscription(db_session, acc1.id, SubscriptionLifecycleStatus.ACTIVE, plan_id="pro")
-    sub2 = await _create_sample_subscription(db_session, acc2.id, SubscriptionLifecycleStatus.EXPIRED, plan_id="basic")
+    sub1 = await _create_sample_subscription(
+        db_session, acc1.id, SubscriptionLifecycleStatus.ACTIVE, plan_id="pro"
+    )
+    sub2 = await _create_sample_subscription(
+        db_session, acc2.id, SubscriptionLifecycleStatus.EXPIRED, plan_id="basic"
+    )
 
-    headers, _ = await admin_auth_headers_factory(is_super_admin=False, username="sub_list_admin")
+    headers, _ = await admin_auth_headers_factory(
+        is_super_admin=False, username="sub_list_admin"
+    )
 
     # List all
-    resp_all = await async_client.get("/api/admin/subscriptions?limit=10&offset=0", headers=headers)
+    resp_all = await async_client.get(
+        "/api/admin/subscriptions?limit=10&offset=0", headers=headers
+    )
     assert resp_all.status_code == 200
     body_all = resp_all.json()
     _assert_no_sensitive_fields(body_all)
@@ -245,20 +277,26 @@ async def test_admin_subscriptions_list_and_get(
     assert any(s["id"] == str(sub1.id) for s in body_all["subscriptions"])
 
     # Filter by status
-    resp_active = await async_client.get("/api/admin/subscriptions?status=ACTIVE", headers=headers)
+    resp_active = await async_client.get(
+        "/api/admin/subscriptions?status=ACTIVE", headers=headers
+    )
     assert resp_active.status_code == 200
     body_active = resp_active.json()
     assert all(s["status"] == "ACTIVE" for s in body_active["subscriptions"])
 
     # Get single subscription
-    resp_single = await async_client.get(f"/api/admin/subscription/{sub1.id}", headers=headers)
+    resp_single = await async_client.get(
+        f"/api/admin/subscription/{sub1.id}", headers=headers
+    )
     assert resp_single.status_code == 200
     body_single = resp_single.json()
     assert body_single["id"] == str(sub1.id)
     assert body_single["plan_id"] == "pro"
 
     # Get unknown subscription
-    resp_unknown = await async_client.get(f"/api/admin/subscription/{uuid.uuid4()}", headers=headers)
+    resp_unknown = await async_client.get(
+        f"/api/admin/subscription/{uuid.uuid4()}", headers=headers
+    )
     assert resp_unknown.status_code == 404
 
 
@@ -267,10 +305,14 @@ async def test_admin_subscription_lifecycle_actions(
 ):
     """Test super-admin lifecycle actions: grace, activate, renew, expire, cancel."""
     acc = await account_factory(account_id="RT-ADM-SUB-LIFE")
-    sub = await _create_sample_subscription(db_session, acc.id, SubscriptionLifecycleStatus.ACTIVE)
+    sub = await _create_sample_subscription(
+        db_session, acc.id, SubscriptionLifecycleStatus.ACTIVE
+    )
     await _create_sample_provisioning(db_session, acc.id, ProvisioningState.ACTIVE)
 
-    super_headers, _ = await admin_auth_headers_factory(is_super_admin=True, username="super_sub_admin")
+    super_headers, _ = await admin_auth_headers_factory(
+        is_super_admin=True, username="super_sub_admin"
+    )
 
     # Enter grace period
     resp_grace = await async_client.post(
@@ -314,9 +356,13 @@ async def test_admin_subscription_readonly_forbidden(
 ):
     """Verify read-only admin gets HTTP 403 Forbidden when attempting write operations."""
     acc = await account_factory(account_id="RT-ADM-SUB-RO")
-    sub = await _create_sample_subscription(db_session, acc.id, SubscriptionLifecycleStatus.ACTIVE)
+    sub = await _create_sample_subscription(
+        db_session, acc.id, SubscriptionLifecycleStatus.ACTIVE
+    )
 
-    readonly_headers, _ = await admin_auth_headers_factory(is_super_admin=False, username="readonly_sub_admin")
+    readonly_headers, _ = await admin_auth_headers_factory(
+        is_super_admin=False, username="readonly_sub_admin"
+    )
 
     resp = await async_client.post(
         f"/api/admin/subscription/{sub.id}/activate",
@@ -328,16 +374,25 @@ async def test_admin_subscription_readonly_forbidden(
 
 # ── 3. Payments Administration ──────────────────────────────────────────────
 
+
 async def test_admin_payments_list_and_reconcile_resolve(
     async_client, account_factory, admin_auth_headers_factory, db_session
 ):
     """Test listing payments, filtering, reconcile, and resolve actions."""
     acc = await account_factory(account_id="RT-ADM-PAY-1")
-    pay_paid = await _create_sample_payment(db_session, acc.id, status=PaymentStatus.PAID, amount=49900)
-    pay_pending = await _create_sample_payment(db_session, acc.id, status=PaymentStatus.PENDING, amount=99900)
+    pay_paid = await _create_sample_payment(
+        db_session, acc.id, status=PaymentStatus.PAID, amount=49900
+    )
+    pay_pending = await _create_sample_payment(
+        db_session, acc.id, status=PaymentStatus.PENDING, amount=99900
+    )
 
-    headers, _ = await admin_auth_headers_factory(is_super_admin=False, username="pay_ro_admin")
-    super_headers, _ = await admin_auth_headers_factory(is_super_admin=True, username="pay_super_admin")
+    headers, _ = await admin_auth_headers_factory(
+        is_super_admin=False, username="pay_ro_admin"
+    )
+    super_headers, _ = await admin_auth_headers_factory(
+        is_super_admin=True, username="pay_super_admin"
+    )
 
     # List
     resp_list = await async_client.get("/api/admin/payments?limit=10", headers=headers)
@@ -345,12 +400,16 @@ async def test_admin_payments_list_and_reconcile_resolve(
     _assert_no_sensitive_fields(resp_list.json())
 
     # Get single
-    resp_get = await async_client.get(f"/api/admin/payment/{pay_paid.id}", headers=headers)
+    resp_get = await async_client.get(
+        f"/api/admin/payment/{pay_paid.id}", headers=headers
+    )
     assert resp_get.status_code == 200
     assert resp_get.json()["amount_minor_units"] == 49900
 
     # Reconcile already PAID payment
-    resp_rec = await async_client.post(f"/api/admin/payment/{pay_paid.id}/reconcile", headers=super_headers)
+    resp_rec = await async_client.post(
+        f"/api/admin/payment/{pay_paid.id}/reconcile", headers=super_headers
+    )
     assert resp_rec.status_code == 200
     assert resp_rec.json()["status"] == "PAID"
 
@@ -366,15 +425,22 @@ async def test_admin_payments_list_and_reconcile_resolve(
 
 # ── 4. Provisioning Administration ──────────────────────────────────────────
 
+
 async def test_admin_provisioning_endpoints(
     async_client, account_factory, admin_auth_headers_factory, db_session
 ):
     """Test listing provisioning profiles and executing administrative actions."""
     acc = await account_factory(account_id="RT-ADM-PROV-1")
-    prov = await _create_sample_provisioning(db_session, acc.id, ProvisioningState.ACTIVE)
+    prov = await _create_sample_provisioning(
+        db_session, acc.id, ProvisioningState.ACTIVE
+    )
 
-    headers, _ = await admin_auth_headers_factory(is_super_admin=False, username="prov_ro_admin")
-    super_headers, _ = await admin_auth_headers_factory(is_super_admin=True, username="prov_super_admin")
+    headers, _ = await admin_auth_headers_factory(
+        is_super_admin=False, username="prov_ro_admin"
+    )
+    super_headers, _ = await admin_auth_headers_factory(
+        is_super_admin=True, username="prov_super_admin"
+    )
 
     # List
     resp_list = await async_client.get("/api/admin/provisioning", headers=headers)
@@ -383,12 +449,15 @@ async def test_admin_provisioning_endpoints(
     assert any(p["id"] == str(prov.id) for p in resp_list.json()["profiles"])
 
     # Sync
-    resp_sync = await async_client.post(f"/api/admin/provisioning/{prov.id}/sync", headers=super_headers)
+    resp_sync = await async_client.post(
+        f"/api/admin/provisioning/{prov.id}/sync", headers=super_headers
+    )
     assert resp_sync.status_code == 200
     assert resp_sync.json()["provisioning_state"] in ("ACTIVE", "FAILED")
 
 
 # ── 5. Retry Queue Administration ───────────────────────────────────────────
+
 
 async def test_admin_retry_queue_endpoints(
     async_client, account_factory, admin_auth_headers_factory, db_session
@@ -399,8 +468,12 @@ async def test_admin_retry_queue_endpoints(
     item1 = await _create_sample_retry_item(db_session, acc.id, RetryItemStatus.PENDING)
     item2 = await _create_sample_retry_item(db_session, acc.id, RetryItemStatus.PENDING)
 
-    headers, _ = await admin_auth_headers_factory(is_super_admin=False, username="retry_ro_admin")
-    super_headers, _ = await admin_auth_headers_factory(is_super_admin=True, username="retry_super_admin")
+    headers, _ = await admin_auth_headers_factory(
+        is_super_admin=False, username="retry_ro_admin"
+    )
+    super_headers, _ = await admin_auth_headers_factory(
+        is_super_admin=True, username="retry_super_admin"
+    )
 
     # Inspect queue
     resp_q = await async_client.get("/api/admin/retry-queue", headers=headers)
@@ -411,21 +484,28 @@ async def test_admin_retry_queue_endpoints(
     assert any(i["id"] == str(item1.id) for i in body_q["items"])
 
     # Retry now
-    resp_retry = await async_client.post(f"/api/admin/retry/{item1.id}/retry-now", headers=super_headers)
+    resp_retry = await async_client.post(
+        f"/api/admin/retry/{item1.id}/retry-now", headers=super_headers
+    )
     assert resp_retry.status_code == 200
     assert resp_retry.json()["id"] == str(item1.id)
 
     # Discard item
-    resp_disc = await async_client.post(f"/api/admin/retry/{item2.id}/discard", headers=super_headers)
+    resp_disc = await async_client.post(
+        f"/api/admin/retry/{item2.id}/discard", headers=super_headers
+    )
     assert resp_disc.status_code == 200
     assert resp_disc.json()["status"] == "FAILED"
 
 
 # ── 6. System Health Administration ─────────────────────────────────────────
 
+
 async def test_admin_system_health(async_client, admin_auth_headers_factory):
     """GET /api/admin/system-health inspects provider and database status."""
-    headers, _ = await admin_auth_headers_factory(is_super_admin=False, username="health_admin")
+    headers, _ = await admin_auth_headers_factory(
+        is_super_admin=False, username="health_admin"
+    )
     resp = await async_client.get("/api/admin/system-health", headers=headers)
     assert resp.status_code == 200, resp.text
     body = resp.json()
@@ -437,14 +517,21 @@ async def test_admin_system_health(async_client, admin_auth_headers_factory):
 
 # ── 7. Security Isolation: Customer JWT Rejection ───────────────────────────
 
+
 async def test_admin_billing_customer_jwt_rejected(async_client, account_factory):
     """Verify that a valid customer JWT is rejected on administrative routes with HTTP 401."""
     # Obtain a valid customer access token via login
     master_token = secrets.token_hex(32)
-    acc = await account_factory(account_id="RT-CUST-ISOLATE", master_token_hash=hash_master_token(master_token))
+    acc = await account_factory(
+        account_id="RT-CUST-ISOLATE", master_token_hash=hash_master_token(master_token)
+    )
     login_resp = await async_client.post(
         "/api/auth/login",
-        json={"account_id": "RT-CUST-ISOLATE", "master_token": master_token, "device_guid": "dev-isolate-001"},
+        json={
+            "account_id": "RT-CUST-ISOLATE",
+            "master_token": master_token,
+            "device_guid": "dev-isolate-001",
+        },
     )
     assert login_resp.status_code == 200
     customer_token = login_resp.json()["access_token"]
@@ -456,6 +543,8 @@ async def test_admin_billing_customer_jwt_rejected(async_client, account_factory
     assert "authentication failed" in resp_dash.json()["detail"].lower()
 
     # Attempt to list subscriptions with customer token
-    resp_subs = await async_client.get("/api/admin/subscriptions", headers=customer_headers)
+    resp_subs = await async_client.get(
+        "/api/admin/subscriptions", headers=customer_headers
+    )
     assert resp_subs.status_code == 401
     assert "authentication failed" in resp_subs.json()["detail"].lower()

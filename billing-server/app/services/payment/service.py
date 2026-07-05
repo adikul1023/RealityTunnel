@@ -2,27 +2,29 @@
 service.py — PaymentService orchestrating payment transactions, gateway interactions,
 and entitlement activation via SubscriptionService (Phase 2.3).
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import EntityNotFoundError
-from app.models import Payment, PaymentStatus, PaymentProviderType
+from app.models import Payment, PaymentProviderType, PaymentStatus
 from app.models.base import SubscriptionLifecycleStatus
 from app.repositories import PaymentRepository, SubscriptionRepository
-from app.services.subscription_service import SubscriptionService
-from app.services.payment.provider import PaymentProvider
 from app.services.exceptions import (
-    PaymentServiceError,
+    DuplicateWebhookError,
     PaymentNotFoundError,
+    PaymentRefundError,
+    PaymentServiceError,
     PaymentVerificationError,
     PaymentWebhookError,
-    DuplicateWebhookError,
-    PaymentRefundError,
 )
+from app.services.payment.provider import PaymentProvider
+from app.services.subscription_service import SubscriptionService
 
 logger = logging.getLogger(__name__)
 
@@ -59,9 +61,15 @@ class PaymentService:
         Create a new payment transaction and initiate an order on the payment gateway.
         Idempotent: if idempotency_key already exists, returns the existing payment record.
         """
-        existing = await self.payment_repo.get_by_idempotency_key(idempotency_key, for_update=True)
+        existing = await self.payment_repo.get_by_idempotency_key(
+            idempotency_key, for_update=True
+        )
         if existing:
-            logger.info("Returning existing payment id=%s for idempotency_key=%s", existing.id, idempotency_key)
+            logger.info(
+                "Returning existing payment id=%s for idempotency_key=%s",
+                existing.id,
+                idempotency_key,
+            )
             return existing
 
         receipt = f"rcpt_{idempotency_key[:24]}"
@@ -89,7 +97,12 @@ class PaymentService:
             status=PaymentStatus.CREATED,
             idempotency_key=idempotency_key,
         )
-        logger.info("Created new payment id=%s order_id=%s status=%s", payment.id, payment.provider_order_id, payment.status.value)
+        logger.info(
+            "Created new payment id=%s order_id=%s status=%s",
+            payment.id,
+            payment.provider_order_id,
+            payment.status.value,
+        )
         return payment
 
     async def confirm_payment(
@@ -112,20 +125,51 @@ class PaymentService:
         if signature and raw_payload:
             await self.provider.verify_webhook(raw_payload, signature)
 
-        payment = await self.payment_repo.get_by_provider_order_id(provider_order_id, for_update=True)
+        payment = await self.payment_repo.get_by_provider_order_id(
+            provider_order_id, for_update=True
+        )
         if not payment and provider_payment_id:
-            payment = await self.payment_repo.get_by_provider_payment_id(provider_payment_id, for_update=True)
+            payment = await self.payment_repo.get_by_provider_payment_id(
+                provider_payment_id, for_update=True
+            )
         if not payment:
-            raise EntityNotFoundError(f"Payment for order ID {provider_order_id} not found.")
+            raise EntityNotFoundError(
+                f"Payment for order ID {provider_order_id} not found."
+            )
 
         if payment.status == PaymentStatus.PAID:
-            logger.info("Payment id=%s (order=%s) is already PAID. Idempotent return.", payment.id, provider_order_id)
+            logger.info(
+                "Payment id=%s (order=%s) is already PAID. Idempotent return.",
+                payment.id,
+                provider_order_id,
+            )
             return payment
 
         verification = await self.provider.fetch_payment(provider_payment_id)
         if not verification.is_valid:
             raise PaymentVerificationError(
                 f"Payment {provider_payment_id} is not valid or captured on the gateway (status={verification.status})"
+            )
+
+        # SECURITY INVARIANT (Finding C-1 defense-in-depth): the amount actually captured at the
+        # gateway (fetched live from the provider, not trusted from the webhook payload alone)
+        # must match the amount the order was created for. This blocks any scenario where the
+        # captured amount was tampered with or diverges from what was originally billed, and
+        # ensures a mismatch never results in subscription activation.
+        if (
+            verification.amount_minor_units is not None
+            and verification.amount_minor_units != payment.amount_minor_units
+        ):
+            logger.warning(
+                "Payment amount mismatch detected for payment id=%s (order=%s): "
+                "expected=%s captured=%s. Refusing to activate entitlement.",
+                payment.id,
+                provider_order_id,
+                payment.amount_minor_units,
+                verification.amount_minor_units,
+            )
+            raise PaymentVerificationError(
+                f"Captured amount for payment {provider_payment_id} does not match the expected order amount."
             )
 
         try:
@@ -137,28 +181,52 @@ class PaymentService:
 
             # Entitlement Activation via SubscriptionService
             if payment.subscription_id:
-                sub = await self.subscription_repo.get_by_id(payment.subscription_id, for_update=True)
+                sub = await self.subscription_repo.get_by_id(
+                    payment.subscription_id, for_update=True
+                )
                 if sub:
-                    if sub.status in (SubscriptionLifecycleStatus.ACTIVE, SubscriptionLifecycleStatus.GRACE, SubscriptionLifecycleStatus.TRIAL):
+                    if sub.status in (
+                        SubscriptionLifecycleStatus.ACTIVE,
+                        SubscriptionLifecycleStatus.GRACE,
+                        SubscriptionLifecycleStatus.TRIAL,
+                    ):
                         new_expires_at = max(sub.expires_at, now) + timedelta(days=30)
-                        await self.subscription_service.renew_subscription(sub.id, new_expires_at, commit=False)
+                        await self.subscription_service.renew_subscription(
+                            sub.id, new_expires_at, commit=False
+                        )
                     else:
-                        await self.subscription_service.activate_subscription(sub.id, commit=False)
+                        await self.subscription_service.activate_subscription(
+                            sub.id, commit=False
+                        )
                     await self.session.commit()
                     await self.session.refresh(payment)
-                    logger.info("Updated existing subscription id=%s for payment id=%s", sub.id, payment.id)
+                    logger.info(
+                        "Updated existing subscription id=%s for payment id=%s",
+                        sub.id,
+                        payment.id,
+                    )
                     return payment
 
             # Look for an existing active subscription for this account
-            existing_active = await self.subscription_repo.get_active_for_account(payment.account_id, now, for_update=True)
+            existing_active = await self.subscription_repo.get_active_for_account(
+                payment.account_id, now, for_update=True
+            )
             if existing_active:
-                new_expires_at = max(existing_active.expires_at, now) + timedelta(days=30)
-                renewed = await self.subscription_service.renew_subscription(existing_active.id, new_expires_at, commit=False)
+                new_expires_at = max(existing_active.expires_at, now) + timedelta(
+                    days=30
+                )
+                renewed = await self.subscription_service.renew_subscription(
+                    existing_active.id, new_expires_at, commit=False
+                )
                 payment.subscription_id = renewed.id
                 await self.payment_repo.update(payment, commit=False)
                 await self.session.commit()
                 await self.session.refresh(payment)
-                logger.info("Renewed active subscription id=%s for payment id=%s", renewed.id, payment.id)
+                logger.info(
+                    "Renewed active subscription id=%s for payment id=%s",
+                    renewed.id,
+                    payment.id,
+                )
                 return payment
 
             # Otherwise, create a new active subscription for the account
@@ -174,7 +242,11 @@ class PaymentService:
             await self.payment_repo.update(payment, commit=False)
             await self.session.commit()
             await self.session.refresh(payment)
-            logger.info("Created and linked new subscription id=%s for payment id=%s", new_sub.id, payment.id)
+            logger.info(
+                "Created and linked new subscription id=%s for payment id=%s",
+                new_sub.id,
+                payment.id,
+            )
             return payment
         except Exception:
             await self.session.rollback()
@@ -189,16 +261,29 @@ class PaymentService:
         Mark a payment as failed after notification from the gateway.
         Idempotent if already marked FAILED or CANCELLED.
         """
-        payment = await self.payment_repo.get_by_provider_order_id(provider_order_id, for_update=True)
+        payment = await self.payment_repo.get_by_provider_order_id(
+            provider_order_id, for_update=True
+        )
         if not payment:
-            raise EntityNotFoundError(f"Payment for order ID {provider_order_id} not found.")
+            raise EntityNotFoundError(
+                f"Payment for order ID {provider_order_id} not found."
+            )
 
-        if payment.status in (PaymentStatus.PAID, PaymentStatus.REFUNDED, PaymentStatus.FAILED, PaymentStatus.CANCELLED):
+        if payment.status in (
+            PaymentStatus.PAID,
+            PaymentStatus.REFUNDED,
+            PaymentStatus.FAILED,
+            PaymentStatus.CANCELLED,
+        ):
             return payment
 
         payment.status = PaymentStatus.FAILED
         await self.payment_repo.update(payment)
-        logger.info("Marked payment id=%s as FAILED. Reason: %s", payment.id, reason or "Gateway notification")
+        logger.info(
+            "Marked payment id=%s as FAILED. Reason: %s",
+            payment.id,
+            reason or "Gateway notification",
+        )
         return payment
 
     async def refund_payment(
@@ -215,10 +300,14 @@ class PaymentService:
             raise EntityNotFoundError(f"Payment with ID {payment_id} not found.")
 
         if payment.status != PaymentStatus.PAID:
-            raise PaymentRefundError(f"Cannot refund payment id={payment_id} in status {payment.status.value}")
+            raise PaymentRefundError(
+                f"Cannot refund payment id={payment_id} in status {payment.status.value}"
+            )
 
         if not payment.provider_payment_id:
-            raise PaymentRefundError(f"Payment id={payment_id} is missing provider_payment_id")
+            raise PaymentRefundError(
+                f"Payment id={payment_id} is missing provider_payment_id"
+            )
 
         try:
             await self.provider.refund_payment(
@@ -230,10 +319,16 @@ class PaymentService:
             payment.status = PaymentStatus.REFUNDED
             await self.payment_repo.update(payment, commit=False)
             if payment.subscription_id:
-                await self.subscription_service.cancel_subscription(payment.subscription_id, commit=False)
+                await self.subscription_service.cancel_subscription(
+                    payment.subscription_id, commit=False
+                )
             await self.session.commit()
             await self.session.refresh(payment)
-            logger.info("Refunded payment id=%s amount=%s", payment.id, amount_minor_units or payment.amount_minor_units)
+            logger.info(
+                "Refunded payment id=%s amount=%s",
+                payment.id,
+                amount_minor_units or payment.amount_minor_units,
+            )
             return payment
         except Exception:
             await self.session.rollback()
@@ -253,7 +348,9 @@ class PaymentService:
             raise EntityNotFoundError(f"Payment with ID {payment_id} not found.")
 
         if payment.status in (PaymentStatus.PAID, PaymentStatus.REFUNDED):
-            raise PaymentServiceError(f"Cannot cancel payment id={payment_id} in status {payment.status.value}")
+            raise PaymentServiceError(
+                f"Cannot cancel payment id={payment_id} in status {payment.status.value}"
+            )
 
         if payment.status == PaymentStatus.CANCELLED:
             return payment
@@ -286,7 +383,9 @@ class PaymentService:
         """
         limit = min(max(1, limit), 100)
         offset = max(0, offset)
-        payments = await self.payment_repo.list_by_account_id_paginated(account_id, limit, offset)
+        payments = await self.payment_repo.list_by_account_id_paginated(
+            account_id, limit, offset
+        )
         total = await self.payment_repo.count_by_account_id(account_id)
         return payments, total
 
@@ -300,7 +399,9 @@ class PaymentService:
         """
         payment = await self.payment_repo.get_by_provider_order_id(payment_identifier)
         if not payment:
-            payment = await self.payment_repo.get_by_provider_payment_id(payment_identifier)
+            payment = await self.payment_repo.get_by_provider_payment_id(
+                payment_identifier
+            )
         if not payment:
             try:
                 payment_uuid = uuid.UUID(payment_identifier)
@@ -309,11 +410,13 @@ class PaymentService:
                 pass
 
         if not payment or payment.account_id != account_id:
-            logger.warning("Anti-IDOR: Account %s attempted access or lookup of missing payment identifier %s", account_id, payment_identifier)
+            logger.warning(
+                "Anti-IDOR: Account %s attempted access or lookup of missing payment identifier %s",
+                account_id,
+                payment_identifier,
+            )
             raise PaymentNotFoundError(f"Payment '{payment_identifier}' not found.")
         return payment
-
-
 
     async def process_webhook(
         self,
@@ -358,24 +461,36 @@ class PaymentService:
         Idempotent: if payment is already REFUNDED, returns cleanly.
         """
         if provider_order_id:
-            payment = await self.payment_repo.get_by_provider_order_id(provider_order_id, for_update=True)
+            payment = await self.payment_repo.get_by_provider_order_id(
+                provider_order_id, for_update=True
+            )
         elif provider_payment_id:
-            payment = await self.payment_repo.get_by_provider_payment_id(provider_payment_id, for_update=True)
+            payment = await self.payment_repo.get_by_provider_payment_id(
+                provider_payment_id, for_update=True
+            )
         else:
-            raise PaymentWebhookError("Refund webhook missing both order_id and payment_id")
+            raise PaymentWebhookError(
+                "Refund webhook missing both order_id and payment_id"
+            )
 
         if not payment:
-            raise EntityNotFoundError(f"Payment not found for refund webhook order={provider_order_id} payment={provider_payment_id}")
+            raise EntityNotFoundError(
+                f"Payment not found for refund webhook order={provider_order_id} payment={provider_payment_id}"
+            )
 
         if payment.status == PaymentStatus.REFUNDED:
-            logger.info("Payment id=%s is already REFUNDED. Idempotent return.", payment.id)
+            logger.info(
+                "Payment id=%s is already REFUNDED. Idempotent return.", payment.id
+            )
             return payment
 
         try:
             payment.status = PaymentStatus.REFUNDED
             await self.payment_repo.update(payment, commit=False)
             if payment.subscription_id:
-                await self.subscription_service.cancel_subscription(payment.subscription_id, commit=False)
+                await self.subscription_service.cancel_subscription(
+                    payment.subscription_id, commit=False
+                )
             await self.session.commit()
             await self.session.refresh(payment)
             logger.info("Processed refund webhook for payment id=%s", payment.id)

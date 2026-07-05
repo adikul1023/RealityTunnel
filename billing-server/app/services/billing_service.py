@@ -7,6 +7,7 @@ Strictly enforces architectural boundaries:
 - Never leaks internal database UUIDs (account.id, payment.id, subscription.id) or provider secrets.
 - Performs zero database repository queries directly; relies exclusively on domain services.
 """
+
 from __future__ import annotations
 
 import logging
@@ -16,17 +17,17 @@ from typing import Any
 from app.models.account import Account
 from app.models.payment import Payment
 from app.models.subscription import Subscription
-from app.services.payment.service import PaymentService
-from app.services.subscription_service import SubscriptionService
-from app.services.subscription_plan import SubscriptionPlanService
 from app.services.billing_dtos import (
-    SubscriptionDTO,
-    PlanDTO,
     PaymentDTO,
     PaymentListDTO,
+    PlanDTO,
     PurchaseRequestDTO,
     PurchaseResponseDTO,
+    SubscriptionDTO,
 )
+from app.services.payment.service import PaymentService
+from app.services.subscription_plan import SubscriptionPlanService
+from app.services.subscription_service import SubscriptionService
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,10 @@ class BillingService:
         """
         sub = await self.subscription_service.get_active_subscription(account_id)
         if not sub:
-            logger.info("Account %s has no active subscription; returning clean default DTO", account_id)
+            logger.info(
+                "Account %s has no active subscription; returning clean default DTO",
+                account_id,
+            )
             return SubscriptionDTO(
                 plan="none",
                 lifecycle_status="NONE",
@@ -86,7 +90,6 @@ class BillingService:
                 price=p.price_minor_units,
                 currency=p.currency,
                 max_devices=p.max_devices,
-
                 max_concurrent_ips=p.max_concurrent_ips,
                 quota=p.data_quota_bytes,
             )
@@ -99,7 +102,9 @@ class BillingService:
         Uses provider_order_id as the primary public payment_id to prevent leaking DB UUIDs.
         If provider_order_id is missing, falls back to provider_payment_id or stringified UUID.
         """
-        public_id = payment.provider_order_id or payment.provider_payment_id or str(payment.id)
+        public_id = (
+            payment.provider_order_id or payment.provider_payment_id or str(payment.id)
+        )
         return PaymentDTO(
             payment_id=public_id,
             provider=payment.provider.value,
@@ -115,7 +120,9 @@ class BillingService:
         """
         Retrieve paginated payment history for an account, ordered newest first.
         """
-        payments, total = await self.payment_service.list_account_payments(account_id, limit, offset)
+        payments, total = await self.payment_service.list_account_payments(
+            account_id, limit, offset
+        )
         dto_list = [self._map_payment_dto(p) for p in payments]
         return PaymentListDTO(
             payments=dto_list,
@@ -130,7 +137,9 @@ class BillingService:
         """
         Retrieve a specific payment by identifier. Enforces Anti-IDOR via domain service.
         """
-        payment = await self.payment_service.get_account_payment(account_id, payment_identifier)
+        payment = await self.payment_service.get_account_payment(
+            account_id, payment_identifier
+        )
         return self._map_payment_dto(payment)
 
     async def purchase_subscription(
@@ -141,10 +150,11 @@ class BillingService:
         Does NOT activate the subscription; activation occurs exclusively via verified webhooks.
         """
         plan = self.plan_service.get_plan(request.plan_id)
-        amount_minor_units = request.amount if request.amount is not None else plan.price_minor_units
+        # SECURITY INVARIANT (Finding C-1): amount is always derived from the server-side plan
+        # registry. PurchaseRequestDTO intentionally has no client-controllable amount field.
+        amount_minor_units = plan.price_minor_units
 
         payment = await self.payment_service.create_payment(
-
             account_id=account_id,
             amount_minor_units=amount_minor_units,
             currency=request.currency,
@@ -152,7 +162,9 @@ class BillingService:
             plan_id=request.plan_id,
         )
 
-        public_id = payment.provider_order_id or payment.provider_payment_id or str(payment.id)
+        public_id = (
+            payment.provider_order_id or payment.provider_payment_id or str(payment.id)
+        )
         return PurchaseResponseDTO(
             payment_id=public_id,
             provider=payment.provider.value,
@@ -166,7 +178,9 @@ class BillingService:
         """
         Disable automatic renewal for the customer's active subscription. Idempotent.
         """
-        sub = await self.subscription_service.update_auto_renew(account_id, auto_renew=False)
+        sub = await self.subscription_service.update_auto_renew(
+            account_id, auto_renew=False
+        )
         return SubscriptionDTO(
             plan=sub.plan_id,
             lifecycle_status=sub.status.value,
@@ -180,7 +194,9 @@ class BillingService:
         """
         Enable automatic renewal for the customer's active subscription. Idempotent.
         """
-        sub = await self.subscription_service.update_auto_renew(account_id, auto_renew=True)
+        sub = await self.subscription_service.update_auto_renew(
+            account_id, auto_renew=True
+        )
         return SubscriptionDTO(
             plan=sub.plan_id,
             lifecycle_status=sub.status.value,

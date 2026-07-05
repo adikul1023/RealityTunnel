@@ -1,25 +1,36 @@
 import asyncio
-import pytest
-import pytest_asyncio
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.main import app
+import pytest
+import pytest_asyncio
 from app.database import get_db
-from app.dependencies import get_razorpay_provider, get_marzban_provider
-from app.models import Account, PaymentStatus, SubscriptionLifecycleStatus, ProvisioningState, PaymentProviderType
-from app.repositories import AccountRepository, PaymentRepository, SubscriptionRepository, ProvisioningRepository
+from app.dependencies import get_marzban_provider, get_razorpay_provider
+from app.main import app
+from app.models import (
+    Account,
+    PaymentProviderType,
+    PaymentStatus,
+    ProvisioningState,
+    SubscriptionLifecycleStatus,
+)
+from app.repositories import (
+    AccountRepository,
+    PaymentRepository,
+    ProvisioningRepository,
+    SubscriptionRepository,
+)
 from app.services import (
     PaymentOrderDTO,
+    PaymentTimeoutError,
+    PaymentVerificationDTO,
+    PaymentVerificationError,
     PaymentWebhookDTO,
     ProvisionedUserDTO,
-    PaymentVerificationError,
-    PaymentTimeoutError,
     ProvisioningTimeoutError,
 )
-
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @pytest.fixture
@@ -38,6 +49,14 @@ def mock_razorpay() -> AsyncMock:
         amount_minor_units=99900,
         currency="INR",
     )
+    provider.fetch_payment.return_value = PaymentVerificationDTO(
+        is_valid=True,
+        provider_order_id="order_webhook_int_1",
+        provider_payment_id="pay_webhook_int_1",
+        status="captured",
+        amount_minor_units=99900,
+        currency="INR",
+    )
     return provider
 
 
@@ -49,7 +68,9 @@ def mock_marzban() -> AsyncMock:
         status="active",
         data_limit=107374182400,
         expire_at=1900000000,
-        links=["vless://test-uuid@vpn.realitytunnel.com:443?type=tcp&security=reality&pbk=pub&sni=sni&sid=id#tag"],
+        links=[
+            "vless://test-uuid@vpn.realitytunnel.com:443?type=tcp&security=reality&pbk=pub&sni=sni&sid=id#tag"
+        ],
     )
     provider.create_user.return_value = user_dto
     provider.get_user.return_value = user_dto
@@ -71,7 +92,9 @@ async def client(
     app.dependency_overrides[get_razorpay_provider] = lambda: mock_razorpay
     app.dependency_overrides[get_marzban_provider] = lambda: mock_marzban
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
         yield ac
     app.dependency_overrides.clear()
 
@@ -88,14 +111,20 @@ async def setup_account(db_session: AsyncSession) -> Account:
 
 @pytest.mark.asyncio
 async def test_webhook_missing_signature_returns_400(client: AsyncClient):
-    resp = await client.post("/api/webhooks/razorpay", content=b'{"event":"payment.captured"}')
+    resp = await client.post(
+        "/api/webhooks/razorpay", content=b'{"event":"payment.captured"}'
+    )
     assert resp.status_code == 400
     assert "Missing X-Razorpay-Signature" in resp.json()["detail"]
 
 
 @pytest.mark.asyncio
-async def test_webhook_invalid_signature_returns_400(client: AsyncClient, mock_razorpay: AsyncMock):
-    mock_razorpay.verify_webhook.side_effect = PaymentVerificationError("Invalid HMAC signature")
+async def test_webhook_invalid_signature_returns_400(
+    client: AsyncClient, mock_razorpay: AsyncMock
+):
+    mock_razorpay.verify_webhook.side_effect = PaymentVerificationError(
+        "Invalid HMAC signature"
+    )
     resp = await client.post(
         "/api/webhooks/razorpay",
         content=b'{"event":"payment.captured"}',
@@ -106,7 +135,9 @@ async def test_webhook_invalid_signature_returns_400(client: AsyncClient, mock_r
 
 
 @pytest.mark.asyncio
-async def test_webhook_transient_error_returns_503(client: AsyncClient, mock_razorpay: AsyncMock):
+async def test_webhook_transient_error_returns_503(
+    client: AsyncClient, mock_razorpay: AsyncMock
+):
     mock_razorpay.verify_webhook.side_effect = PaymentTimeoutError("Gateway timeout")
     resp = await client.post(
         "/api/webhooks/razorpay",
