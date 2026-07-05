@@ -1,0 +1,42 @@
+# .dockerignore — Finding H-5.
+#
+# .gitignore has zero effect on `docker build` — it only controls what gets committed to
+# git. Without this file, the full build context (including any local .env, locally
+# generated dev_keys/*.pem private keys, and .git history) is sent to the Docker daemon and
+# can be copied into an image layer via `COPY . .` in the Dockerfile. Once baked into a
+# layer, secrets remain permanently extractable via `docker history`, `docker save`, or
+# `docker run --rm <image> cat <path>`, even if a later layer "deletes" the file.
+
+# Secrets / environment files
+.env
+.env.*
+
+# Locally generated Ed25519 signing keys (auto-generated in dev mode; never bake into images)
+dev_keys/
+*.pem
+
+# Version control metadata
+.git/
+.gitignore
+
+# Local backups / recovery artifacts
+backups/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+dist/
+build/
+*.log
+
+# Test suite (not needed in the runtime image)
+tests/
+
+# Editor / OS cruft
+.idea/
+.vscode/
+.DS_Store
