@@ -34,7 +34,9 @@ async def test_restore_preview_inspection(db_session: AsyncSession, isolated_bac
     preview = restore_srv.restore_preview(backup_id)
 
     assert preview["backup_id"] == backup_id
-    assert preview["can_restore"] is True
+    assert preview["can_restore"] is False
+    assert preview["restore_method"] == "manual"
+    assert preview["instructions_url"] == "docs/manual_recovery_runbook.md"
     assert preview["postgres_revision"] == meta["postgres_revision"]
     assert preview["backup_size_bytes"] == meta["backup_size_bytes"]
     assert "database.sql.gz" in preview["included_files"]

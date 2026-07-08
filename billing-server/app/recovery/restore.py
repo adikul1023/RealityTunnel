@@ -91,5 +91,7 @@ class RestoreService:
             "compression_algorithm": meta.get("compression_algorithm", "gzip"),
             "included_files": file_sizes,
             "database_preview": db_preview,
-            "can_restore": True,
+            "can_restore": False,
+            "restore_method": "manual",
+            "instructions_url": "docs/manual_recovery_runbook.md",
         }
