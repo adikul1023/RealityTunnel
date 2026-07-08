@@ -23,6 +23,7 @@ from app.services.exceptions import (
     PaymentServiceError,
     PaymentVerificationError,
     PaymentWebhookError,
+    ProvisioningConflictError,
 )
 from app.services.payment.provider import PaymentProvider
 from app.services.subscription_service import SubscriptionService
@@ -272,6 +273,17 @@ class PaymentService:
                 payment.id,
             )
             return payment
+        except ProvisioningConflictError as exc:
+            await self.session.rollback()
+            logger.warning("Admin override conflict during payment confirmation: %s", str(exc))
+            from app.security_hardening.audit import audit_service
+            await audit_service.record_event(
+                event_type="admin_override_conflict",
+                actor_id=str(payment.account_id),
+                target_id=str(payment.id),
+                details={"action": "confirm_payment_blocked", "reason": str(exc)},
+            )
+            raise PaymentVerificationError(f"Payment captured but entitlement activation blocked: {exc}") from exc
         except Exception:
             await self.session.rollback()
             raise

@@ -65,6 +65,9 @@ class ProvisioningProfile(Base, TimestampMixin):
         default=ProvisioningState.PENDING,
         index=True,
     )
+    suspension_reason: Mapped[str | None] = mapped_column(
+        String(20), nullable=True
+    )
     last_sync_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

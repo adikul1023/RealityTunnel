@@ -216,6 +216,12 @@ class ProvisioningService:
             if not profile:
                 raise ProvisioningConflictError(f"Cannot extend: no provisioning profile found for account {account_id}")
 
+            if profile.provisioning_state == ProvisioningState.SUSPENDED and profile.suspension_reason in ("ADMIN", "FRAUD"):
+                raise ProvisioningConflictError(
+                    f"Profile {profile.id} is administratively suspended ({profile.suspension_reason}); "
+                    "will not auto-reactivate via billing renewal. Requires explicit admin reactivation."
+                )
+
             expire_ts = int(new_expires_at.timestamp())
             try:
                 await self.provider.update_user(profile.remote_user_id, expire_at=expire_ts, status="active")
@@ -243,7 +249,7 @@ class ProvisioningService:
                 await self.session.rollback()
             raise self._translate_exception(exc, "extend_subscription") from exc
 
-    async def suspend_subscription(self, account_id: uuid.UUID, *, commit: bool = True) -> ProvisioningProfile:
+    async def suspend_subscription(self, account_id: uuid.UUID, *, reason: str = "BILLING", commit: bool = True) -> ProvisioningProfile:
         """
         Suspend VPN access for an account.
         Idempotent: calling twice on an already suspended profile succeeds without error.
@@ -265,6 +271,7 @@ class ProvisioningService:
                 raise
 
             profile.provisioning_state = ProvisioningState.SUSPENDED
+            profile.suspension_reason = reason
             profile.last_sync_at = datetime.now(timezone.utc)
             profile.last_error = None
             if commit:
@@ -287,6 +294,12 @@ class ProvisioningService:
             profile = await self.provisioning_repo.get_by_account_id(account_id, for_update=True)
             if not profile:
                 raise ProvisioningConflictError(f"Cannot reactivate: no provisioning profile found for account {account_id}")
+
+            if profile.provisioning_state == ProvisioningState.SUSPENDED and profile.suspension_reason in ("ADMIN", "FRAUD"):
+                raise ProvisioningConflictError(
+                    f"Profile {profile.id} is administratively suspended ({profile.suspension_reason}); "
+                    "will not auto-reactivate via billing renewal. Requires explicit admin reactivation."
+                )
 
             try:
                 await self.provider.unsuspend_user(profile.remote_user_id)

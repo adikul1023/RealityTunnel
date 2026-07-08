@@ -242,3 +242,45 @@ async def test_concurrency_row_locking(
     ) as mock_get:
         await service.provision_subscription(test_account.id, plan_id="pro")
         mock_get.assert_called_with(test_account.id, for_update=True)
+
+
+@pytest.mark.asyncio
+async def test_admin_suspension_blocks_extension(
+    service: ProvisioningService, test_account: Account, mock_provider: AsyncMock
+):
+    await service.provision_subscription(test_account.id, plan_id="pro")
+
+    # Suspend with reason="ADMIN"
+    profile = await service.suspend_subscription(test_account.id, reason="ADMIN")
+    assert profile.suspension_reason == "ADMIN"
+    assert profile.provisioning_state == ProvisioningState.SUSPENDED
+
+    # Attempt to extend should fail
+    with pytest.raises(ProvisioningConflictError, match="administratively suspended"):
+        await service.extend_subscription(test_account.id, datetime.now(timezone.utc) + timedelta(days=30))
+
+    # Attempt to reactivate should fail
+    with pytest.raises(ProvisioningConflictError, match="administratively suspended"):
+        await service.reactivate_subscription(test_account.id)
+
+
+@pytest.mark.asyncio
+async def test_billing_suspension_allows_extension(
+    service: ProvisioningService, test_account: Account, mock_provider: AsyncMock, db_session: AsyncSession
+):
+    await service.provision_subscription(test_account.id, plan_id="pro")
+
+    # Suspend with reason="BILLING" (default)
+    profile = await service.suspend_subscription(test_account.id)
+    assert profile.suspension_reason == "BILLING"
+
+    # Extend should succeed and reactivate
+    extended = await service.extend_subscription(test_account.id, datetime.now(timezone.utc) + timedelta(days=30))
+    assert extended.provisioning_state == ProvisioningState.ACTIVE
+
+    # Suspend again
+    await service.suspend_subscription(test_account.id)
+
+    # Reactivate should succeed
+    reactivated = await service.reactivate_subscription(test_account.id)
+    assert reactivated.provisioning_state == ProvisioningState.ACTIVE

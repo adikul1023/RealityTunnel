@@ -383,7 +383,7 @@ class AdminBillingService:
         """Suspend provisioning profile on VPN gateway."""
         profile = await self._get_profile_by_id_or_account(profile_id)
         logger.info("Admin suspending provisioning account_id=%s", profile.account_id)
-        updated = await self.provisioning_service.suspend_subscription(profile.account_id)
+        updated = await self.provisioning_service.suspend_subscription(profile.account_id, reason="ADMIN")
         return self._to_provisioning_dto(updated)
 
     async def restore_provisioning(self, profile_id: str | uuid.UUID) -> AdminProvisioningDTO:
