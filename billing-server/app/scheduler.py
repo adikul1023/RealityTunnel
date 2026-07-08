@@ -158,6 +158,7 @@ class JobScheduler:
             ("grace_period_expiration", 600, "run_grace_period_expiration_job"),
             ("stale_pending_payment_cleanup", 1800, "run_stale_pending_payment_cleanup_job"),
             ("orphan_provisioning_cleanup", 3600, "run_orphan_provisioning_cleanup_job"),
+            ("provisioning_reconciliation", 3600, "run_provisioning_reconciliation_job"),
             ("credential_rotation", 86400, "run_credential_rotation_job"),
         ]
         for name, interval, method_name in jobs:

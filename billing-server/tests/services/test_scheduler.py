@@ -25,7 +25,7 @@ async def test_scheduler_start_stop(mock_session_factory):
 
     scheduler.start()
     assert scheduler._running
-    assert len(scheduler._tasks) == 7
+    assert len(scheduler._tasks) == 8
 
     # Let loop run a tiny bit
     await asyncio.sleep(0.01)

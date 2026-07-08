@@ -24,7 +24,7 @@ class ProvisioningRetryRepository(BaseRepository[ProvisioningRetryItem]):
         super().__init__(ProvisioningRetryItem, session)
 
     async def get_pending_retries(
-        self, now: datetime, *, for_update: bool = False
+        self, now: datetime, *, for_update: bool = False, skip_locked: bool = False
     ) -> list[ProvisioningRetryItem]:
         """
         Retrieve all pending retry items whose scheduled execution time has arrived.
@@ -38,7 +38,7 @@ class ProvisioningRetryRepository(BaseRepository[ProvisioningRetryItem]):
                 .order_by(ProvisioningRetryItem.next_retry_at.asc())
             )
             if for_update:
-                stmt = stmt.with_for_update()
+                stmt = stmt.with_for_update(skip_locked=skip_locked)
             result = await self.session.execute(stmt)
             return list(result.scalars().all())
         except SQLAlchemyError as exc:

@@ -131,7 +131,7 @@ class PaymentRepository(BaseRepository[Payment]):
 
 
     async def get_stale_pending_payments(
-        self, cutoff_time: datetime, *, for_update: bool = False
+        self, cutoff_time: datetime, *, for_update: bool = False, skip_locked: bool = False
     ) -> list[Payment]:
         """
         Retrieve all pending or created payments created before cutoff_time.
@@ -145,7 +145,7 @@ class PaymentRepository(BaseRepository[Payment]):
                 .where(Payment.created_at <= cutoff_time)
             )
             if for_update:
-                stmt = stmt.with_for_update()
+                stmt = stmt.with_for_update(skip_locked=skip_locked)
             result = await self.session.execute(stmt)
             return list(result.scalars().all())
         except SQLAlchemyError as exc:

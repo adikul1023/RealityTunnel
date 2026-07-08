@@ -168,7 +168,12 @@ class CredentialService:
         if profile.provisioning_state == ProvisioningState.TERMINATED:
             raise CredentialNotFoundError(f"Provisioning profile for account {account_id} is terminated")
 
-        if profile.provisioning_state == ProvisioningState.SUSPENDED or user_dto.status.lower() in ("disabled", "suspended", "inactive"):
+        is_live_active = user_dto.status.lower() not in ("disabled", "suspended", "inactive")
+
+        if profile.provisioning_state == ProvisioningState.SUSPENDED and is_live_active:
+            logger.warning("Local profile SUSPENDED but live status is active for account_id=%s. Triggering self-healing.", account_id)
+            await self.provisioning_service.synchronize(account_id)
+        elif profile.provisioning_state == ProvisioningState.SUSPENDED or not is_live_active:
             raise CredentialAlreadyRevokedError(f"Provisioning profile for account {account_id} is revoked or suspended")
 
         logger.info("Retrieved active credentials for account_id=%s", account_id)

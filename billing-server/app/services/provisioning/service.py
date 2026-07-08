@@ -413,7 +413,9 @@ class ProvisioningService:
         except Exception as exc:
             raise self._translate_exception(exc, "get_provisioned_user") from exc
 
-    async def rotate_user_credentials(self, account_id: uuid.UUID) -> tuple[ProvisioningProfile, ProvisionedUserDTO]:
+    async def rotate_user_credentials(
+        self, account_id: uuid.UUID, cutoff: datetime | None = None
+    ) -> tuple[ProvisioningProfile, ProvisionedUserDTO]:
         """
         Atomically reset/rotate remote user credentials and update synchronization timestamp.
         Acquires row-level lock (SELECT ... FOR UPDATE) on the provisioning profile.
@@ -422,6 +424,12 @@ class ProvisioningService:
             profile = await self.provisioning_repo.get_by_account_id(account_id, for_update=True)
             if not profile:
                 raise EntityNotFoundError(f"Provisioning profile for account {account_id} not found.")
+
+            if cutoff and profile.last_sync_at and profile.last_sync_at > cutoff:
+                logger.info("Skipping rotation for account_id=%s, already rotated.", account_id)
+                # Re-fetch DTO to return since we skipped rotation
+                user_dto = await self.provider.get_user(profile.remote_user_id)
+                return profile, user_dto
 
             try:
                 user_dto = await self.provider.reset_user_credentials(profile.remote_user_id)

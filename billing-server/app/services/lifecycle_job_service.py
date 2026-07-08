@@ -64,7 +64,9 @@ class LifecycleJobService:
         Returns number of subscriptions processed.
         """
         now = now or datetime.now(timezone.utc)
-        expired_subs = await self.subscription_repo.get_expired_active_subscriptions(now)
+        expired_subs = await self.subscription_repo.get_expired_active_subscriptions(
+            now, for_update=True, skip_locked=True
+        )
         count = 0
         for sub in expired_subs:
             try:
@@ -96,7 +98,9 @@ class LifecycleJobService:
         Returns number of grace subscriptions expired.
         """
         now = now or datetime.now(timezone.utc)
-        expired_grace = await self.subscription_repo.get_expired_grace_subscriptions(now)
+        expired_grace = await self.subscription_repo.get_expired_grace_subscriptions(
+            now, for_update=True, skip_locked=True
+        )
         count = 0
         for sub in expired_grace:
             try:
@@ -125,7 +129,9 @@ class LifecycleJobService:
         """
         now = now or datetime.now(timezone.utc)
         cutoff = now - timedelta(hours=24)
-        stale_payments = await self.payment_repo.get_stale_pending_payments(cutoff)
+        stale_payments = await self.payment_repo.get_stale_pending_payments(
+            cutoff, for_update=True, skip_locked=True
+        )
         count = 0
         for payment in stale_payments:
             try:
@@ -144,7 +150,9 @@ class LifecycleJobService:
         Returns number of orphan profiles cleaned up.
         """
         now = now or datetime.now(timezone.utc)
-        profiles = await self.provisioning_repo.get_all_active_or_suspended()
+        profiles = await self.provisioning_repo.get_all_active_or_suspended(
+            for_update=True, skip_locked=True
+        )
         count = 0
         for profile in profiles:
             try:
@@ -230,13 +238,15 @@ class LifecycleJobService:
         """
         now = now or datetime.now(timezone.utc)
         cutoff = now - timedelta(days=30)
-        profiles = await self.provisioning_repo.get_all_active_or_suspended()
+        profiles = await self.provisioning_repo.get_stale_profiles(
+            cutoff, for_update=True, skip_locked=True
+        )
         count = 0
         for profile in profiles:
-            if profile.provisioning_state == ProvisioningState.ACTIVE and profile.last_sync_at <= cutoff:
+            if profile.provisioning_state == ProvisioningState.ACTIVE:
                 try:
                     logger.info("Performing scheduled credential rotation for account_id=%s", profile.account_id)
-                    await self.provisioning_service.rotate_user_credentials(profile.account_id)
+                    await self.provisioning_service.rotate_user_credentials(profile.account_id, cutoff=cutoff)
                     count += 1
                 except Exception as exc:
                     logger.warning(
@@ -256,7 +266,9 @@ class LifecycleJobService:
         Returns number of retry items successfully completed.
         """
         now = now or datetime.now(timezone.utc)
-        pending_items = await self.retry_repo.get_pending_retries(now)
+        pending_items = await self.retry_repo.get_pending_retries(
+            now, for_update=True, skip_locked=True
+        )
         count = 0
         for item in pending_items:
             try:
@@ -306,4 +318,29 @@ class LifecycleJobService:
                         str(update_exc),
                     )
                     await self.session.rollback()
+        return count
+
+    async def run_provisioning_reconciliation_job(self, now: datetime | None = None) -> int:
+        """
+        Job 8: Reconcile drift between local state and Marzban API (M-3).
+        Checks profiles not synced in the last 60 minutes.
+        """
+        now = now or datetime.now(timezone.utc)
+        cutoff = now - timedelta(minutes=60)
+        profiles = await self.provisioning_repo.get_stale_profiles(
+            cutoff, for_update=True, skip_locked=True
+        )
+        count = 0
+        for profile in profiles:
+            try:
+                logger.info("Running provisioning reconciliation for account_id=%s", profile.account_id)
+                await self.provisioning_service.synchronize(profile.account_id)
+                count += 1
+            except Exception as exc:
+                logger.error(
+                    "Reconciliation failed for account_id=%s: %s",
+                    profile.account_id,
+                    str(exc)
+                )
+                await self.session.rollback()
         return count

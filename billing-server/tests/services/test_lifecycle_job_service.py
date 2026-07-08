@@ -151,11 +151,15 @@ async def test_run_credential_rotation_job(job_service, mock_prov_service):
         provisioning_state=ProvisioningState.ACTIVE,
         last_sync_at=now - timedelta(days=35),
     )
-    job_service.provisioning_repo.get_all_active_or_suspended.return_value = [mock_profile]
+    job_service.provisioning_repo.get_stale_profiles.return_value = [mock_profile]
 
     count = await job_service.run_credential_rotation_job()
     assert count == 1
-    mock_prov_service.rotate_user_credentials.assert_called_once_with(mock_profile.account_id)
+    # Check that cutoff was passed by extracting the kwargs
+    mock_prov_service.rotate_user_credentials.assert_called_once()
+    args, kwargs = mock_prov_service.rotate_user_credentials.call_args
+    assert args[0] == mock_profile.account_id
+    assert "cutoff" in kwargs
 
 
 # ── 7. Failed Provision Retry Job ────────────────────────────────────────────

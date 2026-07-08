@@ -81,7 +81,7 @@ class SubscriptionRepository(BaseRepository[Subscription]):
             ) from exc
 
     async def get_expired_active_subscriptions(
-        self, now: datetime, *, for_update: bool = False
+        self, now: datetime, *, for_update: bool = False, skip_locked: bool = False
     ) -> list[Subscription]:
         """
         Retrieve all active subscriptions whose expiration timestamp has passed.
@@ -94,7 +94,7 @@ class SubscriptionRepository(BaseRepository[Subscription]):
                 .where(Subscription.expires_at <= now)
             )
             if for_update:
-                stmt = stmt.with_for_update()
+                stmt = stmt.with_for_update(skip_locked=skip_locked)
             result = await self.session.execute(stmt)
             return list(result.scalars().all())
         except SQLAlchemyError as exc:
@@ -103,7 +103,7 @@ class SubscriptionRepository(BaseRepository[Subscription]):
             ) from exc
 
     async def get_expired_grace_subscriptions(
-        self, now: datetime, *, for_update: bool = False
+        self, now: datetime, *, for_update: bool = False, skip_locked: bool = False
     ) -> list[Subscription]:
         """
         Retrieve all grace subscriptions whose grace period timestamp has elapsed.
@@ -117,7 +117,7 @@ class SubscriptionRepository(BaseRepository[Subscription]):
                 .where(Subscription.grace_expires_at <= now)
             )
             if for_update:
-                stmt = stmt.with_for_update()
+                stmt = stmt.with_for_update(skip_locked=skip_locked)
             result = await self.session.execute(stmt)
             return list(result.scalars().all())
         except SQLAlchemyError as exc:

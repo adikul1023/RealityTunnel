@@ -4,6 +4,7 @@ provisioning_repository.py — Persistence layer for ProvisioningProfile entitie
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from sqlalchemy import select, func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -82,7 +83,7 @@ class ProvisioningRepository(BaseRepository[ProvisioningProfile]):
             ) from exc
 
     async def get_all_active_or_suspended(
-        self, *, for_update: bool = False
+        self, *, for_update: bool = False, skip_locked: bool = False
     ) -> list[ProvisioningProfile]:
         """
         Retrieve all provisioning profiles not in TERMINATED state.
@@ -94,12 +95,35 @@ class ProvisioningRepository(BaseRepository[ProvisioningProfile]):
                 ProvisioningProfile.provisioning_state != ProvisioningState.TERMINATED
             )
             if for_update:
-                stmt = stmt.with_for_update()
+                stmt = stmt.with_for_update(skip_locked=skip_locked)
             result = await self.session.execute(stmt)
             return list(result.scalars().all())
         except SQLAlchemyError as exc:
             raise DatabaseOperationError(
                 "Database error querying active or suspended provisioning profiles"
+            ) from exc
+
+    async def get_stale_profiles(
+        self, cutoff: datetime, *, for_update: bool = False, skip_locked: bool = False
+    ) -> list[ProvisioningProfile]:
+        """
+        Retrieve ACTIVE or SUSPENDED provisioning profiles synced at or before cutoff.
+        If for_update=True, acquires row-level exclusive lock (SELECT ... FOR UPDATE).
+        """
+        try:
+            from app.models.provisioning import ProvisioningState
+            stmt = (
+                select(ProvisioningProfile)
+                .where(ProvisioningProfile.provisioning_state != ProvisioningState.TERMINATED)
+                .where(ProvisioningProfile.last_sync_at <= cutoff)
+            )
+            if for_update:
+                stmt = stmt.with_for_update(skip_locked=skip_locked)
+            result = await self.session.execute(stmt)
+            return list(result.scalars().all())
+        except SQLAlchemyError as exc:
+            raise DatabaseOperationError(
+                "Database error querying stale provisioning profiles"
             ) from exc
 
     async def list_all_paginated(
