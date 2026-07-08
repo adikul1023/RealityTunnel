@@ -97,8 +97,9 @@ app = FastAPI(
     title="RealityTunnel Billing/Auth API",
     description="Billing & authentication backend for RealityTunnel VPN.",
     version=settings.app_version,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url=settings.docs_url_effective,       # M-7: None in production
+    redoc_url=settings.redoc_url_effective,     # M-7: None in production
+    openapi_url=settings.openapi_url_effective, # M-7: None in production
     lifespan=lifespan,
 )
 

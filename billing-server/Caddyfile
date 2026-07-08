@@ -1,0 +1,43 @@
+# Caddyfile — Reference TLS-terminating reverse proxy for RealityTunnel billing-server.
+# M-8: Caddy sits in ingress_net + internal_net and proxies to billing-api on internal_net.
+#
+# Usage:
+#   CADDY_DOMAIN=billing.example.com docker compose -f docker-compose.prod.yml up -d
+#
+# Caddy automatically obtains and renews a Let's Encrypt certificate for CADDY_DOMAIN.
+# For local testing without a real domain, replace {$CADDY_DOMAIN} with "localhost" and
+# Caddy will use a self-signed certificate.
+
+{$CADDY_DOMAIN} {
+    # Proxy all traffic to the billing-api container on the internal Docker network.
+    reverse_proxy billing-api:8080 {
+        # Health checks from Caddy to the upstream.
+        health_uri      /health
+        health_interval 15s
+        health_timeout  5s
+
+        # Forward the real client IP so rate-limiting and audit logs are accurate.
+        header_up X-Real-IP           {remote_host}
+        header_up X-Forwarded-For     {remote_host}
+        header_up X-Forwarded-Proto   {scheme}
+        header_up X-Forwarded-Host    {host}
+    }
+
+    # Security headers (belt-and-suspenders — the app also sets these).
+    header {
+        Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+        X-Content-Type-Options    "nosniff"
+        X-Frame-Options           "DENY"
+        Referrer-Policy           "strict-origin-when-cross-origin"
+        -Server  # Remove "Caddy" server header
+    }
+
+    # Enable access logging.
+    log {
+        output file /var/log/caddy/access.log {
+            roll_size 10MB
+            roll_keep 5
+        }
+        format json
+    }
+}

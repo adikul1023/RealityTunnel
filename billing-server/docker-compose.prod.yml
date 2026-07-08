@@ -116,10 +116,10 @@ services:
       - backup_data_prod:/app/backups
       - brain_data_prod:/app/brain
     ports:
-      - "${PORT:-8080}:8080"
+      # M-8: Bind to loopback only. External traffic must enter via the caddy reverse proxy.
+      - "127.0.0.1:${PORT:-8080}:8080"
     networks:
       - internal_net
-      - ingress_net
     depends_on:
       postgres:
         condition: service_healthy
@@ -149,6 +149,41 @@ services:
           cpus: "0.5"
           memory: "512M"
 
+  # ── Caddy Reverse Proxy — TLS termination & HTTP→HTTPS redirect (M-8) ──────
+  # Caddy automatically provisions and renews TLS certificates via ACME/Let's Encrypt.
+  # It proxies HTTPS traffic to billing-api over the internal Docker network.
+  # Set the CADDY_DOMAIN env variable (e.g. billing.example.com) before starting.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"        # HTTP → HTTPS redirect
+      - "443:443"      # HTTPS (TLS terminated here)
+      - "443:443/udp"  # HTTP/3 (QUIC)
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - internal_net
+      - ingress_net
+    depends_on:
+      billing-api:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: "128M"
+        reservations:
+          cpus: "0.05"
+          memory: "32M"
+
 networks:
   internal_net:
     internal: true
@@ -160,3 +195,5 @@ volumes:
   redis_data_prod:
   backup_data_prod:
   brain_data_prod:
+  caddy_data:
+  caddy_config:

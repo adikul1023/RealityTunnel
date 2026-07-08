@@ -107,7 +107,7 @@ class Settings(BaseSettings):
         500.0  # [Operational Parameter]: threshold in milliseconds
     )
     metrics_auth_required: bool = (
-        False  # [Security Config]: whether /metrics requires Admin JWT
+        False  # [Security Config]: whether /metrics requires Admin JWT. Always True in production (enforced by validator).
     )
 
     # ── Rate Limiting & Abuse Protection [Operational Parameter / Security] ──
@@ -184,7 +184,31 @@ class Settings(BaseSettings):
                     "SECRET_KEY must be set to a strong random value in production. "
                     "The default placeholder is not permitted."
                 )
+            # M-6: Metrics endpoint must require authentication in production.
+            if not self.metrics_auth_required:
+                import warnings
+                warnings.warn(
+                    "metrics_auth_required is False in production — forcing to True. "
+                    "Set METRICS_AUTH_REQUIRED=true explicitly to suppress this warning.",
+                    stacklevel=2,
+                )
+                object.__setattr__(self, "metrics_auth_required", True)
         return self
+
+    @property
+    def docs_url_effective(self) -> str | None:
+        """M-7: Disable Swagger UI in production."""
+        return None if self.environment.lower() == "production" else "/docs"
+
+    @property
+    def redoc_url_effective(self) -> str | None:
+        """M-7: Disable ReDoc in production."""
+        return None if self.environment.lower() == "production" else "/redoc"
+
+    @property
+    def openapi_url_effective(self) -> str | None:
+        """M-7: Disable OpenAPI schema endpoint in production."""
+        return None if self.environment.lower() == "production" else "/openapi.json"
 
 
 @lru_cache
