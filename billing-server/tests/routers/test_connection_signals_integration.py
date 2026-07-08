@@ -140,3 +140,132 @@ async def test_exception_safety_in_signal_recording(async_client: AsyncClient, a
         assert "access_token" in resp.json()
     finally:
         app.dependency_overrides.pop(get_signal_service, None)
+
+
+# ── Phase 3.0.9: H-7 Signal-Invariant Enforcement ─────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_login_device_limit_records_signal_failure(
+    async_client: AsyncClient, account_factory, device_service, signal_service: ConnectionSignalService
+):
+    """
+    When login is rejected due to device limit exceeded (Finding H-7),
+    safe_record_signal(success=False) fires and persists a LOGIN failure signal.
+    """
+    master_token = "a" * 64
+    acc = await account_factory(
+        account_id="SIG-H7-LIMIT", master_token_hash=hash_master_token(master_token)
+    )
+    assert acc.plan_id == "free"
+
+    await device_service.register_device(acc.id, "sig-h7-d1", "Laptop")
+    await device_service.register_device(acc.id, "sig-h7-d2", "Phone")
+
+    resp = await async_client.post(
+        "/api/auth/login",
+        json={
+            "account_id": "SIG-H7-LIMIT",
+            "master_token": master_token,
+            "device_guid": "sig-h7-d3-new",
+        },
+    )
+    assert resp.status_code == 403
+
+    signals = await signal_service.get_recent_signals(acc.id)
+    fail_signals = [
+        s for s in signals
+        if s.event_type == ConnectionEventType.LOGIN and s.success is False
+    ]
+    assert len(fail_signals) >= 1
+    assert fail_signals[0].device_guid == "sig-h7-d3-new"
+
+
+@pytest.mark.asyncio
+async def test_login_device_ownership_records_signal_failure(
+    async_client: AsyncClient, account_factory, device_service, signal_service: ConnectionSignalService
+):
+    """
+    When login is rejected because the device_guid belongs to a different account
+    (Finding H-7), safe_record_signal(success=False) fires for the requesting account.
+    """
+    master_a = "a" * 64
+    master_b = "b" * 64
+    acc_a = await account_factory(
+        account_id="SIG-H7-OWN-A", master_token_hash=hash_master_token(master_a)
+    )
+    acc_b = await account_factory(
+        account_id="SIG-H7-OWN-B", master_token_hash=hash_master_token(master_b)
+    )
+
+    await device_service.register_device(acc_a.id, "sig-h7-shared", "Account A's device")
+
+    resp = await async_client.post(
+        "/api/auth/login",
+        json={
+            "account_id": "SIG-H7-OWN-B",
+            "master_token": master_b,
+            "device_guid": "sig-h7-shared",
+        },
+    )
+    assert resp.status_code == 401
+
+    signals = await signal_service.get_recent_signals(acc_b.id)
+    fail_signals = [
+        s for s in signals
+        if s.event_type == ConnectionEventType.LOGIN and s.success is False
+    ]
+    assert len(fail_signals) >= 1
+    assert fail_signals[0].device_guid == "sig-h7-shared"
+
+
+@pytest.mark.asyncio
+async def test_login_deactivated_device_records_signal_failure(
+    async_client: AsyncClient, account_factory, signal_service: ConnectionSignalService
+):
+    """
+    When login is rejected because the device was previously deactivated
+    (Finding H-7), safe_record_signal(success=False) fires.
+    """
+    master_token = "a" * 64
+    acc = await account_factory(
+        account_id="SIG-H7-DEACT", master_token_hash=hash_master_token(master_token)
+    )
+
+    # Login to register the device
+    login_resp = await async_client.post(
+        "/api/auth/login",
+        json={
+            "account_id": "SIG-H7-DEACT",
+            "master_token": master_token,
+            "device_guid": "sig-h7-deact-dev",
+        },
+    )
+    assert login_resp.status_code == 200
+    access_token = login_resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    # Deactivate the device
+    deact_resp = await async_client.delete(
+        "/api/devices/sig-h7-deact-dev", headers=headers
+    )
+    assert deact_resp.status_code == 200
+
+    # Try to login again with the deactivated device
+    resp = await async_client.post(
+        "/api/auth/login",
+        json={
+            "account_id": "SIG-H7-DEACT",
+            "master_token": master_token,
+            "device_guid": "sig-h7-deact-dev",
+        },
+    )
+    assert resp.status_code == 403
+
+    signals = await signal_service.get_recent_signals(acc.id)
+    fail_signals = [
+        s for s in signals
+        if s.event_type == ConnectionEventType.LOGIN and s.success is False
+    ]
+    assert len(fail_signals) >= 1
+    assert fail_signals[0].device_guid == "sig-h7-deact-dev"

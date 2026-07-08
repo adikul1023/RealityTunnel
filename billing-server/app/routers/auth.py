@@ -14,38 +14,54 @@ LOGGING INVARIANT:
 Never logs Account IDs, Master Tokens, Refresh Tokens, JWTs, Hashes, or Device GUIDs.
 Logs only generic outcome descriptions: "Login succeeded", "Login failed", "Refresh succeeded", "Refresh failed", "Logout", "Logout all".
 """
+
 from __future__ import annotations
 
 import logging
 import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.dependencies import (
     get_auth_service,
     get_current_account,
+    get_device_service,
     get_jwt_service,
     get_refresh_service,
     get_signal_service,
 )
 from app.models.account import Account
 from app.models.connection_signal import ConnectionEventType
+from typing import Union
+
 from app.rate_limit import require_rate_limit
-from app.security import JWTService
-from app.services import AuthenticationService, RefreshTokenService, ConnectionSignalService
-from app.services.exceptions import (
-    RefreshTokenExpiredError,
-    RefreshTokenNotFoundError,
-    RefreshTokenReplayError,
-    RefreshTokenRevokedError,
-)
 from app.routers.auth_models import (
     AccountMeResponse,
+    DeviceLimitErrorResponse,
+    InactiveDeviceErrorResponse,
     LoginRequest,
     LoginResponse,
     LogoutRequest,
     RefreshRequest,
     RefreshResponse,
     SuccessResponse,
+)
+from app.security import JWTService
+from app.services import (
+    AuthenticationService,
+    ConnectionSignalService,
+    DeviceService,
+    RefreshTokenService,
+)
+from app.services.exceptions import (
+    DeviceLimitExceededError,
+    DeviceOwnershipError,
+    DeviceServiceError,
+    InactiveDeviceError,
+    RefreshTokenExpiredError,
+    RefreshTokenNotFoundError,
+    RefreshTokenReplayError,
+    RefreshTokenRevokedError,
 )
 
 logger = logging.getLogger(__name__)
@@ -62,7 +78,9 @@ async def safe_record_signal(
 ) -> None:
     """Safely record a security signal without letting exceptions disrupt authentication."""
     try:
-        source_ip = http_request.client.host if http_request and http_request.client else None
+        source_ip = (
+            http_request.client.host if http_request and http_request.client else None
+        )
         user_agent = http_request.headers.get("user-agent") if http_request else None
         await signal_service.record_signal(
             account_id=account_id,
@@ -85,6 +103,10 @@ async def safe_record_signal(
     responses={
         400: {"description": "Validation error"},
         401: {"description": "Authentication failed or account inactive"},
+        403: {
+            "model": Union[DeviceLimitErrorResponse, InactiveDeviceErrorResponse],
+            "description": "Device limit reached for subscription plan, or this device has been deactivated",
+        },
         429: {"description": "Rate limit exceeded"},
         500: {"description": "Unexpected service or database error"},
     },
@@ -95,11 +117,17 @@ async def login(
     auth_service: AuthenticationService = Depends(get_auth_service),
     jwt_service: JWTService = Depends(get_jwt_service),
     refresh_service: RefreshTokenService = Depends(get_refresh_service),
+    device_service: DeviceService = Depends(get_device_service),
     signal_service: ConnectionSignalService = Depends(get_signal_service),
 ) -> LoginResponse:
     """
     Authenticate Account ID and Master Token credential pair.
     On success, issues a short-lived Ed25519 Access JWT and a long-lived rotated Refresh Token.
+
+    Finding H-7: the presented device_guid is registered (or touched, if already registered
+    to this account) via DeviceService.register_device before any tokens are issued. This
+    makes the subscription plan's device-limit enforcement load-bearing at login, not only
+    on the separate POST /api/devices endpoint.
     """
     result = await auth_service.authenticate(request.account_id, request.master_token)
     if not result.success or result.account is None:
@@ -115,6 +143,76 @@ async def login(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication failed: invalid credentials or inactive account",
+        )
+
+    try:
+        await device_service.register_device(
+            account_id=result.account.id,
+            device_guid=request.device_guid,
+            friendly_name=None,
+        )
+    except DeviceLimitExceededError:
+        logger.info("Login failed: device limit reached")
+        await safe_record_signal(
+            signal_service,
+            account_id=result.account.id,
+            event_type=ConnectionEventType.LOGIN,
+            success=False,
+            device_guid=request.device_guid,
+            http_request=http_request,
+        )
+        # Re-raised as-is: the globally registered DeviceLimitExceededError handler
+        # (app/main.py) already produces the exact structured 403 body
+        # ({"detail": ..., "plan": ..., "current_devices": ..., "max_devices": ...}) used by
+        # POST /api/devices today. Reuse it rather than duplicating that response shape here.
+        raise
+    except DeviceOwnershipError:
+        # SECURITY: never reveal that this device_guid is registered to a different
+        # account — that would leak information about another account's device inventory.
+        # Respond identically to an invalid-credentials failure.
+        logger.info("Login failed")
+        await safe_record_signal(
+            signal_service,
+            account_id=result.account.id,
+            event_type=ConnectionEventType.LOGIN,
+            success=False,
+            device_guid=request.device_guid,
+            http_request=http_request,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed: invalid credentials or inactive account",
+        )
+    except InactiveDeviceError:
+        logger.info("Login failed: device deactivated")
+        await safe_record_signal(
+            signal_service,
+            account_id=result.account.id,
+            event_type=ConnectionEventType.LOGIN,
+            success=False,
+            device_guid=request.device_guid,
+            http_request=http_request,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "This device has been deactivated. Reactivate it via "
+                f"/api/devices/{request.device_guid}/reactivate or register a new device."
+            ),
+        )
+    except DeviceServiceError:
+        logger.error("Login failed due to device registration error")
+        await safe_record_signal(
+            signal_service,
+            account_id=result.account.id,
+            event_type=ConnectionEventType.LOGIN,
+            success=False,
+            device_guid=request.device_guid,
+            http_request=http_request,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected service or database error",
         )
 
     access_token = jwt_service.issue_access_token(
@@ -311,4 +409,3 @@ async def get_me(
         status=current_account.status,
         subscription_expires_at=current_account.subscription_expires_at,
     )
-

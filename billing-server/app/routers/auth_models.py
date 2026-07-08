@@ -72,3 +72,20 @@ class AccountMeResponse(BaseModel):
         None, description="Subscription expiration timestamp (UTC)"
     )
 
+
+class DeviceLimitErrorResponse(BaseModel):
+    """
+    Error response returned when device registration exceeds the subscription plan limit (HTTP 403).
+    """
+    detail: str = Field(default="Device limit reached", description="Error explanation")
+    plan: str = Field(..., description="Subscription plan identifier")
+    current_devices: int = Field(..., description="Current number of active devices")
+    max_devices: int = Field(..., description="Maximum allowed devices for the plan")
+
+
+class InactiveDeviceErrorResponse(BaseModel):
+    """
+    Error response returned when attempting to login with a deactivated device (HTTP 403).
+    """
+    detail: str = Field(..., description="Instructions to reactivate the device or register a new one")
+

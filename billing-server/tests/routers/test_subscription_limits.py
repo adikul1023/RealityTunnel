@@ -24,9 +24,8 @@ async def test_register_device_limit_reached_returns_403(
     headers, account = await auth_headers_factory("LIMIT-ROUTER-1")
     assert account.plan_id == "free"
 
-    # Register 2 allowed devices directly via domain service to reach the limit of 2:
+    # Login auto-registered 1 device. Register 1 more allowed device via domain service to reach the limit of 2:
     await device_service.register_device(account.id, "device-guid-1", "Laptop")
-    await device_service.register_device(account.id, "device-guid-2", "Phone")
 
     # Attempt to register a 3rd device via HTTP REST API
     response = await async_client.post(

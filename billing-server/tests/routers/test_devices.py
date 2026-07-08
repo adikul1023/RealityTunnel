@@ -64,8 +64,8 @@ async def get_auth_headers(async_client: AsyncClient, account_factory, account_i
 async def test_list_devices(async_client: AsyncClient, account_factory, device_service: DeviceService):
     """1. GET /api/devices returns all devices owned by current account."""
     headers, acc = await get_auth_headers(async_client, account_factory, "RT-LIST-001")
+    # Login auto-registered "dev-RT-LIST-001". Register 1 more device:
     await device_service.register_device(acc.id, "guid-list-1", "Desktop")
-    await device_service.register_device(acc.id, "guid-list-2", "Laptop")
 
     resp = await async_client.get("/api/devices", headers=headers)
     assert resp.status_code == 200, resp.text
@@ -74,7 +74,7 @@ async def test_list_devices(async_client: AsyncClient, account_factory, device_s
     assert len(data["devices"]) == 2
 
     guids = {d["device_guid"] for d in data["devices"]}
-    assert guids == {"guid-list-1", "guid-list-2"}
+    assert guids == {"dev-RT-LIST-001", "guid-list-1"}
 
     # Verify public fields only (never expose database UUID or foreign keys)
     for dev in data["devices"]:
