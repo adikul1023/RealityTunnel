@@ -110,14 +110,15 @@ services:
       # which app.core.startup_validator enforces the presence and validity of at boot.
       RATE_LIMIT_BACKEND: ${RATE_LIMIT_BACKEND:-redis}
       REDIS_URL: redis://redis:6379/0
-      TRUST_PROXY: ${TRUST_PROXY:-false}
-      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-}
+      # M-8: Trust X-Forwarded-* headers only from Caddy on the shared internal_net.
+      # The internal Docker bridge (172.x.x.x) is the only source that can reach this container.
+      TRUST_PROXY: "true"
+      TRUSTED_PROXY_IPS: "172.0.0.0/8"
     volumes:
       - backup_data_prod:/app/backups
       - brain_data_prod:/app/brain
-    ports:
-      # M-8: Bind to loopback only. External traffic must enter via the caddy reverse proxy.
-      - "127.0.0.1:${PORT:-8080}:8080"
+    # No host ports published — billing-api is only reachable from within internal_net.
+    # Caddy proxies to it by container name (billing-api:8080) over the shared Docker network.
     networks:
       - internal_net
     depends_on:
