@@ -35,6 +35,7 @@ class ProvisioningProfile(Base, TimestampMixin):
     ProvisioningProfile table.
     Stores synchronization state, remote user identifiers, and retry diagnostics for VPN providers.
     Never stores plaintext VPN credentials, VLESS URIs, or traffic logs.
+    Account deletion must go through an explicit account-deletion service method that calls ProvisioningService.terminate_subscription() first. Do not hard-delete accounts rows directly — the RESTRICT constraint will reject it, by design, until that flow exists.
     """
     __tablename__ = "provisioning_profiles"
 
@@ -46,7 +47,7 @@ class ProvisioningProfile(Base, TimestampMixin):
     )
     account_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),
-        ForeignKey("accounts.id", ondelete="CASCADE"),
+        ForeignKey("accounts.id", ondelete="RESTRICT"),
         unique=True,
         index=True,
         nullable=False,
@@ -77,5 +78,5 @@ class ProvisioningProfile(Base, TimestampMixin):
 
     account: Mapped["Account"] = relationship(
         "Account",
-        backref=backref("provisioning_profile", uselist=False, cascade="all, delete-orphan"),
+        backref=backref("provisioning_profile", uselist=False),
     )

@@ -24,6 +24,7 @@ class Account(Base, TimestampMixin):
     Accounts table.
     Stores subscription state, human-readable Account ID, and hashed Master Token.
     Never stores plaintext credentials or VPN traffic logs.
+    Account deletion must go through an explicit account-deletion service method that calls ProvisioningService.terminate_subscription() first. Do not hard-delete accounts rows directly — the RESTRICT constraint will reject it, by design, until that flow exists.
     """
     __tablename__ = "accounts"
 

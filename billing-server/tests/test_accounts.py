@@ -62,6 +62,38 @@ async def test_delete_account(db_session: AsyncSession, account_factory):
     assert deleted is True
     assert not await repo.exists(id=acc.id)
 
-    # Deleting again returns False
     deleted_again = await repo.delete(acc.id)
     assert deleted_again is False
+
+
+@pytest.mark.asyncio
+async def test_account_deletion_restricted_by_provisioning_profile(db_session: AsyncSession, account_factory):
+    from app.exceptions import DatabaseOperationError, DuplicateEntityError
+    from app.models import ProvisioningProfile, ProvisioningState
+    
+    # 1. Create account
+    repo = AccountRepository(db_session)
+    acc = await account_factory(account_id="RESTRICT-ACC-01")
+    
+    # 2. Create associated provisioning profile
+    profile = ProvisioningProfile(
+        account_id=acc.id,
+        remote_user_id="remote_test_user_01",
+        provisioning_state=ProvisioningState.ACTIVE,
+    )
+    db_session.add(profile)
+    await db_session.commit()
+
+    # 3. Attempt to delete account directly - must fail due to RESTRICT FK constraint
+    # (BaseRepository.delete translates IntegrityError to DuplicateEntityError for foreign key violations if it catches it,
+    # or DatabaseOperationError. Let's catch both or generic Exception and assert it's a DB constraint failure)
+    try:
+        await repo.delete(acc.id)
+        pytest.fail("Expected deletion to fail due to foreign key RESTRICT constraint")
+    except Exception as e:
+        # Check it is a database operation error or duplicate entity error (from IntegrityError wrapper)
+        assert isinstance(e, (DatabaseOperationError, DuplicateEntityError))
+
+    # 4. Cleanup manually to not break fixture cleanup
+    await db_session.delete(profile)
+    await db_session.commit()
