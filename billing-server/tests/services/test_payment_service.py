@@ -162,6 +162,30 @@ async def test_razorpay_verify_webhook_invalid_hmac(test_settings: Settings):
 
 
 @pytest.mark.asyncio
+async def test_razorpay_fetch_payment_rejects_refunded(test_settings: Settings):
+    from unittest.mock import MagicMock
+    mock_client = AsyncMock(spec=httpx.AsyncClient)
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "id": "pay_test_789",
+        "order_id": "order_test_456",
+        "status": "captured",
+        "amount": 49900,
+        "currency": "INR",
+        "amount_refunded": 49900
+    }
+    mock_client.request.return_value = mock_response
+    
+    provider = RazorpayProvider(settings=test_settings, client=mock_client)
+    dto = await provider.fetch_payment("pay_test_789")
+    
+    assert dto.is_valid is False
+    assert dto.amount_refunded_minor_units == 49900
+    assert dto.status == "captured"
+
+
+@pytest.mark.asyncio
 async def test_razorpay_timeout_and_retries(test_settings: Settings):
     mock_client = AsyncMock(spec=httpx.AsyncClient)
     mock_client.request.side_effect = httpx.TimeoutException("Connection timed out")
@@ -270,6 +294,43 @@ async def test_confirm_payment_rejects_captured_amount_mismatch(
     assert payment.status == PaymentStatus.CREATED
     assert payment.subscription_id is None
     assert payment.paid_at is None
+
+
+@pytest.mark.asyncio
+async def test_confirm_payment_rejects_refunded_payment(
+    service: PaymentService,
+    test_account: Account,
+    mock_provider: AsyncMock,
+    db_session: AsyncSession,
+):
+    key = f"idem_{uuid.uuid4().hex}"
+    payment = await service.create_payment(
+        test_account.id, 99900, "INR", key, plan_id="pro"
+    )
+    payment.status = PaymentStatus.REFUNDED
+    await service.payment_repo.update(payment, commit=True)
+    
+    # Simulate stale webhook where provider hasn't been told about the refund yet
+    mock_provider.fetch_payment.return_value = PaymentVerificationDTO(
+        is_valid=True,
+        provider_order_id="order_test_123456",
+        provider_payment_id="pay_test_789012",
+        status="captured",
+        amount_minor_units=99900,
+        currency="INR",
+        amount_refunded_minor_units=0
+    )
+
+    with pytest.raises(PaymentVerificationError):
+        await service.confirm_payment(
+            provider_order_id="order_test_123456",
+            provider_payment_id="pay_test_789012",
+            plan_id="pro",
+        )
+
+    await db_session.refresh(payment)
+    assert payment.status == PaymentStatus.REFUNDED
+    assert payment.subscription_id is None
 
 
 @pytest.mark.asyncio

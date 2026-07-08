@@ -229,7 +229,8 @@ class RazorpayProvider(PaymentProvider):
         data = await self._request_with_retries("GET", path)
 
         status = str(data.get("status", ""))
-        is_valid = status in ("captured", "authorized")
+        amount_refunded = int(data.get("amount_refunded", 0) or 0)
+        is_valid = status in ("captured", "authorized") and amount_refunded == 0
         order_id = str(data.get("order_id", ""))
 
         return PaymentVerificationDTO(
@@ -239,6 +240,7 @@ class RazorpayProvider(PaymentProvider):
             status=status,
             amount_minor_units=int(data["amount"]) if "amount" in data else None,
             currency=str(data["currency"]) if "currency" in data else None,
+            amount_refunded_minor_units=amount_refunded,
             raw_data=data,
         )
 

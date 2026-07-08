@@ -163,6 +163,12 @@ class PaymentService:
             )
             return payment
 
+        if payment.status in (PaymentStatus.REFUNDED, PaymentStatus.CANCELLED, PaymentStatus.FAILED):
+            raise PaymentVerificationError(
+                f"Payment {payment.id} is in terminal state {payment.status.value}; "
+                "refusing to reactivate entitlement from a stale/replayed webhook."
+            )
+
         verification = await self.provider.fetch_payment(provider_payment_id)
         if not verification.is_valid:
             raise PaymentVerificationError(

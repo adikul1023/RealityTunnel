@@ -30,6 +30,7 @@ class PaymentVerificationDTO:
     status: str
     amount_minor_units: int | None = None
     currency: str | None = None
+    amount_refunded_minor_units: int = 0
     raw_data: dict[str, Any] = field(default_factory=dict)
 
 
