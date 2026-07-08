@@ -105,6 +105,7 @@ To create a single-file, self-contained `setup.exe` installer that bundles all c
    ```bash
    adb install app/build/outputs/apk/debug/app-debug.apk
    ```
+   Or just directly download and install on android directly.
 
 ### Features
 
