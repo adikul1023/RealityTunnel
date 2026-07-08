@@ -34,7 +34,7 @@ from app.models.account import Account
 from app.models.connection_signal import ConnectionEventType
 from typing import Union
 
-from app.rate_limit import require_rate_limit
+from app.rate_limit import require_rate_limit, RateLimiter, get_rate_limiter, KeyType
 from app.routers.auth_models import (
     AccountMeResponse,
     DeviceLimitErrorResponse,
@@ -119,6 +119,7 @@ async def login(
     refresh_service: RefreshTokenService = Depends(get_refresh_service),
     device_service: DeviceService = Depends(get_device_service),
     signal_service: ConnectionSignalService = Depends(get_signal_service),
+    limiter: RateLimiter = Depends(get_rate_limiter),
 ) -> LoginResponse:
     """
     Authenticate Account ID and Master Token credential pair.
@@ -129,6 +130,8 @@ async def login(
     makes the subscription plan's device-limit enforcement load-bearing at login, not only
     on the separate POST /api/devices endpoint.
     """
+    await limiter.enforce(http_request, "login_account", KeyType.ACCOUNT, key_override=request.account_id)
+
     result = await auth_service.authenticate(request.account_id, request.master_token)
     if not result.success or result.account is None:
         logger.info("Login failed")

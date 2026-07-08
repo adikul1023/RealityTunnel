@@ -161,6 +161,19 @@ class RateLimiter:
         except Exception as exc:
             logger.error("RateLimitBackend error during increment for key %s: %s", key, exc)
             metrics_registry.inc_counter("rate_limit_backend_errors", labels={"operation": "increment"})
+            if rule_name in ("login", "admin_login", "refresh"):
+                logger.error("Rate limiter failing CLOSED due to backend error for critical rule: %s", rule_name)
+                metrics_registry.inc_counter("rate_limit_failed_closed", labels={"endpoint": endpoint, "rule": rule_name})
+                res = RateLimitResult(
+                    allowed=False,
+                    limit=rule.max_requests,
+                    remaining=0,
+                    reset=int(time.time()) + rule.window_seconds,
+                    retry_after=rule.window_seconds
+                )
+                self._attach_state(request, res)
+                return res
+
             # FAIL-OPEN RULE: Do not DOS legitimate users if storage backend fails
             res = RateLimitResult.unlimited()
             self._attach_state(request, res)

@@ -124,10 +124,12 @@ class Settings(BaseSettings):
     )
     rate_limit_anonymous: str = "100/minute"  # [Operational Parameter]
     rate_limit_login: str = "10/minute"  # [Operational Parameter]
+    rate_limit_login_account: str = "10/minute"  # [Operational Parameter]
     rate_limit_register: str = "5/minute"  # [Operational Parameter]
     rate_limit_refresh: str = "30/minute"  # [Operational Parameter]
     rate_limit_device_register: str = "20/hour"  # [Operational Parameter]
     rate_limit_admin_login: str = "5/minute"  # [Operational Parameter]
+    rate_limit_admin_login_account: str = "5/minute"  # [Operational Parameter]
     rate_limit_admin_endpoints: str = "100/minute"  # [Operational Parameter]
     rate_limit_webhook: str = "unlimited"  # [Operational Parameter]
     rate_limit_health: str = "unlimited"  # [Operational Parameter]

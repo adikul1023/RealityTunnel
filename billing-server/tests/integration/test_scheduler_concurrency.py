@@ -51,8 +51,13 @@ async def _create_account_and_profile(
 
 
 async def _cleanup_test_accounts(session: AsyncSession, account_id_prefixes: list[str]) -> None:
-    """Delete test accounts by account_id prefix (cascades to profiles)."""
+    """Delete test accounts by account_id prefix."""
     for prefix in account_id_prefixes:
+        # H6 changed ondelete from CASCADE to RESTRICT, so we must manually delete profiles first
+        await session.execute(
+            text("DELETE FROM provisioning_profiles WHERE account_id IN (SELECT id FROM accounts WHERE account_id LIKE :prefix)"),
+            {"prefix": f"{prefix}%"},
+        )
         await session.execute(
             text("DELETE FROM accounts WHERE account_id LIKE :prefix"),
             {"prefix": f"{prefix}%"},

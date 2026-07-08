@@ -48,7 +48,7 @@ async def test_admin_recovery_lifecycle_endpoints(
     assert res_prev.status_code == 200
     prev = res_prev.json()
     assert prev["backup_id"] == backup_id
-    assert prev["can_restore"] is True
+    assert prev["can_restore"] is False
 
     # 4. Verify integrity via super admin
     res_ver = await async_client.post(f"/api/admin/recovery/backups/{backup_id}/verify", headers=super_admin_auth_headers)

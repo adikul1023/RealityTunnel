@@ -157,7 +157,7 @@ class BillingService:
         payment = await self.payment_service.create_payment(
             account_id=account_id,
             amount_minor_units=amount_minor_units,
-            currency=request.currency,
+            currency=plan.currency,
             idempotency_key=request.idempotency_key,
             plan_id=request.plan_id,
         )

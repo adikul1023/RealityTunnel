@@ -298,16 +298,40 @@ def validate_startup_configuration(
         checks["Razorpay Gateway (Disabled)"] = True
 
     # 6. Writable Directories Check
-    try:
-        dev_keys_dir = _project_root() / "dev_keys"
-        dev_keys_dir.mkdir(parents=True, exist_ok=True)
-        test_file = dev_keys_dir / ".write_test"
-        test_file.write_text("ok", encoding="utf-8")
-        test_file.unlink(missing_ok=True)
-        checks["Writable Directories"] = True
-    except Exception as exc:
-        checks["Writable Directories"] = False
-        errors.append(f"Directory write permission test failed: {exc}")
+    #
+    # DEPLOYMENT FIX: this check previously ALWAYS tested write access to dev_keys/, which is
+    # correct in development (where missing Ed25519 keys are auto-generated on first boot) but
+    # is fundamentally incompatible with the security-hardened production deployment pattern:
+    # dev_keys/ MUST be mounted read-only in production (see docker-compose.prod.yml) so that a
+    # compromised/malicious process running inside the container can never overwrite its own
+    # signing keys. Enforcing writability there in production would force operators to choose
+    # between "app can boot" and "signing keys are immutable from inside the container" -- a
+    # false choice that should never exist.
+    #
+    # Fix: only require dev_keys/ to be writable outside production (where auto-generation is a
+    # deliberate convenience feature). In every profile, verify the directories the application
+    # genuinely needs to write to at runtime (backups/, brain/) are writable -- these are always
+    # backed by writable volumes per docker-compose.prod.yml, independent of environment.
+    writable_targets: list[Path] = [
+        _project_root() / "backups",
+        _project_root() / "brain",
+    ]
+    if not profile.is_production:
+        writable_targets.append(_project_root() / "dev_keys")
+
+    all_writable = True
+    for target_dir in writable_targets:
+        try:
+            target_dir.mkdir(parents=True, exist_ok=True)
+            test_file = target_dir / ".write_test"
+            test_file.write_text("ok", encoding="utf-8")
+            test_file.unlink(missing_ok=True)
+        except Exception as exc:
+            all_writable = False
+            errors.append(
+                f"Directory write permission test failed for '{target_dir}': {exc}"
+            )
+    checks["Writable Directories"] = all_writable
 
     # 7. Production Guards (Strict Phase 3.1.5 enforcement)
     if profile.is_production:
@@ -365,8 +389,18 @@ def validate_startup_configuration(
             )
 
         # HTTPS / Localhost callback URL check
+        #
+        # BUG FIX: `no_localhost` previously had no `not flags.provisioning_enabled` escape hatch,
+        # unlike the parallel `https_ok` check right below it. Since `marzban_base_url` defaults to
+        # "http://localhost:8000" (app/config.py), this meant production startup would ALWAYS fail
+        # this guard whenever PROVISIONING_ENABLED=false and the operator left marzban_base_url at
+        # its default -- i.e., a fully-disabled, entirely-unused subsystem could still block the
+        # whole application from booting. Both conditions must be exempted identically when the
+        # Marzban subsystem itself is disabled.
         marz_url = (settings.marzban_base_url or "").lower()
-        no_localhost = "localhost" not in marz_url and "127.0.0.1" not in marz_url
+        no_localhost = (
+            "localhost" not in marz_url and "127.0.0.1" not in marz_url
+        ) or not flags.provisioning_enabled
         https_ok = marz_url.startswith("https://") or not flags.provisioning_enabled
         prod_checks["HTTPS / No Localhost Gateways"] = bool(no_localhost and https_ok)
         if not (no_localhost and https_ok):

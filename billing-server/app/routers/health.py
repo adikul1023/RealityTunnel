@@ -86,12 +86,13 @@ async def health_check(
     except Exception as exc:
         pg_latency = round((time.perf_counter() - t0) * 1000, 2)
         logger.error("Health check — PostgreSQL unreachable: %s", exc)
+        err_detail = str(exc) if admin else "database unreachable"
         components["postgresql"] = ComponentStatus(
             status="error",
             latency_ms=pg_latency,
-            detail=str(exc),
+            detail=err_detail,
         )
-        db_status = {"status": "error", "latency_ms": pg_latency, "detail": str(exc)}
+        db_status = {"status": "error", "latency_ms": pg_latency, "detail": err_detail}
         overall_ok = False
 
     # ── Background Monitored Components (Marzban & Payment Gateway) ──────

@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.dependencies import get_admin_auth_service, get_current_admin
 from app.models.admin_user import AdminUser
-from app.rate_limit import require_rate_limit
+from app.rate_limit import require_rate_limit, RateLimiter, get_rate_limiter, KeyType
 from app.routers.admin_models import (
     AdminLoginRequest,
     AdminLoginResponse,
@@ -43,11 +43,14 @@ async def login(
     request: AdminLoginRequest,
     http_request: Request,
     admin_auth_service: AdminAuthenticationService = Depends(get_admin_auth_service),
+    limiter: RateLimiter = Depends(get_rate_limiter),
 ) -> AdminLoginResponse:
     """
     Authenticate an administrative username and password pair.
     On success, issues a short-lived Ed25519 signed Admin Access JWT.
     """
+    await limiter.enforce(http_request, "admin_login_account", KeyType.ACCOUNT, key_override=request.username)
+
     # Hash client IP for audit logging (never store raw IPs)
     client_ip = http_request.client.host if http_request.client else "unknown"
     ip_hash = hashlib.sha256(client_ip.encode()).hexdigest()[:16]

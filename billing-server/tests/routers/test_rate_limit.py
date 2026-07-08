@@ -60,8 +60,8 @@ async def test_admin_login_rate_limit_enforcement(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_router_fail_open_on_storage_backend_error(async_client: AsyncClient):
-    """Verify that if the rate limit storage backend fails, traffic fails open without 500 error."""
+async def test_router_fail_closed_on_storage_backend_error_critical(async_client: AsyncClient):
+    """Verify that if the rate limit storage backend fails, traffic fails closed with 429 for critical rules."""
     backend = get_rate_limit_backend()
     url = "/api/auth/login"
     payload = {"account_id": "ACC-9999-8888", "master_token": "mt_secret_token", "device_guid": "dev-2"}
@@ -70,7 +70,5 @@ async def test_router_fail_open_on_storage_backend_error(async_client: AsyncClie
         mock_inc.side_effect = RuntimeError("Redis cluster outage simulated")
 
         resp = await async_client.post(url, json=payload)
-        # Should NOT be 500 or 429! Must fail open and reach the auth handler (returning 401 or 200)
-        assert resp.status_code in (401, 200), f"Fail open failed, got {resp.status_code}: {resp.text}"
-        # Unlimited fallback header should be attached
-        assert resp.headers["X-RateLimit-Limit"] == "999999"
+        # Should be 429 because it fails closed!
+        assert resp.status_code == 429, f"Fail closed failed, got {resp.status_code}: {resp.text}"

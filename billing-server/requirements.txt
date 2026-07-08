@@ -6,10 +6,7 @@ sqlalchemy==2.0.36
 asyncpg==0.30.0
 alembic==1.14.0
 httpx==0.28.1
-pytest==8.3.4
-pytest-asyncio==0.25.0
 pyjwt==2.10.1
 cryptography==44.0.0
 argon2-cffi==23.1.0
 redis==8.0.1
-fakeredis==2.36.2  # test-only: in-memory Redis simulator for RedisRateLimitBackend tests

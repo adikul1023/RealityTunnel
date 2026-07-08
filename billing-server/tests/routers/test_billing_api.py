@@ -276,17 +276,17 @@ async def test_purchase_subscription_success(
 
 
 @pytest.mark.asyncio
-async def test_purchase_subscription_ignores_client_supplied_amount(
+async def test_purchase_subscription_ignores_client_supplied_amount_and_currency(
     client_with_mock_provider: AsyncClient, account_factory, mock_provider: AsyncMock
 ):
     """
-    Regression test for Finding C-1 (payment tampering).
+    Regression test for Finding C-1 (payment tampering) and M2 (currency tampering).
 
     A malicious client attempts to purchase the 'pro' plan while smuggling a drastically
-    reduced 'amount' field into the request payload. The server must never honor a
-    client-supplied amount: PurchaseRequestDTO has no such field, so it is silently
-    dropped by FastAPI/Pydantic request parsing, and the amount actually sent to the
-    payment gateway must always equal the authoritative plan price (49900 for 'pro'),
+    reduced 'amount' field and a different 'currency' into the request payload. The server 
+    must never honor client-supplied amount or currency: PurchaseRequestDTO has no such fields, 
+    so they are silently dropped by FastAPI/Pydantic request parsing, and the amount and currency 
+    actually sent to the payment gateway must always equal the authoritative plan price (49900 for 'pro', INR),
     regardless of what the client attempted to smuggle in.
     """
     headers, _ = await get_auth_headers(
@@ -296,6 +296,7 @@ async def test_purchase_subscription_ignores_client_supplied_amount(
         "plan_id": "pro",
         "idempotency_key": "idem_purchase_tamper_001",
         "amount": 100,  # Attacker attempts to pay 1 INR instead of the real 499 INR price.
+        "currency": "USD", # Attacker attempts to pay in USD.
     }
     resp = await client_with_mock_provider.post(
         "/api/billing/purchase", json=tampered_req_data, headers=headers
@@ -303,13 +304,15 @@ async def test_purchase_subscription_ignores_client_supplied_amount(
     assert resp.status_code == 200, resp.text
 
     data = resp.json()
-    # The response amount must reflect the real plan price, never the attacker-supplied value.
+    # The response amount and currency must reflect the real plan price, never the attacker-supplied value.
     assert data["amount"] == 49900
+    assert data["currency"] == "INR"
 
-    # The amount actually requested from the payment gateway must be the plan price too.
+    # The amount and currency actually requested from the payment gateway must be the plan price too.
     assert mock_provider.create_order.call_count == 1
     _, call_kwargs = mock_provider.create_order.call_args
     assert call_kwargs["amount_minor_units"] == 49900
+    assert call_kwargs["currency"] == "INR"
 
 
 @pytest.mark.asyncio

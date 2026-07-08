@@ -17,17 +17,48 @@ SECURITY & ARCHITECTURAL DECISIONS — WHY ARGON2ID INSTEAD OF SHA-256 OR BCRYPT
    attempts is identical regardless of whether the target username exists, completely preventing account enumeration via
    network response timing analysis.
 """
+
 from __future__ import annotations
 
 import logging
+import secrets
+
 from argon2 import PasswordHasher
-from argon2.exceptions import VerifyMismatchError, VerificationError, InvalidHashError
+from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 
 logger = logging.getLogger(__name__)
 
-# Pre-computed valid Argon2id hash of a random string used exclusively for timing attack defense
-# when querying non-existent usernames during authentication.
-DUMMY_ADMIN_PASSWORD_HASH = "$argon2id$v=19$m=65536,t=3,p=4$4Hty2D7M0b+7eD1w/w8uGg$rK3U2g1O5G7n6b5f4c3d2e1f0a9b8c7d6e5f4a3b2c1"
+# Argon2id parameters shared between real password hashing and the dummy timing-defense hash below.
+# Both MUST use identical parameters so that a genuine hash and the dummy hash impose identical
+# computational/memory cost on `verify()`, regardless of whether the target account exists.
+_ADMIN_ARGON2_PARAMS: dict[str, int] = {
+    "time_cost": 3,
+    "memory_cost": 65536,
+    "parallelism": 4,
+    "hash_len": 32,
+    "salt_len": 16,
+}
+
+# SECURITY FIX (Audit Finding H1): The dummy hash used for timing-attack defense when an admin
+# username does not exist MUST be a syntactically and semantically valid Argon2id hash that is
+# guaranteed to run the *full* memory-hard KDF on every verification attempt.
+#
+# Previously this was a hand-crafted, structurally invalid PHC string. Because it could not be
+# decoded by the underlying Argon2 implementation, `verify()` failed in under a millisecond
+# (~0.5ms) instead of running the ~68ms memory-hard computation a real hash requires -- creating a
+# ~140x timing gap that let an unauthenticated attacker enumerate valid admin usernames purely by
+# measuring response latency.
+#
+# The fix: generate the dummy hash the same way a real hash would be generated -- by actually
+# calling `PasswordHasher(**_ADMIN_ARGON2_PARAMS).hash(...)` against a high-entropy random secret.
+# This guarantees the dummy hash is always a well-formed Argon2id digest, so `verify()` always runs
+# the complete KDF and always fails with `VerifyMismatchError` (a mismatched digest), never with
+# `VerificationError`/`InvalidHashError` (a decode failure). This is computed once, at module import
+# time, so the (relatively expensive) hash generation cost is paid once at process startup rather
+# than on every dummy comparison.
+DUMMY_ADMIN_PASSWORD_HASH: str = PasswordHasher(**_ADMIN_ARGON2_PARAMS).hash(
+    secrets.token_urlsafe(32)
+)
 
 
 class AdminPasswordService:
@@ -38,13 +69,9 @@ class AdminPasswordService:
 
     def __init__(self) -> None:
         # Explicitly configured Argon2id parameters: memory_cost=65536 KB (64 MB), time_cost=3, parallelism=4
-        self._hasher = PasswordHasher(
-            time_cost=3,
-            memory_cost=65536,
-            parallelism=4,
-            hash_len=32,
-            salt_len=16,
-        )
+        # Uses the same shared parameter set as DUMMY_ADMIN_PASSWORD_HASH above, guaranteeing that
+        # real and dummy verification attempts impose identical computational cost.
+        self._hasher = PasswordHasher(**_ADMIN_ARGON2_PARAMS)
 
     def hash_password(self, password: str) -> str:
         """
@@ -60,7 +87,12 @@ class AdminPasswordService:
         Verify a candidate password against an Argon2id hash string.
         Returns True if matching, False otherwise. Handles invalid hash strings without raising exceptions.
         """
-        if not isinstance(password, str) or not isinstance(password_hash, str) or not password or not password_hash:
+        if (
+            not isinstance(password, str)
+            or not isinstance(password_hash, str)
+            or not password
+            or not password_hash
+        ):
             return False
         try:
             return self._hasher.verify(password_hash, password)

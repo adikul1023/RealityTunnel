@@ -112,9 +112,6 @@ class PurchaseRequestDTO(BaseModel):
         max_length=64,
         description="Unique idempotency key to prevent duplicate orders",
     )
-    currency: str = Field(
-        default="INR", min_length=3, max_length=3, description="Currency code"
-    )
 
 
 class PurchaseResponseDTO(BaseModel):

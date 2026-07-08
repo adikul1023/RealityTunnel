@@ -174,7 +174,7 @@ async def test_rate_limiter_fail_open_on_backend_error(backend: RateLimitBackend
         mock_inc.side_effect = RuntimeError("Simulated Redis connection timeout")
 
         req = make_dummy_request(ip="192.168.1.100")
-        result = await limiter.check(req, "login")
+        result = await limiter.check(req, "device_register")
 
         # Must fail open
         assert result.allowed is True
@@ -184,6 +184,24 @@ async def test_rate_limiter_fail_open_on_backend_error(backend: RateLimitBackend
         # Verify backend error metric was incremented
         summary = metrics_registry.get_summary()
         assert summary.get("rate_limit_backend_errors", 0) >= 1.0
+
+@pytest.mark.asyncio
+async def test_rate_limiter_fail_closed_on_backend_error_critical(backend: RateLimitBackend):
+    """Verify RateLimiter fails closed if backend raises exception for critical rules."""
+    limiter = RateLimiter(backend)
+
+    with patch.object(backend, "increment", new_callable=AsyncMock) as mock_inc:
+        mock_inc.side_effect = RuntimeError("Simulated Redis connection timeout")
+
+        req = make_dummy_request(ip="192.168.1.100")
+        result = await limiter.check(req, "login")
+
+        # Must fail closed
+        assert result.allowed is False
+        assert result.remaining == 0
+
+        summary = metrics_registry.get_summary()
+        assert summary.get("rate_limit_failed_closed", 0) >= 1.0
 
 
 @pytest.mark.asyncio
