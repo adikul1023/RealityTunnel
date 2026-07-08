@@ -111,10 +111,10 @@ services:
       RATE_LIMIT_BACKEND: ${RATE_LIMIT_BACKEND:-redis}
       REDIS_URL: redis://redis:6379/0
       # M-8: Trust X-Forwarded-* headers only from Caddy on the shared internal_net.
-      # We restrict the internal_net to a deterministic subnet (172.28.0.0/16) to prevent
-      # blindly trusting all 172.x.x.x addresses.
+      # We restrict the internal_net to a deterministic subnet to prevent blindly trusting
+      # all 172.x.x.x addresses.
       TRUST_PROXY: "true"
-      TRUSTED_PROXY_IPS: "172.28.0.0/16"
+      TRUSTED_PROXY_IPS: "${DOCKER_INTERNAL_SUBNET:-172.28.0.0/16}"
     volumes:
       - backup_data_prod:/app/backups
       - brain_data_prod:/app/brain
@@ -191,7 +191,7 @@ networks:
     internal: true
     ipam:
       config:
-        - subnet: 172.28.0.0/16
+        - subnet: ${DOCKER_INTERNAL_SUBNET:-172.28.0.0/16}
   ingress_net:
     driver: bridge
 
