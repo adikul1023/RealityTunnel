@@ -7,6 +7,7 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from typing import Any
+from collections import OrderedDict
 
 from app.config import settings
 from app.observability.metrics import metrics_registry
@@ -85,7 +86,7 @@ class MemoryCache(BaseCache):
     """
 
     def __init__(self, maxsize: int = 10000) -> None:
-        self._store: dict[str, tuple[Any, float]] = {}
+        self._store: OrderedDict[str, tuple[Any, float]] = OrderedDict()
         self._lock = asyncio.Lock()
         self._hits = 0
         self._misses = 0
@@ -119,8 +120,8 @@ class MemoryCache(BaseCache):
             metrics_registry.inc_counter("cache_hits_total")
             self._update_metrics()
             
-            # Simple LRU-ish behavior: re-insert to move to end (newest)
-            self._store[key] = self._store.pop(key)
+            # LRU behavior: move to end (newest)
+            self._store.move_to_end(key)
             return value
 
     async def set(self, key: str, value: Any, ttl: int | None = None) -> None:
@@ -130,14 +131,15 @@ class MemoryCache(BaseCache):
         effective_ttl = ttl if ttl is not None else settings.cache_ttl_seconds
         expire_at = (time.time() + effective_ttl) if effective_ttl > 0 else 0.0
         async with self._lock:
-            # If it already exists, popping it ensures it's added at the end (newest)
-            self._store.pop(key, None)
+            # Add or update the key
             self._store[key] = (value, expire_at)
+            # Move to end to mark as newest
+            self._store.move_to_end(key)
             
-            # Evict oldest if we exceed maxsize
+            # Evict oldest (least recently used) if we exceed maxsize
             if len(self._store) > self.maxsize:
-                oldest_key = next(iter(self._store))
-                del self._store[oldest_key]
+                # popitem(last=False) removes the first (oldest) item
+                self._store.popitem(last=False)
 
     async def delete(self, key: str) -> bool:
         validate_cache_key(key)

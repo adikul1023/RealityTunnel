@@ -165,10 +165,10 @@ class CredentialService:
         except EntityNotFoundError as exc:
             raise CredentialNotFoundError(f"No provisioning profile found for account {account_id}") from exc
         except SQLAlchemyError as exc:
-            logger.error("Database error in get_credentials for account_id=%s: %s", account_id, str(exc))
+            logger.exception("Database error in get_credentials for account_id=%s", account_id)
             raise CredentialServiceError("A database error occurred while retrieving credentials") from exc
         except Exception as exc:
-            logger.error("Unexpected error in get_credentials for account_id=%s: %s", account_id, str(exc))
+            logger.exception("Unexpected error in get_credentials for account_id=%s", account_id)
             raise CredentialServiceError("An unexpected error occurred while retrieving credentials") from exc
 
         if profile.provisioning_state == ProvisioningState.TERMINATED:
@@ -212,10 +212,10 @@ class CredentialService:
         except EntityNotFoundError as exc:
             raise CredentialNotFoundError(f"No provisioning profile found for account {account_id}") from exc
         except SQLAlchemyError as exc:
-            logger.error("Database error during credential rotation for account_id=%s: %s", account_id, str(exc))
+            logger.exception("Database error during credential rotation for account_id=%s", account_id)
             raise CredentialRotationFailedError("Database error during credential rotation") from exc
         except Exception as exc:
-            logger.error("Unexpected error during credential rotation for account_id=%s: %s", account_id, str(exc))
+            logger.exception("Unexpected error during credential rotation for account_id=%s", account_id)
             raise CredentialRotationFailedError("An unexpected error occurred during credential rotation") from exc
 
     async def revoke_credentials(self, account_id: uuid.UUID, *, commit: bool = True) -> None:
@@ -234,10 +234,10 @@ class CredentialService:
             await self.provisioning_service.suspend_subscription(account_id, commit=commit)
             logger.info("Successfully revoked credentials for account_id=%s", account_id)
         except SQLAlchemyError as exc:
-            logger.error("Database error during credential revocation for account_id=%s: %s", account_id, str(exc))
+            logger.exception("Database error during credential revocation for account_id=%s", account_id)
             raise CredentialServiceError("Database error during credential revocation") from exc
         except Exception as exc:
-            logger.error("Unexpected error during credential revocation for account_id=%s: %s", account_id, str(exc))
+            logger.exception("Unexpected error during credential revocation for account_id=%s", account_id)
             raise CredentialServiceError("An unexpected error occurred during credential revocation") from exc
 
     async def restore_credentials(self, account_id: uuid.UUID, *, commit: bool = True) -> None:
@@ -256,10 +256,10 @@ class CredentialService:
             await self.provisioning_service.reactivate_subscription(account_id, commit=commit)
             logger.info("Successfully restored credentials for account_id=%s", account_id)
         except SQLAlchemyError as exc:
-            logger.error("Database error during credential restoration for account_id=%s: %s", account_id, str(exc))
+            logger.exception("Database error during credential restoration for account_id=%s", account_id)
             raise CredentialServiceError("Database error during credential restoration") from exc
         except Exception as exc:
-            logger.error("Unexpected error during credential restoration for account_id=%s: %s", account_id, str(exc))
+            logger.exception("Unexpected error during credential restoration for account_id=%s", account_id)
             raise CredentialServiceError("An unexpected error occurred during credential restoration") from exc
 
     async def generate(self, account_id: uuid.UUID) -> dict[str, Any]:
