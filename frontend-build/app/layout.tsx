@@ -6,9 +6,9 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'NullRoute — Secure Private Network Access',
+  title: 'Stealthy — Secure Private Network Access',
   description:
-    'NullRoute provides encrypted, private network access with no activity logs. Anonymous account-key authentication, no email required.',
+    'Stealthy provides encrypted, private network access with no activity logs. Anonymous account-key authentication, no email required.',
   generator: 'v0.app',
   keywords: [
     'secure connection',

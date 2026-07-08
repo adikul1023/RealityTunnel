@@ -82,8 +82,8 @@ const categories = [
         a: 'The number of simultaneous device slots depends on your plan: 3 slots on the Monthly plan, and 5 slots on the Yearly plan. You can view and manage your connected devices from the My Devices dashboard.',
       },
       {
-        q: 'What encryption does NullRoute use?',
-        a: 'NullRoute uses industry-standard protocols for establishing the encrypted tunnel between your device and our servers. Specific protocol details are available in our technical documentation.',
+        q: 'What encryption does Stealthy use?',
+        a: 'Stealthy uses industry-standard protocols for establishing the encrypted tunnel between your device and our servers. Specific protocol details are available in our technical documentation.',
       },
       {
         q: 'What should I do if I cannot connect?',
@@ -128,7 +128,7 @@ export default function FaqPage() {
               FAQ &amp; Support
             </h1>
             <p className="text-muted-foreground max-w-lg mx-auto text-pretty">
-              Common questions about NullRoute. If you cannot find an answer below, contact us directly.
+              Common questions about Stealthy. If you cannot find an answer below, contact us directly.
             </p>
           </div>
 

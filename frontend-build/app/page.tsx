@@ -89,7 +89,7 @@ export default function HomePage() {
             </h1>
 
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-10 text-pretty">
-              NullRoute provides a secure, encrypted tunnel for your internet traffic. No email.
+              Stealthy provides a secure, encrypted tunnel for your internet traffic. No email.
               No personal data. Anonymous account-key authentication — your identity stays yours.
             </p>
 

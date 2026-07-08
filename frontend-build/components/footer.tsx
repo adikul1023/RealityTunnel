@@ -11,7 +11,7 @@ export function Footer() {
               <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/15 ring-1 ring-primary/30">
                 <Shield className="h-3.5 w-3.5 text-primary" />
               </div>
-              <span className="font-semibold text-foreground">NullRoute</span>
+              <span className="font-semibold text-foreground">Stealthy</span>
             </Link>
             <p className="text-xs text-muted-foreground leading-relaxed max-w-xs">
               Encrypted, private network access. No activity logs. Anonymous account-key
@@ -54,7 +54,7 @@ export function Footer() {
 
         <div className="mt-8 pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} NullRoute. All rights reserved. GST registered entity.
+            &copy; {new Date().getFullYear()} Stealthy. All rights reserved. GST registered entity.
           </p>
           <p className="text-xs text-muted-foreground">
             India-based infrastructure subject to data retention requirements.{' '}

@@ -57,13 +57,13 @@ export default function RegisterPage() {
 
   function handleDownloadKey() {
     const blob = new Blob(
-      [`NullRoute Account Key\n\n${accountKey}\n\nGenerated: ${new Date().toISOString()}\n\nKEEP THIS FILE SECURE. It cannot be recovered if lost.`],
+      [`Stealthy Account Key\n\n${accountKey}\n\nGenerated: ${new Date().toISOString()}\n\nKEEP THIS FILE SECURE. It cannot be recovered if lost.`],
       { type: 'text/plain' }
     )
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'nullroute-account-key.txt'
+    a.download = 'stealthy-account-key.txt'
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -76,13 +76,13 @@ export default function RegisterPage() {
 
   function handleDownloadBackup() {
     const blob = new Blob(
-      [`NullRoute 2FA Backup Codes\n\n${MOCK_BACKUP_CODES.join('\n')}\n\nEach code can only be used once.\nGenerated: ${new Date().toISOString()}`],
+      [`Stealthy 2FA Backup Codes\n\n${MOCK_BACKUP_CODES.join('\n')}\n\nEach code can only be used once.\nGenerated: ${new Date().toISOString()}`],
       { type: 'text/plain' }
     )
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'nullroute-backup-codes.txt'
+    a.download = 'stealthy-backup-codes.txt'
     a.click()
     URL.revokeObjectURL(url)
   }

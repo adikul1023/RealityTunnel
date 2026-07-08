@@ -18,14 +18,14 @@ export default function TermsPage() {
           <div className="space-y-8">
             <LegalSection title="1. Acceptance of terms">
               <p className="text-sm text-muted-foreground leading-relaxed">
-                By creating an account or using NullRoute services, you agree to be bound by these Terms of
+                By creating an account or using Stealthy services, you agree to be bound by these Terms of
                 Service. If you do not agree, do not use the service.
               </p>
             </LegalSection>
 
             <LegalSection title="2. Description of service">
               <p className="text-sm text-muted-foreground leading-relaxed">
-                NullRoute provides a private network access service that encrypts your internet traffic and
+                Stealthy provides a private network access service that encrypts your internet traffic and
                 routes it through our server infrastructure. The service is provided on a subscription basis.
                 Access requires a valid 32-character account key and an active paid plan.
               </p>
@@ -34,7 +34,7 @@ export default function TermsPage() {
             <LegalSection title="3. Account key and authentication">
               <p className="text-sm text-muted-foreground leading-relaxed">
                 Your account key is your sole authentication credential. It is generated on your device and
-                is your responsibility to store securely. NullRoute does not retain a copy of your plaintext
+                is your responsibility to store securely. Stealthy does not retain a copy of your plaintext
                 account key and cannot recover it under any circumstances. Loss of your account key means
                 permanent loss of access to the associated account and any remaining subscription period.
               </p>
@@ -42,7 +42,7 @@ export default function TermsPage() {
 
             <LegalSection title="4. Acceptable use">
               <p className="text-sm text-muted-foreground leading-relaxed mb-3">
-                You agree not to use NullRoute for any of the following:
+                You agree not to use Stealthy for any of the following:
               </p>
               <ul className="space-y-1.5 text-sm text-muted-foreground">
                 <li>· Activities that violate any applicable law or regulation in India or your jurisdiction</li>
@@ -90,7 +90,7 @@ export default function TermsPage() {
 
             <LegalSection title="9. Limitation of liability">
               <p className="text-sm text-muted-foreground leading-relaxed">
-                To the maximum extent permitted by applicable law, NullRoute shall not be liable for any
+                To the maximum extent permitted by applicable law, Stealthy shall not be liable for any
                 indirect, incidental, special, consequential, or punitive damages arising from use of the
                 service. Our total liability to you for any claim arising from the service shall not exceed
                 the amount you paid in the three months preceding the claim.

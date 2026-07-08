@@ -62,7 +62,7 @@ export default function PrivacyPolicyPage() {
           <div className="prose prose-sm max-w-none space-y-8">
             <LegalSection title="1. Who we are">
               <p className="text-sm text-muted-foreground leading-relaxed">
-                NullRoute is a private network access service operated as a GST-registered entity in India.
+                Stealthy is a private network access service operated as a GST-registered entity in India.
                 This Privacy Policy explains how we collect, use, and protect information when you use our
                 services.
               </p>

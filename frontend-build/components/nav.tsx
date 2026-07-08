@@ -33,7 +33,7 @@ export function Nav({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/15 ring-1 ring-primary/30 group-hover:bg-primary/25 transition-colors">
               <Shield className="h-4 w-4 text-primary" />
             </div>
-            <span className="font-semibold tracking-tight text-foreground">NullRoute</span>
+            <span className="font-semibold tracking-tight text-foreground">Stealthy</span>
           </Link>
 
           {/* Desktop nav */}

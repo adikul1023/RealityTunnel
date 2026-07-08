@@ -584,7 +584,7 @@ const DOWNLOAD_PLATFORMS = [
     steps: [
       'Download the installer (.exe) and run it.',
       'Accept the license agreement and complete installation.',
-      'Launch NullRoute from your Start menu or desktop shortcut.',
+      'Launch Stealthy from your Start menu or desktop shortcut.',
       'Enter your 32-character account key when prompted.',
       'Select a server region and click Connect.',
     ],
@@ -604,7 +604,7 @@ const DOWNLOAD_PLATFORMS = [
       'Download the APK file to your Android device.',
       'Enable "Install from unknown sources" in device settings if prompted.',
       'Open the downloaded APK and follow the installation prompts.',
-      'Launch NullRoute and enter your 32-character account key.',
+      'Launch Stealthy and enter your 32-character account key.',
       'Grant VPN permissions when the system dialog appears, then tap Connect.',
     ],
     downloads: [
@@ -628,7 +628,7 @@ function DownloadsTab() {
   return (
     <div className="space-y-5">
       <p className="text-sm text-muted-foreground">
-        Download the NullRoute client for your platform. Your account key is required to connect.
+        Download the Stealthy client for your platform. Your account key is required to connect.
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

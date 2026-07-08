@@ -101,7 +101,7 @@ export default function LoginPage() {
           <Link href="/" className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15 ring-1 ring-primary/30 mb-3">
             <Shield className="h-6 w-6 text-primary" />
           </Link>
-          <h1 className="text-xl font-semibold text-foreground">Log in to NullRoute</h1>
+          <h1 className="text-xl font-semibold text-foreground">Log in to Stealthy</h1>
           <p className="text-sm text-muted-foreground mt-1">Enter your account key to continue</p>
         </div>
 
