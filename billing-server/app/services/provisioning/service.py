@@ -55,8 +55,13 @@ class ProvisioningService:
             ),
         ):
             return exc
+        from sqlalchemy.exc import SQLAlchemyError
+        if isinstance(exc, SQLAlchemyError):
+            logger.error("Database error during provisioning action=%s: %s", action, str(exc))
+            return ProvisioningServiceError(f"Database error during {action}")
+
         logger.error("Unhandled exception during provisioning action=%s: %s", action, str(exc))
-        return ProvisioningServiceError(f"Provisioning error during {action}: {str(exc)}")
+        return ProvisioningServiceError(f"An unexpected error occurred during {action}")
 
     async def check_provider_health(self) -> bool:
         """Check health and readiness of the remote provisioning provider."""

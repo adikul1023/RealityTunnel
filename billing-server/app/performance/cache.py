@@ -84,11 +84,12 @@ class MemoryCache(BaseCache):
     Used for local development, testing, and single-node production deployment.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, maxsize: int = 10000) -> None:
         self._store: dict[str, tuple[Any, float]] = {}
         self._lock = asyncio.Lock()
         self._hits = 0
         self._misses = 0
+        self.maxsize = maxsize
 
     def _update_metrics(self) -> None:
         total = self._hits + self._misses
@@ -117,6 +118,9 @@ class MemoryCache(BaseCache):
             self._hits += 1
             metrics_registry.inc_counter("cache_hits_total")
             self._update_metrics()
+            
+            # Simple LRU-ish behavior: re-insert to move to end (newest)
+            self._store[key] = self._store.pop(key)
             return value
 
     async def set(self, key: str, value: Any, ttl: int | None = None) -> None:
@@ -126,7 +130,14 @@ class MemoryCache(BaseCache):
         effective_ttl = ttl if ttl is not None else settings.cache_ttl_seconds
         expire_at = (time.time() + effective_ttl) if effective_ttl > 0 else 0.0
         async with self._lock:
+            # If it already exists, popping it ensures it's added at the end (newest)
+            self._store.pop(key, None)
             self._store[key] = (value, expire_at)
+            
+            # Evict oldest if we exceed maxsize
+            if len(self._store) > self.maxsize:
+                oldest_key = next(iter(self._store))
+                del self._store[oldest_key]
 
     async def delete(self, key: str) -> bool:
         validate_cache_key(key)

@@ -2,6 +2,10 @@
 credentials.py — Phase 2.4 VPN Credential Lifecycle & Client Configuration Delivery API Router.
 Provides authenticated endpoints for retrieving and managing VPN client configurations and credentials.
 Enforces zero-secret logging and consumes CredentialService exclusively.
+
+Note (L-6): Logging internal account UUIDs (`account.id`) is intentional and permitted.
+Internal UUIDs are pseudonymous tracing tokens, not PII. This does not violate the 
+"never log identifiers" invariant, which strictly applies to external identities (emails, IPs) and secrets.
 """
 from __future__ import annotations
 

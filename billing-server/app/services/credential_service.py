@@ -10,6 +10,8 @@ import logging
 import urllib.parse
 import uuid
 from typing import Any
+
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import EntityNotFoundError
@@ -162,8 +164,12 @@ class CredentialService:
             profile, user_dto = await self.provisioning_service.get_provisioned_user(account_id)
         except EntityNotFoundError as exc:
             raise CredentialNotFoundError(f"No provisioning profile found for account {account_id}") from exc
+        except SQLAlchemyError as exc:
+            logger.error("Database error in get_credentials for account_id=%s: %s", account_id, str(exc))
+            raise CredentialServiceError("A database error occurred while retrieving credentials") from exc
         except Exception as exc:
-            raise CredentialServiceError(str(exc)) from exc
+            logger.error("Unexpected error in get_credentials for account_id=%s: %s", account_id, str(exc))
+            raise CredentialServiceError("An unexpected error occurred while retrieving credentials") from exc
 
         if profile.provisioning_state == ProvisioningState.TERMINATED:
             raise CredentialNotFoundError(f"Provisioning profile for account {account_id} is terminated")
@@ -205,9 +211,12 @@ class CredentialService:
             return self._build_credential_payload(profile, user_dto)
         except EntityNotFoundError as exc:
             raise CredentialNotFoundError(f"No provisioning profile found for account {account_id}") from exc
+        except SQLAlchemyError as exc:
+            logger.error("Database error during credential rotation for account_id=%s: %s", account_id, str(exc))
+            raise CredentialRotationFailedError("Database error during credential rotation") from exc
         except Exception as exc:
-            logger.error("Failed credential rotation for account_id=%s", account_id)
-            raise CredentialRotationFailedError(f"Credential rotation failed: {str(exc)}") from exc
+            logger.error("Unexpected error during credential rotation for account_id=%s: %s", account_id, str(exc))
+            raise CredentialRotationFailedError("An unexpected error occurred during credential rotation") from exc
 
     async def revoke_credentials(self, account_id: uuid.UUID, *, commit: bool = True) -> None:
         """
@@ -224,8 +233,12 @@ class CredentialService:
         try:
             await self.provisioning_service.suspend_subscription(account_id, commit=commit)
             logger.info("Successfully revoked credentials for account_id=%s", account_id)
+        except SQLAlchemyError as exc:
+            logger.error("Database error during credential revocation for account_id=%s: %s", account_id, str(exc))
+            raise CredentialServiceError("Database error during credential revocation") from exc
         except Exception as exc:
-            raise CredentialServiceError(f"Failed to revoke credentials: {str(exc)}") from exc
+            logger.error("Unexpected error during credential revocation for account_id=%s: %s", account_id, str(exc))
+            raise CredentialServiceError("An unexpected error occurred during credential revocation") from exc
 
     async def restore_credentials(self, account_id: uuid.UUID, *, commit: bool = True) -> None:
         """
@@ -242,8 +255,12 @@ class CredentialService:
         try:
             await self.provisioning_service.reactivate_subscription(account_id, commit=commit)
             logger.info("Successfully restored credentials for account_id=%s", account_id)
+        except SQLAlchemyError as exc:
+            logger.error("Database error during credential restoration for account_id=%s: %s", account_id, str(exc))
+            raise CredentialServiceError("Database error during credential restoration") from exc
         except Exception as exc:
-            raise CredentialServiceError(f"Failed to restore credentials: {str(exc)}") from exc
+            logger.error("Unexpected error during credential restoration for account_id=%s: %s", account_id, str(exc))
+            raise CredentialServiceError("An unexpected error occurred during credential restoration") from exc
 
     async def generate(self, account_id: uuid.UUID) -> dict[str, Any]:
         """
