@@ -284,3 +284,30 @@ async def test_billing_suspension_allows_extension(
     # Reactivate should succeed
     reactivated = await service.reactivate_subscription(test_account.id)
     assert reactivated.provisioning_state == ProvisioningState.ACTIVE
+
+
+@pytest.mark.asyncio
+async def test_provision_subscription_concurrency_race(
+    test_account: Account, mock_provider: AsyncMock
+):
+    from app.database import AsyncSessionLocal
+    import asyncio
+
+    async def provision_with_new_session():
+        async with AsyncSessionLocal() as session:
+            service = ProvisioningService(session, mock_provider)
+            return await service.provision_subscription(test_account.id, plan_id="pro")
+
+    # Run two concurrent requests
+    res1, res2 = await asyncio.gather(
+        provision_with_new_session(),
+        provision_with_new_session(),
+        return_exceptions=True
+    )
+
+    assert not isinstance(res1, Exception), f"Res1 failed: {res1}"
+    assert not isinstance(res2, Exception), f"Res2 failed: {res2}"
+
+    # Both should return a valid profile with the exact same ID
+    assert res1.remote_user_id == res2.remote_user_id
+    assert res1.id == res2.id

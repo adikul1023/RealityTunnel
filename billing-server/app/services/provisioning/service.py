@@ -11,6 +11,7 @@ from datetime import datetime, timezone, timedelta
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database import advisory_xact_lock
 from app.exceptions import EntityNotFoundError, DatabaseOperationError, DuplicateEntityError
 from app.models import ProvisioningProfile, ProvisioningState, ProvisioningRetryItem, RetryItemStatus
 from app.repositories import AccountRepository, ProvisioningRepository, ProvisioningRetryRepository
@@ -125,6 +126,7 @@ class ProvisioningService:
         Acquires row-level exclusive lock on the provisioning profile.
         """
         try:
+            await advisory_xact_lock(self.session, f"provisioning:{account_id}")
             account = await self.account_repo.get_by_id_or_raise(account_id)
             profile = await self.provisioning_repo.get_by_account_id(account_id, for_update=True)
 
@@ -194,6 +196,14 @@ class ProvisioningService:
                 await self.credential_service.generate(account_id)
             return profile
 
+        except DuplicateEntityError:
+            if commit:
+                await self.session.rollback()
+            logger.info("DuplicateEntityError caught during provision_subscription; returning existing profile for account_id=%s", account_id)
+            profile = await self.provisioning_repo.get_by_account_id(account_id, for_update=False)
+            if profile:
+                return profile
+            raise ProvisioningConflictError("Duplicate entity exception but profile not found")
         except (EntityNotFoundError, DatabaseOperationError):
             raise
         except Exception as exc:
