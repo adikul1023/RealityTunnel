@@ -19,6 +19,22 @@ def mock_payment_service() -> MagicMock:
 
 
 @pytest.mark.asyncio
+async def test_process_event_authorized_payment_ignored(mock_payment_service: MagicMock):
+    service = WebhookService(mock_payment_service)
+    mock_payment_service.provider.verify_webhook.return_value = PaymentWebhookDTO(
+        event_type="payment.authorized",
+        status="authorized",
+        provider_order_id="order_TEST123",
+        provider_payment_id="pay_TEST123",
+    )
+
+    result = await service.process_event(b'{"event":"payment.authorized"}', "valid_signature")
+
+    assert result is None
+    mock_payment_service.confirm_payment.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_process_event_captured_payment_success(mock_payment_service: MagicMock):
     service = WebhookService(mock_payment_service)
     mock_payment_service.provider.verify_webhook.return_value = PaymentWebhookDTO(

@@ -230,7 +230,7 @@ class RazorpayProvider(PaymentProvider):
 
         status = str(data.get("status", ""))
         amount_refunded = int(data.get("amount_refunded", 0) or 0)
-        is_valid = status in ("captured", "authorized") and amount_refunded == 0
+        is_valid = status == "captured" and amount_refunded == 0
         order_id = str(data.get("order_id", ""))
 
         return PaymentVerificationDTO(

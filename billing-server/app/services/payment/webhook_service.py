@@ -38,7 +38,10 @@ class WebhookService:
             dto.provider_payment_id,
         )
 
-        if dto.event_type in ("payment.captured", "payment.authorized", "order.paid"):
+        if dto.event_type == "payment.authorized":
+            logger.info("Payment authorized (not yet captured) order_id=%s payment_id=%s", dto.provider_order_id, dto.provider_payment_id)
+            return None
+        elif dto.event_type in ("payment.captured", "order.paid"):
             if not dto.provider_order_id:
                 raise PaymentWebhookError("Webhook payload for captured payment missing order ID")
             if not dto.provider_payment_id:
