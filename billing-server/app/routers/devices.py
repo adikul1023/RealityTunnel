@@ -51,7 +51,7 @@ async def safe_record_signal(
 ) -> None:
     """Safely record a security signal without letting exceptions disrupt device management."""
     try:
-        source_ip = http_request.client.host if http_request and http_request.client else None
+        source_ip = getattr(http_request.state, "client_ip", "unknown") if http_request else None
         user_agent = http_request.headers.get("user-agent") if http_request else None
         await signal_service.record_signal(
             account_id=account_id,

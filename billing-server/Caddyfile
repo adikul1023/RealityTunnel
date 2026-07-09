@@ -29,6 +29,11 @@
         header_up X-Forwarded-Host  {host}
     }
 
+    # Block external access to the database-hitting readiness probe
+    handle /readyz* {
+        respond "Forbidden" 403
+    }
+
     # Security headers (belt-and-suspenders — the app also sets these via middleware).
     header {
         Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"

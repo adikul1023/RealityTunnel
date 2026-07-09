@@ -52,7 +52,7 @@ async def login(
     await limiter.enforce(http_request, "admin_login_account", KeyType.ACCOUNT, key_override=request.username)
 
     # Hash client IP for audit logging (never store raw IPs)
-    client_ip = http_request.client.host if http_request.client else "unknown"
+    client_ip = getattr(http_request.state, "client_ip", "unknown")
     ip_hash = hashlib.sha256(client_ip.encode()).hexdigest()[:16]
     
     result = await admin_auth_service.authenticate(request.username, request.password)
