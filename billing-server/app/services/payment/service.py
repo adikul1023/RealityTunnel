@@ -482,6 +482,7 @@ class PaymentService:
             return await self.process_refund_webhook(
                 provider_order_id=dto.provider_order_id,
                 provider_payment_id=dto.provider_payment_id,
+                reason=dto.event_type,
             )
 
         logger.info("Ignored unhandled webhook event type: %s", dto.event_type)
@@ -491,9 +492,10 @@ class PaymentService:
         self,
         provider_order_id: str | None = None,
         provider_payment_id: str | None = None,
+        reason: str | None = None,
     ) -> Payment:
         """
-        Process a refund.processed webhook event from the gateway.
+        Process a refund.processed or dispute webhook event from the gateway.
         Idempotent: if payment is already REFUNDED, returns cleanly.
         """
         if provider_order_id:
@@ -520,16 +522,34 @@ class PaymentService:
             )
             return payment
 
+        # Determine if it's a partial refund or full refund/chargeback
+        is_chargeback = False
+        if reason and ("dispute" in reason or "chargeback" in reason):
+            is_chargeback = True
+            
+        is_partial = False
+        if not is_chargeback and payment.provider_payment_id:
+            verification = await self.provider.fetch_payment(payment.provider_payment_id)
+            if verification.amount_refunded_minor_units > 0 and verification.amount_refunded_minor_units < payment.amount_minor_units:
+                is_partial = True
+
         try:
-            payment.status = PaymentStatus.REFUNDED
-            await self.payment_repo.update(payment, commit=False)
-            if payment.subscription_id:
-                await self.subscription_service.cancel_subscription(
-                    payment.subscription_id, commit=False
-                )
+            if is_partial:
+                payment.status = PaymentStatus.PARTIALLY_REFUNDED
+                await self.payment_repo.update(payment, commit=False)
+                # We do NOT cancel the subscription for a partial refund.
+                logger.info("Processed PARTIAL refund webhook for payment id=%s", payment.id)
+            else:
+                payment.status = PaymentStatus.REFUNDED
+                await self.payment_repo.update(payment, commit=False)
+                if payment.subscription_id:
+                    await self.subscription_service.cancel_subscription(
+                        payment.subscription_id, commit=False
+                    )
+                logger.info("Processed FULL refund/chargeback webhook for payment id=%s (reason=%s)", payment.id, reason)
+                
             await self.session.commit()
             await self.session.refresh(payment)
-            logger.info("Processed refund webhook for payment id=%s", payment.id)
             return payment
         except Exception:
             await self.session.rollback()

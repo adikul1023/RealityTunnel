@@ -24,11 +24,12 @@ class ProvisioningRetryRepository(BaseRepository[ProvisioningRetryItem]):
         super().__init__(ProvisioningRetryItem, session)
 
     async def get_pending_retries(
-        self, now: datetime, *, for_update: bool = False, skip_locked: bool = False
+        self, now: datetime, *, for_update: bool = False, skip_locked: bool = False, limit: int = 100
     ) -> list[ProvisioningRetryItem]:
         """
         Retrieve all pending retry items whose scheduled execution time has arrived.
         If for_update=True, acquires row-level exclusive lock (SELECT ... FOR UPDATE).
+        Returns a bounded batch to prevent memory exhaustion during mass reconciliation.
         """
         try:
             stmt = (
@@ -36,6 +37,7 @@ class ProvisioningRetryRepository(BaseRepository[ProvisioningRetryItem]):
                 .where(ProvisioningRetryItem.status == RetryItemStatus.PENDING)
                 .where(ProvisioningRetryItem.next_retry_at <= now)
                 .order_by(ProvisioningRetryItem.next_retry_at.asc())
+                .limit(limit)
             )
             if for_update:
                 stmt = stmt.with_for_update(skip_locked=skip_locked)

@@ -13,6 +13,7 @@ from app.services.payment.service import PaymentService
 from app.services.payment.provider import PaymentProvider, PaymentOrderDTO, PaymentWebhookDTO, PaymentVerificationDTO, PaymentRefundDTO
 from app.services.exceptions import PaymentVerificationError, PaymentWebhookError, PaymentTimeoutError
 from app.main import app
+from app.database import AsyncSessionLocal
 
 @pytest.fixture
 def mock_razorpay() -> AsyncMock:
@@ -100,16 +101,24 @@ async def test_scenario_cd_partial_refund_revokes_access(db_session: AsyncSessio
     p1 = await service.confirm_payment(payment.provider_order_id, "pay_adv")
     assert p1.status == PaymentStatus.PAID
     
-    # 2. Gateway sends refund.processed webhook (Even if it's partial)
-    # The process_refund_webhook doesn't check the amount; ANY refund cancels the sub.
+    # 2. Gateway sends refund.processed webhook (partial)
+    mock_razorpay.fetch_payment.return_value = PaymentVerificationDTO(
+        is_valid=True,
+        provider_order_id=payment.provider_order_id,
+        provider_payment_id="pay_adv",
+        status="captured",
+        amount_minor_units=100000,
+        currency="INR",
+        amount_refunded_minor_units=30000 # 300 / 1000 refunded
+    )
+    
     p2 = await service.process_refund_webhook(provider_order_id=payment.provider_order_id)
-    assert p2.status == PaymentStatus.REFUNDED
+    assert p2.status == PaymentStatus.PARTIALLY_REFUNDED
     
     sub_repo = SubscriptionRepository(db_session)
-    # Wait for cancel to commit in db session
     await db_session.refresh(p2)
     subs = await sub_repo.get_active_for_account(account.id, datetime.now(timezone.utc))
-    assert not subs  # Cancelled!
+    assert subs  # NOT Cancelled!
 
 
 @pytest.mark.asyncio
@@ -137,6 +146,51 @@ async def test_scenario_e_chargeback_handling(db_session: AsyncSession, account_
     sub_repo = SubscriptionRepository(db_session)
     subs = await sub_repo.get_active_for_account(account.id, datetime.now(timezone.utc))
     assert not subs
+
+
+@pytest.mark.asyncio
+async def test_scenario_refund_race(db_session: AsyncSession, account_factory, mock_razorpay):
+    """Scenario C: Refund Race - Concurrently fire Capture, Renew, and Refund webhooks for the same order."""
+    account = await account_factory()
+    service = PaymentService(db_session, mock_razorpay)
+    payment = await service.create_payment(account.id, 100000, "INR", "idem_refund_race")
+    await db_session.commit()
+    
+    async def worker_capture():
+        async with AsyncSessionLocal() as session:
+            svc = PaymentService(session, mock_razorpay)
+            try:
+                await svc.confirm_payment(payment.provider_order_id, "pay_adv")
+            except Exception:
+                pass
+                
+    async def worker_refund():
+        async with AsyncSessionLocal() as session:
+            svc = PaymentService(session, mock_razorpay)
+            try:
+                await svc.process_refund_webhook(provider_order_id=payment.provider_order_id)
+            except Exception:
+                pass
+
+    # Fire them concurrently. The DB locks should serialize them.
+    await asyncio.gather(worker_capture(), worker_refund())
+    
+    # Check final state. It should either be PAID or REFUNDED, but if REFUNDED, the sub must not be active.
+    async with AsyncSessionLocal() as session:
+        sub_repo = SubscriptionRepository(session)
+        subs = await sub_repo.get_active_for_account(account.id, datetime.now(timezone.utc))
+        
+        # We can't guarantee which won the race, but we CAN guarantee they didn't leave inconsistent state.
+        # If refund processed AFTER capture, sub is dead.
+        # If refund processed BEFORE capture (which is invalid workflow but possible), capture might fail
+        # due to terminal state check!
+        svc = PaymentService(session, mock_razorpay)
+        final_payment = await svc.get_payment(payment.id)
+        if final_payment.status == PaymentStatus.REFUNDED:
+            assert not subs
+        else:
+            assert final_payment.status == PaymentStatus.PAID
+            assert subs
 
 
 @pytest.mark.asyncio
@@ -197,3 +251,40 @@ def test_scenario_g_malformed_webhook_headers():
     # 2. Empty signature
     resp = client.post("/api/webhooks/razorpay", json={}, headers={"X-Razorpay-Signature": ""})
     assert resp.status_code == 400
+
+    # 3. Multiple header values (Duplicated header)
+    # httpx handles this by joining them with commas or sending multiple. We can mock it.
+    resp = client.post(
+        "/api/webhooks/razorpay", 
+        json={"event": "payment.captured"},
+        headers=[("x-razorpay-signature", "sig1"), ("x-razorpay-signature", "sig2")]
+    )
+    assert resp.status_code == 400
+
+    # 4. Oversized signature
+    resp = client.post("/api/webhooks/razorpay", json={}, headers={"X-Razorpay-Signature": "A" * 10000})
+    assert resp.status_code == 400
+    
+    # 5. Invalid UTF-8 (FastAPI handles decoding, but if a client manages to send bad bytes, we should reject)
+    resp = client.post("/api/webhooks/razorpay", content=b"\xff\xff", headers={"X-Razorpay-Signature": "sig"})
+    # It might be 400 or 422 depending on FastAPI's JSON parser, but definitely not 500
+    assert resp.status_code in (400, 422)
+
+@pytest.mark.asyncio
+async def test_scenario_unknown_webhook_event(db_session: AsyncSession, account_factory, mock_razorpay):
+    """Payment-6: Unknown webhook events should be safely ignored and return 200 OK."""
+    service = PaymentService(db_session, mock_razorpay)
+    
+    mock_razorpay.verify_webhook.return_value = PaymentWebhookDTO(
+        event_type="payment.magic.future.event",
+        status="captured",
+        provider_order_id="any",
+        provider_payment_id="any",
+        amount_minor_units=100000,
+        currency="INR",
+        signature="mock"
+    )
+    
+    # Should process without throwing, returning None
+    res = await service.process_webhook(b"raw", "mock")
+    assert res is None

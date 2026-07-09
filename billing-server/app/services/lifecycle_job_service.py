@@ -271,6 +271,7 @@ class LifecycleJobService:
         )
         count = 0
         for item in pending_items:
+            item_id = item.id
             try:
                 await self.provisioning_service.provision_subscription(
                     item.account_id,
@@ -283,14 +284,14 @@ class LifecycleJobService:
                 await self.retry_repo.update(item, commit=True)
                 logger.info(
                     "Successfully processed provisioning retry item id=%s account_id=%s",
-                    item.id,
+                    item_id,
                     item.account_id,
                 )
                 count += 1
             except Exception as exc:
                 await self.session.rollback()
                 try:
-                    item_db = await self.retry_repo.get_by_id(item.id, for_update=True)
+                    item_db = await self.retry_repo.get_by_id(item_id, for_update=True)
                     if item_db and item_db.status == RetryItemStatus.PENDING:
                         item_db.attempt_count += 1
                         item_db.last_error = str(exc)[:499]
