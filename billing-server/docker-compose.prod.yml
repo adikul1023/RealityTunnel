@@ -124,7 +124,7 @@ services:
       PAYMENTS_ENABLED: ${PAYMENTS_ENABLED:-true}
       PROVISIONING_ENABLED: ${PROVISIONING_ENABLED:-true}
       WEBHOOKS_ENABLED: ${WEBHOOKS_ENABLED:-true}
-      MARZBAN_BASE_URL: "http://marzban:8001"
+      MARZBAN_BASE_URL: ${MARZBAN_BASE_URL:-}
       MARZBAN_API_TOKEN: ${MARZBAN_API_TOKEN:-}
       RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
       RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
@@ -192,7 +192,8 @@ services:
     restart: unless-stopped
     ports:
       - "80:80" # HTTP → HTTPS redirect
-      # HTTPS on 443 is now handled by Xray (Marzban) which falls back to Caddy:8443 via internal network
+      - "443:443" # HTTPS (TLS terminated here)
+      - "443:443/udp" # HTTP/3 (QUIC)
     volumes:
       - ./Caddyfile.prod:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -218,20 +219,19 @@ services:
           memory: "32M"
 
   # ── Marzban Panel & Xray Edge ───────────────────────────────────────────────
-  # Acts as the primary ingress on port 443. Xray handles REALITY traffic and
-  # transparently forwards normal HTTPS traffic to Caddy:8443 via proxy_protocol.
+  # Shares Caddy's network namespace. Marzban safely binds to 127.0.0.1 
+  # inside this shared namespace, allowing Caddy to directly reverse-proxy it 
+  # without exposing it publicly and without needing socat.
   marzban:
     image: gozargah/marzban:latest
     restart: unless-stopped
-    ports:
-      - "443:443"
+    network_mode: "service:caddy"
     environment:
       - XRAY_JSON=/var/lib/marzban/xray_config.json
     volumes:
       - /opt/realitytunnel/marzban:/var/lib/marzban
-    networks:
-      - internal_net
-      - ingress_net
+    depends_on:
+      - caddy
     logging:
       driver: json-file
       options:
@@ -245,19 +245,6 @@ services:
         reservations:
           cpus: "0.2"
           memory: "128M"
-
-  # ── Marzban Local Proxy ───────────────────────────────────────────────────
-  # Marzban deliberately refuses to bind its API to 0.0.0.0 without a trusted
-  # SSL certificate, binding to 127.0.0.1 internally. This socat sidecar shares
-  # Marzban's network namespace to expose the API internally on port 8001
-  # so that the Billing API can communicate with it.
-  marzban-socat:
-    image: alpine/socat:latest
-    restart: unless-stopped
-    command: tcp-listen:8001,fork,reuseaddr tcp-connect:127.0.0.1:8000
-    network_mode: "service:marzban"
-    depends_on:
-      - marzban
 
 networks:
   internal_net:

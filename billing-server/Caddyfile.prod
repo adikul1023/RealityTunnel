@@ -1,24 +1,12 @@
 {
     email admin@stealthy.co.in
     servers {
-        listener_wrappers {
-            proxy_protocol {
-                timeout 2s
-                allow 172.16.0.0/12
-            }
-            tls
-        }
         trusted_proxies static private_ranges
     }
 }
 
-# Explicit HTTP to HTTPS redirect (since we bind HTTPS to 8443 locally)
-http://api.stealthy.co.in {
-    redir https://api.stealthy.co.in{uri}
-}
-
-# Main site block listens internally on 8443. Xray on 443 proxies here.
-api.stealthy.co.in:8443 {
+# Automatically obtains Let's Encrypt cert and forces HTTPS
+api.stealthy.co.in {
     # Request access logs
     log {
         output file /var/log/caddy/access.log {
@@ -26,6 +14,13 @@ api.stealthy.co.in:8443 {
             roll_keep 3
             roll_keep_for 30d
         }
+        format json
+    }
+
+    # Internal route for Marzban panel and API
+    route /marzban-panel/* {
+        uri strip_prefix /marzban-panel
+        reverse_proxy 127.0.0.1:8000
     }
 
     # Security Headers
