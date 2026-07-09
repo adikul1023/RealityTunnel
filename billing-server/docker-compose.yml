@@ -40,7 +40,7 @@ services:
       dockerfile: Dockerfile
       target: runtime
     restart: unless-stopped
-    env_file: ${ENV_FILE:-.env}
+    env_file: .env
     environment:
       # Override host to point at the compose service name
       POSTGRES_HOST: postgres
