@@ -192,8 +192,7 @@ services:
     restart: unless-stopped
     ports:
       - "80:80" # HTTP → HTTPS redirect
-      - "443:443" # HTTPS (TLS terminated here)
-      - "443:443/udp" # HTTP/3 (QUIC)
+      # HTTPS on 443 is now handled by Xray (Marzban) which falls back to Caddy:8443 via internal network
     volumes:
       - ./Caddyfile.prod:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -217,6 +216,35 @@ services:
         reservations:
           cpus: "0.05"
           memory: "32M"
+
+  # ── Marzban Panel & Xray Edge ───────────────────────────────────────────────
+  # Acts as the primary ingress on port 443. Xray handles REALITY traffic and
+  # transparently forwards normal HTTPS traffic to Caddy:8443 via proxy_protocol.
+  marzban:
+    image: gozargah/marzban:latest
+    restart: unless-stopped
+    ports:
+      - "443:443"
+    environment:
+      - XRAY_JSON=/var/lib/marzban/xray_config.json
+    volumes:
+      - /opt/realitytunnel/marzban:/var/lib/marzban
+    networks:
+      - internal_net
+      - ingress_net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: "512M"
+        reservations:
+          cpus: "0.2"
+          memory: "128M"
 
 networks:
   internal_net:

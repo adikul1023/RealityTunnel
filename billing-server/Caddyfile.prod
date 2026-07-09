@@ -1,14 +1,27 @@
 {
-    email hostmaster@stealthy.co.in
+    email admin@stealthy.co.in
     servers {
+        listener_wrappers {
+            proxy_protocol {
+                timeout 2s
+                allow 172.16.0.0/12
+            }
+            tls
+        }
         trusted_proxies static private_ranges
     }
 }
 
-api.stealthy.co.in {
+# Explicit HTTP to HTTPS redirect (since we bind HTTPS to 8443 locally)
+http://api.stealthy.co.in {
+    redir https://api.stealthy.co.in{uri}
+}
+
+# Main site block listens internally on 8443. Xray on 443 proxies here.
+api.stealthy.co.in:8443 {
     # Request access logs
     log {
-        output file /data/access.log {
+        output file /var/log/caddy/access.log {
             roll_size 10MiB
             roll_keep 3
             roll_keep_for 30d
