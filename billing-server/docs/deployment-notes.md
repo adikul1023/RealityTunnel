@@ -1,4 +1,4 @@
-﻿# Production Deployment Notes (Phase 4.3)
+# Production Deployment Notes (Phase 4.3)
 
 These notes document the manual infrastructure setup, permission fixes, and environment configurations required to successfully deploy the RealityTunnel Billing API onto the production VPS (Contabo).
 
@@ -41,5 +41,17 @@ The startup_validator.py enforces strict production guards. We manually patched 
 2. **Localhost Gateway Prevention:** The MARZBAN_BASE_URL was manually upgraded from http://marzban:8000 to https://marzban:8000 to pass the HTTPS / No Localhost Gateways check.
 
 ## Future Improvements
-- Make JWT file names configurable via JWT_PRIVATE_KEY_PATH in secret_registry.py.
-- Ensure all DUMMY_KEY values are explicitly replaced with real provider keys prior to Phase 5.
+- Make JWT file names configurable via `JWT_PRIVATE_KEY_PATH` in `secret_registry.py`.
+- Ensure all `DUMMY_KEY` values are explicitly replaced with real provider keys prior to Phase 5.
+
+### JWT Path Verification
+Once configurable paths are implemented, use the following snippet to verify the paths loaded in the running production container. If this prints the wrong path after a deployment, you know immediately why JWTs are failing.
+
+```bash
+docker compose exec billing-api \
+python - <<EOF
+from app.core.secret_registry import secret_registry
+print(secret_registry.jwt_private_key_path)
+print(secret_registry.jwt_public_key_path)
+EOF
+```
