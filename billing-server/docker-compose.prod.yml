@@ -227,8 +227,9 @@ services:
     restart: unless-stopped
     network_mode: "service:caddy"
     environment:
-      - XRAY_JSON=/var/lib/marzban/xray_config.json
+      - XRAY_JSON=/app/xray_config.json
     volumes:
+      - ./configs/xray_reality_fallback.json:/app/xray_config.json:ro
       - /opt/realitytunnel/marzban:/var/lib/marzban
     depends_on:
       - caddy
