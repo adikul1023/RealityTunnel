@@ -227,6 +227,7 @@ services:
       - "443:443"
     environment:
       - XRAY_JSON=/var/lib/marzban/xray_config.json
+      - UVICORN_HOST=0.0.0.0
     volumes:
       - /opt/realitytunnel/marzban:/var/lib/marzban
     networks:
