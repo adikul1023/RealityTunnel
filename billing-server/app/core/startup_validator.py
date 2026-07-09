@@ -252,19 +252,21 @@ def validate_startup_configuration(
 
     # 4. Marzban Provisioning Gateway Check
     if flags.provisioning_enabled:
+        rpc_url = settings.marzban_rpc_url
+        pub_url = settings.marzban_base_url
         marz_ok = bool(
-            settings.marzban_base_url
-            and settings.marzban_base_url.startswith(("http://", "https://"))
+            (rpc_url and rpc_url.startswith(("http://", "https://")))
+            or (pub_url and pub_url.startswith(("http://", "https://")))
         )
         checks["Marzban Gateway"] = marz_ok
         if not marz_ok:
             if profile.is_production:
                 errors.append(
-                    "PROVISIONING_ENABLED is true but marzban_base_url is missing or malformed in production."
+                    "PROVISIONING_ENABLED is true but neither marzban_rpc_url nor marzban_base_url is properly configured in production."
                 )
             else:
                 warnings.append(
-                    "PROVISIONING_ENABLED is true but marzban_base_url not configured in dev mode."
+                    "PROVISIONING_ENABLED is true but Marzban gateways not configured in dev mode."
                 )
     else:
         checks["Marzban Gateway (Disabled)"] = True
@@ -389,24 +391,32 @@ def validate_startup_configuration(
             )
 
         # HTTPS / Localhost callback URL check
-        #
-        # BUG FIX: `no_localhost` previously had no `not flags.provisioning_enabled` escape hatch,
-        # unlike the parallel `https_ok` check right below it. Since `marzban_base_url` defaults to
-        # "http://localhost:8000" (app/config.py), this meant production startup would ALWAYS fail
-        # this guard whenever PROVISIONING_ENABLED=false and the operator left marzban_base_url at
-        # its default -- i.e., a fully-disabled, entirely-unused subsystem could still block the
-        # whole application from booting. Both conditions must be exempted identically when the
-        # Marzban subsystem itself is disabled.
-        marz_url = (settings.marzban_base_url or "").lower()
-        no_localhost = (
-            "localhost" not in marz_url and "127.0.0.1" not in marz_url
-        ) or not flags.provisioning_enabled
-        https_ok = marz_url.startswith("https://") or not flags.provisioning_enabled
-        prod_checks["HTTPS / No Localhost Gateways"] = bool(no_localhost and https_ok)
-        if not (no_localhost and https_ok):
-            errors.append(
-                "Production Guard Failure: localhost or non-HTTPS gateway URLs prohibited in production."
-            )
+        if flags.provisioning_enabled:
+            # 1. Validate Public URL (Must be HTTPS and not localhost)
+            pub_url = (settings.marzban_base_url or "").lower()
+            if pub_url:
+                no_localhost_pub = "localhost" not in pub_url and "127.0.0.1" not in pub_url
+                https_pub = pub_url.startswith("https://")
+                prod_checks["Marzban Public URL (HTTPS)"] = bool(no_localhost_pub and https_pub)
+                if not (no_localhost_pub and https_pub):
+                    errors.append(
+                        "Production Guard Failure: marzban_base_url must be a valid public HTTPS URL and not localhost."
+                    )
+
+            # 2. Validate RPC URL (Must be HTTP/HTTPS and internal)
+            rpc_url = (settings.marzban_rpc_url or "").lower()
+            if rpc_url:
+                # We expect the RPC URL to be an internal Docker name or localhost/IP in some topologies, 
+                # so we don't strictly ban localhost, but we DO enforce it's not a generic public HTTP.
+                # Actually, to be generic, we just ensure it's provided. 
+                is_http = rpc_url.startswith(("http://", "https://"))
+                prod_checks["Marzban RPC URL Valid"] = is_http
+                if not is_http:
+                    errors.append(
+                        "Production Guard Failure: marzban_rpc_url must be a valid HTTP/HTTPS internal URL."
+                    )
+        else:
+            prod_checks["HTTPS / No Localhost Gateways"] = True
 
         # Key file permissions check on POSIX (Finding H-6)
         if os.name == "posix":

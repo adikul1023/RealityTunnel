@@ -81,7 +81,8 @@ class Settings(BaseSettings):
     admin_jwt_audience: str = "RealityTunnel Admin Panel"  # [Public Config]
 
     # ── VPN Provisioning (Marzban Integration) [Internal Config / Secret] ────
-    marzban_base_url: str = "http://localhost:8000"  # [Internal Config]
+    marzban_base_url: str = "http://localhost:8000"  # [Internal Config / Public ID]
+    marzban_rpc_url: str | None = None  # [Internal Config] Backend-to-backend RPC url.
     marzban_api_token: SecretStr = SecretStr("")  # [Infrastructure Secret]
     marzban_timeout_seconds: float = 10.0  # [Operational Parameter]
     marzban_max_retries: int = 3  # [Operational Parameter]

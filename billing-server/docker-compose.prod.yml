@@ -219,20 +219,25 @@ services:
           memory: "32M"
 
   # ── Marzban Panel & Xray Edge ───────────────────────────────────────────────
-  # Shares Caddy's network namespace. Marzban safely binds to 127.0.0.1 
-  # inside this shared namespace, allowing Caddy to directly reverse-proxy it 
-  # without exposing it publicly and without needing socat.
+  # Custom downstream build patches Marzban to bind to 0.0.0.0 without TLS.
   marzban:
-    image: gozargah/marzban:latest
+    build:
+      context: ./docker/marzban
+      dockerfile: Dockerfile
     restart: unless-stopped
-    network_mode: "service:caddy"
+    ports:
+      - "2053:2053"
+      - "2053:2053/udp"
     environment:
+      - UVICORN_HOST=0.0.0.0
+      - UVICORN_PORT=8000
       - XRAY_JSON=/app/xray_config.json
+    networks:
+      - internal_net
+      - ingress_net
     volumes:
       - ./configs/xray_reality_fallback.json:/app/xray_config.json:ro
       - /opt/realitytunnel/marzban:/var/lib/marzban
-    depends_on:
-      - caddy
     logging:
       driver: json-file
       options:
