@@ -244,6 +244,38 @@ class RazorpayProvider(PaymentProvider):
             raw_data=data,
         )
 
+    async def fetch_order_payments(
+        self,
+        provider_order_id: str,
+    ) -> list[PaymentVerificationDTO]:
+        """
+        Fetch all payments associated with a specific order from the gateway.
+        """
+        # Strip potential trailing slash from orders_path
+        base_path = self.orders_path.rstrip('/')
+        path = f"{base_path}/{provider_order_id}/payments"
+        logger.info("Fetching Razorpay payments for order_id=%s", provider_order_id)
+        data = await self._request_with_retries("GET", path)
+
+        items = data.get("items", [])
+        results = []
+        for item in items:
+            status = str(item.get("status", ""))
+            amount_refunded = int(item.get("amount_refunded", 0) or 0)
+            is_valid = status == "captured" and amount_refunded == 0
+            
+            results.append(PaymentVerificationDTO(
+                is_valid=is_valid,
+                provider_order_id=provider_order_id,
+                provider_payment_id=str(item.get("id", "")),
+                status=status,
+                amount_minor_units=int(item["amount"]) if "amount" in item else None,
+                currency=str(item["currency"]) if "currency" in item else None,
+                amount_refunded_minor_units=amount_refunded,
+                raw_data=item,
+            ))
+        return results
+
     async def refund_payment(
         self,
         provider_payment_id: str,

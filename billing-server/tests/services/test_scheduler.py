@@ -18,7 +18,8 @@ def mock_session_factory():
 
 
 @pytest.mark.asyncio
-async def test_scheduler_start_stop(mock_session_factory):
+@patch("app.scheduler.LifecycleJobService")
+async def test_scheduler_start_stop(mock_job_svc_class, mock_session_factory):
     scheduler = JobScheduler(mock_session_factory)
     assert not scheduler._running
     assert len(scheduler._tasks) == 0
@@ -36,7 +37,8 @@ async def test_scheduler_start_stop(mock_session_factory):
 
 
 @pytest.mark.asyncio
-async def test_scheduler_start_when_already_running(mock_session_factory):
+@patch("app.scheduler.LifecycleJobService")
+async def test_scheduler_start_when_already_running(mock_job_svc_class, mock_session_factory):
     scheduler = JobScheduler(mock_session_factory)
     scheduler.start()
     tasks_count = len(scheduler._tasks)

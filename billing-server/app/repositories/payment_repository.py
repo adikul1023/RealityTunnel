@@ -131,10 +131,11 @@ class PaymentRepository(BaseRepository[Payment]):
 
 
     async def get_stale_pending_payments(
-        self, cutoff_time: datetime, *, for_update: bool = False, skip_locked: bool = False
+        self, cutoff_time: datetime, start_time: datetime | None = None, *, for_update: bool = False, skip_locked: bool = False
     ) -> list[Payment]:
         """
         Retrieve all pending or created payments created before cutoff_time.
+        If start_time is provided, restricts to payments created after start_time.
         If for_update=True, acquires row-level exclusive lock (SELECT ... FOR UPDATE).
         """
         try:
@@ -144,6 +145,8 @@ class PaymentRepository(BaseRepository[Payment]):
                 .where(Payment.status.in_([PaymentStatus.CREATED, PaymentStatus.PENDING]))
                 .where(Payment.created_at <= cutoff_time)
             )
+            if start_time:
+                stmt = stmt.where(Payment.created_at >= start_time)
             if for_update:
                 stmt = stmt.with_for_update(skip_locked=skip_locked)
             result = await self.session.execute(stmt)

@@ -11,7 +11,9 @@ import logging
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Any
+import time
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.observability import metrics_registry
 
 from app.models import ProvisioningState, RetryItemStatus, SubscriptionLifecycleStatus
 from app.repositories import (
@@ -345,3 +347,87 @@ class LifecycleJobService:
                 )
                 await self.session.rollback()
         return count
+
+    async def run_payment_reconciliation_job(self, now: datetime | None = None) -> int:
+        """
+        Job 9: Reconcile lost payment webhooks by proactively polling pending orders.
+        Checks payments created between 48 hours and 30 minutes ago.
+        """
+        now = now or datetime.now(timezone.utc)
+        cutoff_time = now - timedelta(minutes=30)
+        start_time = now - timedelta(hours=48)
+        
+        metrics_registry.inc_counter("payment_reconciliation_runs_total", 1.0)
+        t0 = time.perf_counter()
+
+        pending_payments = await self.payment_repo.get_stale_pending_payments(
+            cutoff_time=cutoff_time,
+            start_time=start_time,
+            for_update=True,
+            skip_locked=True
+        )
+        
+        count = 0
+        fixed = 0
+        failed = 0
+        skipped = 0
+        provider_errors = 0
+
+        for payment in pending_payments:
+            if not payment.provider_order_id:
+                skipped += 1
+                continue
+
+            try:
+                logger.info("Running payment reconciliation for payment id=%s order_id=%s", payment.id, payment.provider_order_id)
+                verifications = await self.payment_service.provider.fetch_order_payments(payment.provider_order_id)
+                
+                if not verifications:
+                    skipped += 1
+                    continue
+                    
+                captured = next((v for v in verifications if v.status == "captured" and v.is_valid), None)
+                if captured:
+                    await self.payment_service.confirm_payment(
+                        provider_order_id=payment.provider_order_id,
+                        provider_payment_id=captured.provider_payment_id
+                    )
+                    count += 1
+                    fixed += 1
+                    continue
+                    
+                refunded = next((v for v in verifications if v.status == "refunded"), None)
+                if refunded:
+                    await self.payment_service.cancel_payment(payment.id, commit=True)
+                    count += 1
+                    fixed += 1
+                    continue
+                
+                payment_failed = next((v for v in verifications if v.status == "failed"), None)
+                if payment_failed:
+                    await self.payment_service.cancel_payment(payment.id, commit=True)
+                    count += 1
+                    fixed += 1
+                    continue
+                
+                skipped += 1
+
+            except Exception as exc:
+                provider_errors += 1
+                failed += 1
+                logger.error("Payment reconciliation failed for payment id=%s: %s", payment.id, str(exc))
+                await self.session.rollback()
+                
+        duration_s = time.perf_counter() - t0
+        metrics_registry.observe("payment_reconciliation_duration_seconds", duration_s)
+        metrics_registry.inc_counter("payment_reconciliation_fixed_total", fixed)
+        metrics_registry.inc_counter("payment_reconciliation_failed_total", failed)
+        metrics_registry.inc_counter("payment_reconciliation_skipped_total", skipped)
+        metrics_registry.inc_counter("payment_reconciliation_provider_errors_total", provider_errors)
+        
+        # Only record success timestamp if there were no internal errors (provider errors are external, but internal DB failures mean the run failed)
+        if failed == 0:
+            metrics_registry.set_gauge("payment_reconciliation_last_success_timestamp", time.time())
+        
+        return count
+

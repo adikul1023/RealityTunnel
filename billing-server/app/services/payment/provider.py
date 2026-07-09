@@ -105,6 +105,16 @@ class PaymentProvider(ABC):
         pass
 
     @abstractmethod
+    async def fetch_order_payments(
+        self,
+        provider_order_id: str,
+    ) -> list[PaymentVerificationDTO]:
+        """
+        Fetch all payments associated with a specific order from the gateway.
+        """
+        pass
+
+    @abstractmethod
     async def refund_payment(
         self,
         provider_payment_id: str,

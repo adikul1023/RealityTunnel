@@ -157,6 +157,7 @@ class JobScheduler:
             ("subscription_expiration", 600, "run_subscription_expiration_job"),
             ("grace_period_expiration", 600, "run_grace_period_expiration_job"),
             ("stale_pending_payment_cleanup", 1800, "run_stale_pending_payment_cleanup_job"),
+            ("payment_reconciliation", 1800, "run_payment_reconciliation_job"),
             ("orphan_provisioning_cleanup", 3600, "run_orphan_provisioning_cleanup_job"),
             ("provisioning_reconciliation", 3600, "run_provisioning_reconciliation_job"),
             ("credential_rotation", 86400, "run_credential_rotation_job"),

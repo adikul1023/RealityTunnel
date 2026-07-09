@@ -38,7 +38,9 @@ class MockLemonSqueezyProvider(PaymentProvider):
 
     async def health_check(self) -> bool:
         return True
-
+        
+    async def fetch_order_payments(self, provider_order_id: str) -> list[PaymentVerificationDTO]:
+        return []
 
 class MockPaytmProvider(PaymentProvider):
     async def create_order(self, amount_minor_units: int, currency: str, receipt: str, notes: dict | None = None) -> PaymentOrderDTO:
@@ -69,6 +71,9 @@ class MockPaytmProvider(PaymentProvider):
 
     async def health_check(self) -> bool:
         return True
+
+    async def fetch_order_payments(self, provider_order_id: str) -> list[PaymentVerificationDTO]:
+        return []
 
 
 @pytest.fixture(params=[MockLemonSqueezyProvider(), MockPaytmProvider()])
