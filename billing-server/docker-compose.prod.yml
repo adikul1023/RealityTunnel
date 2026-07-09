@@ -228,6 +228,8 @@ services:
     environment:
       - XRAY_JSON=/var/lib/marzban/xray_config.json
       - UVICORN_HOST=0.0.0.0
+      - UVICORN_SSL_CERTFILE=/var/lib/marzban/certs/cert.pem
+      - UVICORN_SSL_KEYFILE=/var/lib/marzban/certs/key.pem
     volumes:
       - /opt/realitytunnel/marzban:/var/lib/marzban
     networks:
