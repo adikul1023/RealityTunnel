@@ -93,99 +93,121 @@ async def test_provisioning_a_marzban_succeeds_db_commit_fails_retry_reconciles(
     mock_marzban: AsyncMock,
 ) -> None:
     """
-    Provisioning Test A: Marzban succeeds → DB commit fails → retry call reconciles.
+    Provisioning Test A: Marzban times out (transient) → DB commit fails is bypassed by
+    independent-session retry enqueue → retry queue drives recovery.
+
+    Previously _maybe_enqueue_retry silently failed because it reused self.session
+    after rollback. With the fix it opens its own AsyncSessionLocal() session, so the
+    retry item is written durably even though the caller's transaction rolled back.
 
     Exact code path:
     ┌─────────────────────────────────────────────────────────────────────────┐
-    │ ATTEMPT 1 – Worker crashes before commit:                               │
+    │ ATTEMPT 1 – Marzban is down; provision_subscription raises transient error:│
     │   provision_subscription()                                              │
-    │   → provider.create_user()          ← Marzban: 200 OK (user created)  │
-    │   → session.commit()                ← Raises (e.g., disk full)        │
-    │   → session.rollback()              ← Transaction rolled back          │
-    │   → ProvisioningServiceError raised                                     │
+    │   → provider.create_user()        ← ProvisioningTimeoutError raised     │
+    │   [except Exception handler]:                                            │
+    │   → session.rollback()           ← transaction rolled back              │
+    │   → _translate_exception()       ← ProvisioningTimeoutError returned    │
+    │   → _maybe_enqueue_retry()       ← opens fresh AsyncSessionLocal()      │
+    │                                     writes ProvisioningRetryItem PENDING │
+    │                                     commits independently                │
+    │   → ProvisioningTimeoutError raised to caller                           │
     │                                                                         │
     │ DB STATE AFTER ATTEMPT 1:                                               │
-    │   • ProvisioningProfile: DOES NOT EXIST (rollback removed it)          │
-    │   • Remote user on Marzban: EXISTS (orphaned)                           │
+    │   • ProvisioningProfile: DOES NOT EXIST (create_user failed first)      │
+    │   • ProvisioningRetryItem: EXISTS and PENDING (independent session)      │
     │                                                                         │
-    │ ATTEMPT 2 – Retry worker calls provision_subscription() again:         │
-    │   → provider.create_user()          ← Marzban: 409 Conflict (exists)  │
-    │   [except ProvisioningConflictError]:                                   │
-    │   → provider.update_user()          ← Marzban: 200 OK (quotas synced) │
-    │   → profile created in DB                                               │
-    │   → session.commit()                ← DB OK                            │
-    │   → ProvisioningProfile ACTIVE returned                                 │
+    │ RETRY – Marzban recovers; run_failed_provision_retry_job() runs:        │
+    │   → retry_repo.get_pending_retries() (SKIP LOCKED)                     │
+    │   → provision_subscription()     ← Marzban OK this time                │
+    │   → ProvisioningProfile ACTIVE written                                  │
+    │   → RetryItem → COMPLETED                                              │
     └─────────────────────────────────────────────────────────────────────────┘
-
-    Tested via two independent sessions to avoid session-state pollution
-    from the simulated crash.
     """
+    from app.services import SubscriptionService
+
     account = await account_factory()
     remote_uid = f"user_{account.id.hex[:8]}"
 
-    # ── ATTEMPT 1: Simulate Marzban succeeds, DB rollback (no commit) ────────
-    # We test the same logical path: create_user succeeds on Marzban,
-    # but no ProvisioningProfile makes it to the DB (simulated by explicit rollback
-    # on a separate session, without any commit).
-    async with AsyncSessionLocal() as crash_session:
-        mock_marzban.create_user.return_value = ProvisionedUserDTO(
-            remote_user_id=remote_uid, status="active", links=["vless://link"]
-        )
-        mock_marzban.update_user.return_value = ProvisionedUserDTO(
-            remote_user_id=remote_uid, status="active", links=["vless://link"]
-        )
-        prov_svc_crash = ProvisioningService(crash_session, mock_marzban)
-        # Call with commit=False: simulates the service having created the profile
-        # object in memory (flushed) but never committed it — then we rollback.
-        await prov_svc_crash.provision_subscription(account.id, "pro", commit=False)
-        # Explicit rollback to simulate the crash before commit
-        await crash_session.rollback()
-
-    # Code path verification: create_user was called exactly once
-    assert mock_marzban.create_user.call_count == 1, (
-        "create_user must be called exactly once before the simulated crash"
+    # ── ATTEMPT 1: Marzban times out (transient failure) ─────────────────────
+    # create_user raises ProvisioningTimeoutError — no Marzban user created,
+    # no DB profile written. _maybe_enqueue_retry should fire.
+    mock_marzban.create_user.side_effect = ProvisioningTimeoutError(
+        "Marzban API timeout during create_user – gateway unreachable"
     )
 
-    # DB state after rollback: no profile in DB
-    async with AsyncSessionLocal() as verify_session:
-        prov_repo_v = ProvisioningRepository(verify_session)
-        profile = await prov_repo_v.get_by_account_id(account.id)
-        assert profile is None, (
-            "ProvisioningProfile must NOT exist after a rolled-back transaction"
-        )
+    async with AsyncSessionLocal() as crash_session:
+        prov_svc_crash = ProvisioningService(crash_session, mock_marzban)
+        with pytest.raises(ProvisioningTimeoutError):
+            await prov_svc_crash.provision_subscription(account.id, "pro")
 
-    # ── ATTEMPT 2: Re-call provision_subscription (retry worker) ─────────────
-    # Marzban now returns Conflict (orphaned user from Attempt 1 still exists)
-    mock_marzban.create_user.side_effect = ProvisioningConflictError(
-        "User already exists on Marzban (orphaned from crashed attempt 1)"
+    # Code path: create_user was called once, raised ProvisioningTimeoutError
+    assert mock_marzban.create_user.call_count == 1
+
+    # ── Prove the retry item WAS written (independent-session fix) ───────────
+    # This is the regression assertion: before the fix, _maybe_enqueue_retry
+    # reused the rolled-back session and the enqueue silently failed.
+    # After the fix, it opens AsyncSessionLocal() independently — so the item
+    # is durable even though the caller's transaction was rolled back.
+    async with AsyncSessionLocal() as verify_session:
+        retry_repo_v = ProvisioningRetryRepository(verify_session)
+        pending = await retry_repo_v.get_pending_retries(
+            datetime.now(timezone.utc) + timedelta(minutes=10)
+        )
+    assert len(pending) == 1, (
+        "_maybe_enqueue_retry must durably write the PENDING retry item using its own "
+        "independent session. If this fails, the session-isolation fix has regressed."
+    )
+    assert pending[0].account_id == account.id
+    retry_item = pending[0]
+
+    # No ProvisioningProfile should exist — Marzban call never succeeded
+    async with AsyncSessionLocal() as verify_session2:
+        prov_repo_v = ProvisioningRepository(verify_session2)
+        profile = await prov_repo_v.get_by_account_id(account.id)
+    assert profile is None, (
+        "ProvisioningProfile must NOT exist — create_user failed before any DB write"
+    )
+
+    # ── RETRY: Marzban recovers; retry job converges ───────────────────────
+    mock_marzban.create_user.side_effect = None
+    mock_marzban.create_user.return_value = ProvisionedUserDTO(
+        remote_user_id=remote_uid, status="active", links=["vless://link"]
     )
 
     async with AsyncSessionLocal() as retry_session:
+        sub_svc = SubscriptionService(retry_session)
+        pay_svc_mock = AsyncMock()
         prov_svc2 = ProvisioningService(retry_session, mock_marzban)
-        recovered_profile = await prov_svc2.provision_subscription(account.id, "pro")
+        lifecycle = LifecycleJobService(retry_session, sub_svc, prov_svc2, pay_svc_mock)
 
-    # Code path verification
-    # create_user was called a second time (which raised ConflictError)
-    assert mock_marzban.create_user.call_count == 2
-    # update_user was called to reconcile quotas/limits on the orphaned user
-    assert mock_marzban.update_user.call_count >= 1, (
-        "update_user must be called when create_user raises ConflictError; "
-        "this is the conflict recovery code path in provision_subscription()"
-    )
+        # Fast-forward retry item so it's eligible immediately
+        async with AsyncSessionLocal() as update_session:
+            update_retry_repo = ProvisioningRetryRepository(update_session)
+            items = await update_retry_repo.get_by_account_id(account.id)
+            for item in items:
+                item.next_retry_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+            await update_session.commit()
 
-    # Final state: profile exists and is ACTIVE
-    assert recovered_profile is not None
-    assert recovered_profile.provisioning_state == ProvisioningState.ACTIVE, (
-        "ProvisioningProfile must be ACTIVE after reconciliation via update_user"
-    )
+        processed = await lifecycle.run_failed_provision_retry_job()
 
-    # Verify it's persisted in DB using a fresh session
+    assert processed == 1, "Retry job must process the PENDING item"
+
+    # Final verification: profile ACTIVE, retry item COMPLETED
     async with AsyncSessionLocal() as final_session:
         prov_repo_f = ProvisioningRepository(final_session)
-        db_profile = await prov_repo_f.get_by_account_id(account.id)
-        assert db_profile is not None
-        assert db_profile.provisioning_state == ProvisioningState.ACTIVE, (
-            "Recovered profile must be durable in the DB"
+        retry_repo_f = ProvisioningRetryRepository(final_session)
+
+        recovered_profile = await prov_repo_f.get_by_account_id(account.id)
+        assert recovered_profile is not None
+        assert recovered_profile.provisioning_state == ProvisioningState.ACTIVE, (
+            "ProvisioningProfile must be ACTIVE after retry job runs"
+        )
+
+        items = await retry_repo_f.get_by_account_id(account.id)
+        assert len(items) == 1
+        assert items[0].status == RetryItemStatus.COMPLETED, (
+            "Retry item must be COMPLETED after successful recovery"
         )
 
 

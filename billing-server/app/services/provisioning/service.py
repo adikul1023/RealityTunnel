@@ -11,7 +11,7 @@ from datetime import datetime, timezone, timedelta
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import advisory_xact_lock
+from app.database import advisory_xact_lock, AsyncSessionLocal
 from app.exceptions import EntityNotFoundError, DatabaseOperationError, DuplicateEntityError
 from app.models import ProvisioningProfile, ProvisioningState, ProvisioningRetryItem, RetryItemStatus
 from app.repositories import AccountRepository, ProvisioningRepository, ProvisioningRetryRepository
@@ -78,6 +78,13 @@ class ProvisioningService:
         """
         Check if an exception represents a transient failure (timeout, 500/502/503/504)
         and enqueue an item in the retry queue if not already pending.
+
+        IMPORTANT: opens its own independent DB session rather than reusing self.session.
+        This is deliberate — this method is always called after the caller's transaction
+        has already been rolled back (or failed to commit). Reusing self.session would cause
+        the enqueue to silently fail because the underlying connection is in an error state.
+        An independent session guarantees the retry item is durably written even when the
+        calling transaction is dead.
         """
         is_transient = False
         if isinstance(exc, (ProvisioningTimeoutError, ProvisioningUnavailableError)):
@@ -99,7 +106,10 @@ class ProvisioningService:
                     last_error=str(exc)[:499],
                     status=RetryItemStatus.PENDING,
                 )
-                await self.retry_repo.create(retry_item, commit=True)
+                # Use a fresh session — caller's session may be in a broken/rolled-back state.
+                async with AsyncSessionLocal() as enqueue_session:
+                    enqueue_repo = ProvisioningRetryRepository(enqueue_session)
+                    await enqueue_repo.create(retry_item, commit=True)
                 logger.info("Enqueued transient provisioning failure for retry account_id=%s", account_id)
             except DuplicateEntityError:
                 # Race recovery (Finding M-10): partial unique index
