@@ -1,4 +1,4 @@
-# Production Deployment Notes (Phase 4.3)
+# Production Deployment Notes
 
 These notes document the manual infrastructure setup, permission fixes, and environment configurations required to successfully deploy the RealityTunnel Billing API onto the production VPS (Contabo).
 
@@ -31,14 +31,23 @@ To satisfy the application's aggressive os.stat().st_mode & 0o077 checks (which 
     └── admin_ed25519_public.pem                # chown 101000:101000, chmod 600
 `
 **Important:** 
-- The directory MUST be owned by k:101000 with 750 permissions so the docker daemon (k) can traverse it and the container user (101000) can enter it.
-- The files MUST be natively named exactly ed25519_private.pem because the Python application's secret_registry.py currently hardcodes the filenames.
+- The directory MUST be owned by `ak:101000` with 750 permissions so the docker daemon (`ak`) can traverse it and the container user (101000) can enter it.
+- The files MUST be natively named exactly `ed25519_private.pem` because the Python application's `secret_registry.py` currently hardcodes the filenames.
+
+## 3. Rootless Docker Privileged Ports (Phase 4.4)
+By default, Rootless Docker (via `rootlesskit`) cannot bind to privileged ports (under 1024). Because Caddy is deployed inside the Docker Compose stack and must listen on ports 80 and 443, the host's `sysctl` was permanently modified to lower the unprivileged port threshold.
+
+If you ever reinstall Ubuntu or migrate to a new server, you MUST apply this setting or Caddy will fail to bind port 80/443:
+```bash
+echo "net.ipv4.ip_unprivileged_port_start=80" | sudo tee /etc/sysctl.d/99-rootless-ports.conf
+sudo sysctl --system
+```
 
 ## 3. Environment Variables (.env.production)
 The startup_validator.py enforces strict production guards. We manually patched the environment on the host to bypass these guards during the initial rollout:
 
-1. **Test Key Prevention:** The validator crashes if payment keys contain placeholder_ or 	est_. The placeholder values were changed to DUMMY_rzp_live_abc123 so the application boots safely without exposing fake keys as real ones.
-2. **Localhost Gateway Prevention:** The MARZBAN_BASE_URL was manually upgraded from http://marzban:8000 to https://marzban:8000 to pass the HTTPS / No Localhost Gateways check.
+1. **Test Key Prevention:** The validator crashes if payment keys contain `placeholder_` or `test_`. The placeholder values were changed to `DUMMY_rzp_live_abc123` so the application boots safely without exposing fake keys as real ones.
+2. **Localhost Gateway Prevention:** The `MARZBAN_BASE_URL` was manually upgraded from `http://marzban:8000` to `https://marzban:8000` to pass the HTTPS / No Localhost Gateways check.
 
 ## Future Improvements
 - Make JWT file names configurable via `JWT_PRIVATE_KEY_PATH` in `secret_registry.py`.
