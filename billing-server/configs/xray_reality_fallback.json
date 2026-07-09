@@ -13,6 +13,11 @@
         "decryption": "none",
         "fallbacks": [
           {
+            "name": "api.stealthy.co.in",
+            "dest": "caddy:8443",
+            "xver": 1
+          },
+          {
             "dest": "caddy:8443",
             "xver": 1
           }
