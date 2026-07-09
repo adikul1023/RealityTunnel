@@ -3,10 +3,19 @@
     servers {
         trusted_proxies static private_ranges
     }
+    servers :8443 {
+        listener_wrappers {
+            proxy_protocol {
+                timeout 2s
+                allow private_ranges
+            }
+            tls
+        }
+    }
 }
 
 # Automatically obtains Let's Encrypt cert and forces HTTPS
-api.stealthy.co.in {
+api.stealthy.co.in, api.stealthy.co.in:8443 {
     # Request access logs
     log {
         output file /var/log/caddy/access.log {
