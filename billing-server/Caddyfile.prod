@@ -1,5 +1,8 @@
-﻿{
+{
     email hostmaster@stealthy.co.in
+    servers {
+        trusted_proxies static private_ranges
+    }
 }
 
 api.stealthy.co.in {
@@ -26,7 +29,7 @@ api.stealthy.co.in {
     # Restrict sensitive endpoints to internal networks
     @protected {
         path /readyz /admin/*
-        not remote_ip 127.0.0.1 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 ::1
+        not client_ip private
     }
     respond @protected "403 Forbidden" 403 {
         close
