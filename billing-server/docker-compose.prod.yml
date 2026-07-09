@@ -218,39 +218,7 @@ services:
           cpus: "0.05"
           memory: "32M"
 
-  # ── Marzban Panel & Xray Edge ───────────────────────────────────────────────
-  # Custom downstream build patches Marzban to bind to 0.0.0.0 without TLS.
-  marzban:
-    build:
-      context: ./docker/marzban
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    ports:
-      - "2053:2053"
-      - "2053:2053/udp"
-    environment:
-      - UVICORN_HOST=0.0.0.0
-      - UVICORN_PORT=8000
-      - XRAY_JSON=/app/xray_config.json
-    networks:
-      - internal_net
-      - ingress_net
-    volumes:
-      - ./configs/xray_reality_fallback.json:/app/xray_config.json:ro
-      - /opt/realitytunnel/marzban:/var/lib/marzban
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: "1.0"
-          memory: "512M"
-        reservations:
-          cpus: "0.2"
-          memory: "128M"
+
 
 networks:
   internal_net:

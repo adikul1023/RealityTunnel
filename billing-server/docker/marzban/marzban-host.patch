@@ -1,8 +1,0 @@
---- main.py
-+++ main.py
-@@ -101,3 +101,3 @@
-             """)
- 
--            bind_args['host'] = '127.0.0.1'
-+            bind_args['host'] = UVICORN_HOST
-             bind_args['port'] = UVICORN_PORT
