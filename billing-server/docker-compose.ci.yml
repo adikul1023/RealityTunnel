@@ -12,4 +12,4 @@ services:
 
   postgres:
     ports:
-      - "5433:5432" # Map to 5433 to avoid conflicts
+      - "5434:5432" # Map to 5433 to avoid conflicts

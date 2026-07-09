@@ -10,8 +10,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"          # host access for Alembic migrations from dev machine
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-billing} -d ${POSTGRES_DB:-billing}"]
       interval: 5s
@@ -30,8 +28,6 @@ services:
     environment:
       # Override host to point at the compose service name
       POSTGRES_HOST: postgres
-    ports:
-      - "${PORT:-8080}:8080"
     depends_on:
       postgres:
         condition: service_healthy

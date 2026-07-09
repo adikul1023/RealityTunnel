@@ -110,7 +110,7 @@ async def test_admin_health_endpoint_backup_metadata(
     backup_srv = BackupService(isolated_backup_dir)
     await backup_srv.create_backup(db_session)
 
-    res = await async_client.get("/health", headers=headers)
+    res = await async_client.get("/admin/health", headers=headers)
     assert res.status_code == 200
     data = res.json()
 

@@ -23,9 +23,7 @@ services:
       start_period: 15s
     logging:
       driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+      options: {max-size: 10m, max-file: 3}
     deploy:
       resources:
         limits:

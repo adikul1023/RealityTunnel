@@ -62,6 +62,7 @@ from app.security import (
 )
 from app.services.exceptions import (
     ServiceError,
+    RefreshTokenServiceError,
     RefreshTokenNotFoundError,
     RefreshTokenExpiredError,
     RefreshTokenRevokedError,

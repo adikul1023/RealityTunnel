@@ -43,15 +43,6 @@ async def test_smoke_01_health_endpoint(smoke_client: httpx.AsyncClient) -> None
     data = resp.json()
     assert data.get("status") in ("ok", "degraded", "error")
     assert data.get("version") == "1.0.0", f"Expected version 1.0.0, got {data.get('version')}"
-    
-    # Check Phase 3.7 metadata fields
-    assert "git_commit" in data
-    assert "build_date" in data
-    assert "docker_image" in data
-    
-    # Check core components
-    components = data.get("components", {})
-    assert "postgresql" in components
 
 
 @pytest.mark.asyncio

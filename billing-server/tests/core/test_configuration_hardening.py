@@ -715,7 +715,7 @@ async def test_health_endpoint_fingerprint_exposure(async_client, admin_user_fac
     token = login_resp.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
-    resp_admin = await async_client.get("/health", headers=headers)
+    resp_admin = await async_client.get("/admin/health", headers=headers)
     assert resp_admin.status_code in (200, 503)
     data_admin = resp_admin.json()
     assert data_admin.get("fingerprint") is not None
