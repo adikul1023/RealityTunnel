@@ -478,7 +478,7 @@ class PaymentService:
                 provider_order_id=dto.provider_order_id,
                 reason="Webhook payment.failed event",
             )
-        elif dto.event_type in ("refund.processed",):
+        elif dto.event_type in ("refund.processed", "payment.dispute.created", "chargeback"):
             return await self.process_refund_webhook(
                 provider_order_id=dto.provider_order_id,
                 provider_payment_id=dto.provider_payment_id,
