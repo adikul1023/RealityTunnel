@@ -124,7 +124,7 @@ services:
       PAYMENTS_ENABLED: ${PAYMENTS_ENABLED:-true}
       PROVISIONING_ENABLED: ${PROVISIONING_ENABLED:-true}
       WEBHOOKS_ENABLED: ${WEBHOOKS_ENABLED:-true}
-      MARZBAN_BASE_URL: ${MARZBAN_BASE_URL:-}
+      MARZBAN_BASE_URL: "http://marzban:8001"
       MARZBAN_API_TOKEN: ${MARZBAN_API_TOKEN:-}
       RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
       RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
@@ -227,9 +227,6 @@ services:
       - "443:443"
     environment:
       - XRAY_JSON=/var/lib/marzban/xray_config.json
-      - UVICORN_HOST=0.0.0.0
-      - UVICORN_SSL_CERTFILE=/var/lib/marzban/certs/cert.pem
-      - UVICORN_SSL_KEYFILE=/var/lib/marzban/certs/key.pem
     volumes:
       - /opt/realitytunnel/marzban:/var/lib/marzban
     networks:
@@ -248,6 +245,19 @@ services:
         reservations:
           cpus: "0.2"
           memory: "128M"
+
+  # ── Marzban Local Proxy ───────────────────────────────────────────────────
+  # Marzban deliberately refuses to bind its API to 0.0.0.0 without a trusted
+  # SSL certificate, binding to 127.0.0.1 internally. This socat sidecar shares
+  # Marzban's network namespace to expose the API internally on port 8001
+  # so that the Billing API can communicate with it.
+  marzban-socat:
+    image: alpine/socat:latest
+    restart: unless-stopped
+    command: tcp-listen:8001,fork,reuseaddr tcp-connect:127.0.0.1:8000
+    network_mode: "service:marzban"
+    depends_on:
+      - marzban
 
 networks:
   internal_net:
