@@ -58,22 +58,29 @@ class SecretRotationService:
         with self._lock:
             now = datetime.now(timezone.utc)
             self._secrets["jwt_key"] = [
-                SecretGeneration(1, getattr(settings, "secret_key", "default_jwt_secret"), now)
+                SecretGeneration(1, settings.secret_key.get_secret_value(), now)
             ]
+            
+            admin_jwt = getattr(settings, "admin_jwt_secret", None)
+            admin_jwt_val = admin_jwt.get_secret_value() if hasattr(admin_jwt, "get_secret_value") else (admin_jwt or settings.secret_key.get_secret_value())
             self._secrets["admin_jwt_key"] = [
-                SecretGeneration(1, getattr(settings, "admin_jwt_secret", getattr(settings, "secret_key", "default_admin_secret")), now)
+                SecretGeneration(1, admin_jwt_val, now)
             ]
+            
+            marz_webhook = getattr(settings, "marzban_webhook_secret", None)
+            marz_val = marz_webhook.get_secret_value() if hasattr(marz_webhook, "get_secret_value") else (marz_webhook or "default_marzban_secret")
             self._secrets["marzban_token"] = [
-                SecretGeneration(1, getattr(settings, "marzban_webhook_secret", "default_marzban_secret"), now)
+                SecretGeneration(1, marz_val, now)
             ]
+            
             self._secrets["payment_secret"] = [
-                SecretGeneration(1, getattr(settings, "razorpay_key_secret", "default_razorpay_secret"), now)
+                SecretGeneration(1, settings.razorpay_key_secret.get_secret_value(), now)
             ]
             self._secrets["webhook_secret"] = [
-                SecretGeneration(1, getattr(settings, "razorpay_webhook_secret", "default_webhook_secret"), now)
+                SecretGeneration(1, settings.razorpay_webhook_secret.get_secret_value(), now)
             ]
             self._secrets["master_signing_key"] = [
-                SecretGeneration(1, getattr(settings, "secret_key", "default_master_key"), now)
+                SecretGeneration(1, settings.secret_key.get_secret_value(), now)
             ]
 
     def rotate_secret(self, secret_type: str, new_secret_value: str, overlap_seconds: int = 3600) -> int:

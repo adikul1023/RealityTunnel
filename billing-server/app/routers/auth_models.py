@@ -7,7 +7,7 @@ Enforces clean OpenAPI documentation without exposing internal dataclasses or cr
 from __future__ import annotations
 
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 
 from app.models import SubscriptionStatus
 from app.security import ACCESS_TOKEN_EXPIRE_MINUTES
@@ -16,7 +16,7 @@ from app.security import ACCESS_TOKEN_EXPIRE_MINUTES
 class LoginRequest(BaseModel):
     """Payload for POST /api/auth/login."""
     account_id: str = Field(..., description="Human-readable Account ID (e.g., RT-XXXX-XXXX)")
-    master_token: str = Field(
+    master_token: SecretStr = Field(
         ...,
         description="64-character hexadecimal Master Token",
         json_schema_extra={"writeOnly": True},

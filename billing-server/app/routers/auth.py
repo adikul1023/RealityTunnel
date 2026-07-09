@@ -132,7 +132,7 @@ async def login(
     """
     await limiter.enforce(http_request, "login_account", KeyType.ACCOUNT, key_override=request.account_id)
 
-    result = await auth_service.authenticate(request.account_id, request.master_token)
+    result = await auth_service.authenticate(request.account_id, request.master_token.get_secret_value())
     if not result.success or result.account is None:
         logger.info("Login failed")
         await safe_record_signal(

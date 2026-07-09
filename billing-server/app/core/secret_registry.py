@@ -68,27 +68,27 @@ class SecretRegistry:
 
         # Database password
         if "postgres_password" in self._secrets:
-            self._secrets["postgres_password"].value = settings.postgres_password
+            self._secrets["postgres_password"].value = settings.postgres_password.get_secret_value()
 
         # Secret key / cookie signing key / encryption key
         if "secret_key" in self._secrets:
-            self._secrets["secret_key"].value = settings.secret_key
+            self._secrets["secret_key"].value = settings.secret_key.get_secret_value()
         if "cookie_signing_key" in self._secrets:
-            self._secrets["cookie_signing_key"].value = settings.secret_key
+            self._secrets["cookie_signing_key"].value = settings.secret_key.get_secret_value()
         if "encryption_key" in self._secrets:
-            self._secrets["encryption_key"].value = settings.secret_key
+            self._secrets["encryption_key"].value = settings.secret_key.get_secret_value()
 
         # Marzban API token
         if "marzban_api_token" in self._secrets:
-            self._secrets["marzban_api_token"].value = settings.marzban_api_token
+            self._secrets["marzban_api_token"].value = settings.marzban_api_token.get_secret_value()
 
         # Razorpay keys
         if "razorpay_key_id" in self._secrets:
             self._secrets["razorpay_key_id"].value = settings.razorpay_key_id
         if "razorpay_key_secret" in self._secrets:
-            self._secrets["razorpay_key_secret"].value = settings.razorpay_key_secret
+            self._secrets["razorpay_key_secret"].value = settings.razorpay_key_secret.get_secret_value()
         if "razorpay_webhook_secret" in self._secrets:
-            self._secrets["razorpay_webhook_secret"].value = settings.razorpay_webhook_secret
+            self._secrets["razorpay_webhook_secret"].value = settings.razorpay_webhook_secret.get_secret_value()
 
         # Check disk/environment for PEM keys
         project_root = Path(__file__).resolve().parent.parent.parent

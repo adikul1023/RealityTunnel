@@ -140,7 +140,7 @@ async def test_razorpay_verify_webhook_valid_hmac(test_settings: Settings):
     }
     raw_payload = json.dumps(payload_dict)
     valid_sig = hmac.new(
-        test_settings.razorpay_webhook_secret.encode("utf-8"),
+        test_settings.razorpay_webhook_secret.get_secret_value().encode("utf-8"),
         raw_payload.encode("utf-8"),
         hashlib.sha256,
     ).hexdigest()

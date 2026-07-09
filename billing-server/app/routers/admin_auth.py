@@ -55,7 +55,7 @@ async def login(
     client_ip = getattr(http_request.state, "client_ip", "unknown")
     ip_hash = hashlib.sha256(client_ip.encode()).hexdigest()[:16]
     
-    result = await admin_auth_service.authenticate(request.username, request.password)
+    result = await admin_auth_service.authenticate(request.username, request.password.get_secret_value())
     if not result.success or result.admin_user is None or result.access_token is None:
         logger.info("Admin login failed")
         # Audit log: failed login attempt

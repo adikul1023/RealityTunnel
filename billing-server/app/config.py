@@ -15,7 +15,7 @@ Every configuration parameter is categorized into one of the following domains:
 
 from functools import lru_cache
 
-from pydantic import model_validator
+from pydantic import model_validator, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -41,16 +41,17 @@ class Settings(BaseSettings):
     postgres_port: int = 5432  # [Internal Config]
     postgres_db: str = "billing"  # [Internal Config]
     postgres_user: str = "billing"  # [Internal Config]
-    postgres_password: str = ""  # [Infrastructure Secret]: Redacted in logs
+    postgres_password: SecretStr = SecretStr("")  # [Infrastructure Secret]: Redacted in logs
 
     # Built lazily from components so individual vars are composable
-    database_url: str = ""  # [Internal Config]
+    database_url: SecretStr = SecretStr("")  # [Internal Config]
 
     @model_validator(mode="after")
     def build_database_url(self) -> "Settings":
-        if not self.database_url:
-            self.database_url = (
-                f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
+        if not self.database_url.get_secret_value():
+            pwd = self.postgres_password.get_secret_value()
+            self.database_url = SecretStr(
+                f"postgresql+asyncpg://{self.postgres_user}:{pwd}"
                 f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
             )
         return self
@@ -58,10 +59,12 @@ class Settings(BaseSettings):
     @property
     def database_url_safe(self) -> str:
         """URL with password redacted for logging [Internal Config]."""
+        pwd = self.postgres_password.get_secret_value()
+        db_url_str = self.database_url.get_secret_value()
         return (
-            self.database_url.replace(self.postgres_password, "***")
-            if self.postgres_password
-            else self.database_url
+            db_url_str.replace(pwd, "***")
+            if pwd
+            else db_url_str
         )
 
     # ── Server [Public Config] ─────────────────────────────────────────────
@@ -71,7 +74,7 @@ class Settings(BaseSettings):
     # ── Security [Security Secret / Public Config] ───────────────────────────
     # secret_key is reserved for future HMAC-based operations (e.g., cookie signing).
     # In production, this MUST be overridden via environment variable SECRET_KEY.
-    secret_key: str = "CHANGE_ME_BEFORE_PRODUCTION"  # [Security Secret]
+    secret_key: SecretStr = SecretStr("CHANGE_ME_BEFORE_PRODUCTION")  # [Security Secret]
     jwt_issuer: str = "RealityTunnel Billing/Auth"  # [Public Config]
     jwt_audience: str = "RealityTunnel Client"  # [Public Config]
     admin_jwt_issuer: str = "RealityTunnel Admin"  # [Public Config]
@@ -79,7 +82,7 @@ class Settings(BaseSettings):
 
     # ── VPN Provisioning (Marzban Integration) [Internal Config / Secret] ────
     marzban_base_url: str = "http://localhost:8000"  # [Internal Config]
-    marzban_api_token: str = ""  # [Infrastructure Secret]
+    marzban_api_token: SecretStr = SecretStr("")  # [Infrastructure Secret]
     marzban_timeout_seconds: float = 10.0  # [Operational Parameter]
     marzban_max_retries: int = 3  # [Operational Parameter]
     marzban_create_user_path: str = "/api/user"  # [Internal Config]
@@ -91,8 +94,8 @@ class Settings(BaseSettings):
 
     # ── Payment Gateway (Razorpay Integration) [Internal Config / Secret] ────
     razorpay_key_id: str = ""  # [Internal Config / Public ID]
-    razorpay_key_secret: str = ""  # [Security Secret]
-    razorpay_webhook_secret: str = ""  # [Security Secret]
+    razorpay_key_secret: SecretStr = SecretStr("")  # [Security Secret]
+    razorpay_webhook_secret: SecretStr = SecretStr("")  # [Security Secret]
     razorpay_base_url: str = "https://api.razorpay.com/v1"  # [Internal Config]
     razorpay_timeout_seconds: float = 10.0  # [Operational Parameter]
     razorpay_max_retries: int = 3  # [Operational Parameter]
@@ -181,7 +184,7 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":
         if self.environment.lower() == "production":
-            if self.secret_key == "CHANGE_ME_BEFORE_PRODUCTION":
+            if self.secret_key.get_secret_value() == "CHANGE_ME_BEFORE_PRODUCTION":
                 raise RuntimeError(
                     "SECRET_KEY must be set to a strong random value in production. "
                     "The default placeholder is not permitted."

@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 # ── Engine ──────────────────────────────────────────────────────────────────
 
 engine = create_async_engine(
-    settings.database_url,
+    settings.database_url.get_secret_value(),
     echo=settings.debug,          # SQL logging in debug mode
     **get_engine_pool_kwargs(),
 )

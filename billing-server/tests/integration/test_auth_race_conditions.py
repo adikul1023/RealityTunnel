@@ -31,7 +31,7 @@ async def test_concurrent_refresh_token_rotation_service_layer(db_session: Async
     
     # 2. Fire N concurrent refresh requests using independent sessions
     N = 5
-    engine = create_async_engine(settings.database_url, pool_size=10, max_overflow=20)
+    engine = create_async_engine(settings.database_url.get_secret_value(), pool_size=10, max_overflow=20)
     async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
     
     async def rotate_with_new_session():

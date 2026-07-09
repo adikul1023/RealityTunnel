@@ -20,7 +20,7 @@ import app.models  # noqa: F401 — ensure all models are imported for Base.meta
 config = context.config
 
 # Inject the runtime DB URL so it is never stored in alembic.ini
-config.set_main_option("sqlalchemy.url", settings.database_url)
+config.set_main_option("sqlalchemy.url", settings.database_url.get_secret_value())
 
 # Python logging from alembic.ini
 if config.config_file_name is not None:

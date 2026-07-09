@@ -37,7 +37,7 @@ class MarzbanProvisioningProvider(ProvisioningProvider):
         client: httpx.AsyncClient | None = None,
     ) -> None:
         self.base_url = (base_url or settings.marzban_base_url).rstrip("/")
-        self.api_token = api_token if api_token is not None else settings.marzban_api_token
+        self.api_token = api_token if api_token is not None else settings.marzban_api_token.get_secret_value()
         self.timeout = timeout_seconds if timeout_seconds is not None else settings.marzban_timeout_seconds
         self.max_retries = max_retries if max_retries is not None else settings.marzban_max_retries
         self._external_client = client

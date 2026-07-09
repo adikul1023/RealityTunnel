@@ -212,7 +212,7 @@ def validate_startup_configuration(
         settings.postgres_host
         and settings.postgres_user
         and settings.postgres_db
-        and settings.database_url
+        and settings.database_url.get_secret_value()
     )
     checks["Database"] = db_ok
     if not db_ok:
@@ -358,7 +358,7 @@ def validate_startup_configuration(
             )
 
         # Default / placeholder secret rejection
-        secret_key_val = settings.secret_key or ""
+        secret_key_val = settings.secret_key.get_secret_value() if settings.secret_key else ""
         valid_secret_key = (
             secret_key_val != "CHANGE_ME_BEFORE_PRODUCTION"
             and len(secret_key_val) >= 32
@@ -375,8 +375,8 @@ def validate_startup_configuration(
 
         # Test payment & webhook keys rejection
         rzp_id = (settings.razorpay_key_id or "").lower()
-        rzp_sec = (settings.razorpay_key_secret or "").lower()
-        rzp_wh = (settings.razorpay_webhook_secret or "").lower()
+        rzp_sec = (settings.razorpay_key_secret.get_secret_value() if settings.razorpay_key_secret else "").lower()
+        rzp_wh = (settings.razorpay_webhook_secret.get_secret_value() if settings.razorpay_webhook_secret else "").lower()
         no_test_keys = not any(
             val.startswith("rzp_test") or "test_" in val or "placeholder" in val
             for val in (rzp_id, rzp_sec, rzp_wh)

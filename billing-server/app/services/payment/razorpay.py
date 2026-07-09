@@ -45,8 +45,8 @@ class RazorpayProvider(PaymentProvider):
     ) -> None:
         self.base_url = settings.razorpay_base_url.rstrip("/")
         self.key_id = settings.razorpay_key_id
-        self.key_secret = settings.razorpay_key_secret
-        self.webhook_secret = settings.razorpay_webhook_secret
+        self.key_secret = settings.razorpay_key_secret.get_secret_value()
+        self.webhook_secret = settings.razorpay_webhook_secret.get_secret_value()
         self.timeout = settings.razorpay_timeout_seconds
         self.max_retries = settings.razorpay_max_retries
         self.orders_path = settings.razorpay_orders_path

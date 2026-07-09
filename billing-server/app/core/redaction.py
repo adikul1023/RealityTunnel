@@ -93,7 +93,27 @@ def redact_string(text: str) -> str:
     text = _JWT_REGEX.sub(REDACTED_STR, text)
     # Redact key=val / key: val assignments in text
     text = _KEY_VAL_REGEX.sub(rf"\1{REDACTED_STR}", text)
-    
+    # Dynamic explicit secret redaction
+    try:
+        from app.config import settings
+        secrets_to_scrub = []
+        if settings.postgres_password:
+            secrets_to_scrub.append(settings.postgres_password.get_secret_value())
+        if settings.secret_key:
+            secrets_to_scrub.append(settings.secret_key.get_secret_value())
+        if settings.marzban_api_token:
+            secrets_to_scrub.append(settings.marzban_api_token.get_secret_value())
+        if settings.razorpay_key_secret:
+            secrets_to_scrub.append(settings.razorpay_key_secret.get_secret_value())
+        if settings.razorpay_webhook_secret:
+            secrets_to_scrub.append(settings.razorpay_webhook_secret.get_secret_value())
+        
+        for secret in secrets_to_scrub:
+            if secret and len(secret) > 3 and secret != "CHANGE_ME_BEFORE_PRODUCTION":
+                text = text.replace(secret, REDACTED_STR)
+    except ImportError:
+        pass
+
     return text
 
 

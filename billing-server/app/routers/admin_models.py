@@ -3,14 +3,14 @@ admin_models.py — Transport DTOs for Administrative Authentication Endpoints.
 """
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 from app.security.admin_jwt import ADMIN_ACCESS_TOKEN_EXPIRE_MINUTES
 
 
 class AdminLoginRequest(BaseModel):
     """Payload for POST /api/admin/login."""
     username: str = Field(..., description="Administrative username")
-    password: str = Field(
+    password: SecretStr = Field(
         ...,
         description="Administrative human-generated password",
         json_schema_extra={"writeOnly": True},
