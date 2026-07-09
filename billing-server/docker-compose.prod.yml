@@ -144,9 +144,10 @@ services:
       # outside development), so previously this compose file had NO way to ever boot successfully.
       # Mounted read-only: the container (non-root, read-only root filesystem) must never be able to
       # write/regenerate its own signing keys.
-      - ./dev_keys:/app/dev_keys:ro
-    # No host ports published — billing-api is only reachable from within internal_net.
-    # Caddy proxies to it by container name (billing-api:8080) over the shared Docker network.
+      - /opt/realitytunnel/secrets/jwt:/app/dev_keys:ro
+    # TEMPORARY VERIFICATION MAPPING for Phase 4.3 (Remove later)
+    ports:
+      - "127.0.0.1:8080:8080"
     networks:
       - internal_net
     depends_on:
