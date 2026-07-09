@@ -13,10 +13,11 @@ The RealityTunnel Billing Backend operates as a highly privileged orchestrator w
 ## 3. Secret Management & Key Rotation
 The system uses asymmetric Ed25519 cryptography to issue JWTs. 
 ### Rotation Procedure:
-1. Generate a new Ed25519 private/public key pair (e.g., using `openssl` or the internal generator).
-2. Replace the `.pem` files in the production secret volume.
-3. Restart the `billing-api` containers.
-4. **Impact:** All existing sessions will immediately terminate (HTTP 401). Users must log in again to mint new tokens.
+1. Generate a new Ed25519 private/public key pair (`jwt_ed25519.pem` and `jwt_ed25519.pub`).
+2. Replace the `.pem` files in the production secret volume (`/opt/realitytunnel/secrets/jwt/`).
+3. Back up the new `jwt_ed25519.pem` to a secure offline vault (e.g., Proton Pass).
+4. Restart the `billing-api` containers.
+5. **Impact:** All existing sessions will immediately terminate (HTTP 401). Users must log in again to mint new tokens.
 
 ## 4. Payment Reconciliation Design
 Webhooks from payment providers (e.g., Razorpay) are inherently untrusted and subject to out-of-order delivery, duplication, or spoofing (if signature validation fails).

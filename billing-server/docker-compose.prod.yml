@@ -134,7 +134,11 @@ services:
       # all 172.x.x.x addresses.
       TRUST_PROXY: "true"
       TRUSTED_PROXY_IPS: "${DOCKER_INTERNAL_SUBNET:-172.28.0.0/16}"
-
+      # Provide explicit paths to the mounted read-only keys for the production environment
+      JWT_PRIVATE_KEY_PATH: "/app/dev_keys/jwt_ed25519.pem"
+      JWT_PUBLIC_KEY_PATH: "/app/dev_keys/jwt_ed25519.pub"
+      ADMIN_JWT_PRIVATE_KEY_PATH: "/app/dev_keys/jwt_ed25519.pem"
+      ADMIN_JWT_PUBLIC_KEY_PATH: "/app/dev_keys/jwt_ed25519.pub"
     volumes:
       - backup_data_prod:/app/backups
       - brain_data_prod:/app/brain
@@ -145,11 +149,7 @@ services:
       # outside development), so previously this compose file had NO way to ever boot successfully.
       # Mounted read-only: the container (non-root, read-only root filesystem) must never be able to
       # write/regenerate its own signing keys.
-      # Map the named keys from the host directly into the expected paths within the container
-      - /opt/realitytunnel/secrets/jwt/jwt_ed25519.pem:/app/dev_keys/ed25519_private.pem:ro
-      - /opt/realitytunnel/secrets/jwt/jwt_ed25519.pub:/app/dev_keys/ed25519_public.pem:ro
-      - /opt/realitytunnel/secrets/jwt/jwt_ed25519.pem:/app/dev_keys/admin/admin_ed25519_private.pem:ro
-      - /opt/realitytunnel/secrets/jwt/jwt_ed25519.pub:/app/dev_keys/admin/admin_ed25519_public.pem:ro
+      - /opt/realitytunnel/secrets/jwt:/app/dev_keys:ro
     # TEMPORARY VERIFICATION MAPPING for Phase 4.3 (Remove later)
     ports:
       - "127.0.0.1:8080:8080"
