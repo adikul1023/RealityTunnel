@@ -150,9 +150,8 @@ services:
       # Mounted read-only: the container (non-root, read-only root filesystem) must never be able to
       # write/regenerate its own signing keys.
       - /opt/realitytunnel/secrets/jwt:/app/dev_keys:ro
-    # TEMPORARY VERIFICATION MAPPING for Phase 4.3 (Remove later)
-    ports:
-      - "127.0.0.1:8080:8080"
+    # Removed host port mapping to ensure zero host bindings. 
+    # Caddy is the only public ingress, proxying via Docker network.
     networks:
       - internal_net
     depends_on:
@@ -196,7 +195,7 @@ services:
       - "443:443" # HTTPS (TLS terminated here)
       - "443:443/udp" # HTTP/3 (QUIC)
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./Caddyfile.prod:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     networks:

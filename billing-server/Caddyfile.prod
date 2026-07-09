@@ -1,0 +1,37 @@
+﻿{
+    email hostmaster@stealthy.co.in
+}
+
+api.stealthy.co.in {
+    # Request access logs
+    log {
+        output file /data/access.log {
+            roll_size 10MiB
+            roll_keep 3
+            roll_keep_for 30d
+        }
+    }
+
+    # Security Headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Frame-Options "DENY"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "geolocation=(), microphone=(), camera=()"
+        Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
+        -Server
+    }
+
+    # Restrict sensitive endpoints to internal networks
+    @protected {
+        path /readyz /admin/*
+        not remote_ip 127.0.0.1 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 ::1
+    }
+    respond @protected "403 Forbidden" 403 {
+        close
+    }
+
+    # Reverse proxy to Billing API over Docker internal network
+    reverse_proxy billing-api:8080
+}
