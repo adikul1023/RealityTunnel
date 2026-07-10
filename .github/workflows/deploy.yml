@@ -62,8 +62,8 @@ jobs:
           script: |
             cd /opt/realitytunnel/current
             
-            # Export DOCKER_IMAGE explicitly for the docker-compose file
-            export DOCKER_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+            # Export DOCKER_IMAGE explicitly for the docker-compose file using the git sha
+            export DOCKER_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}"
             
             # Use sed to ensure DOCKER_IMAGE is in .env so docker-compose picks it up automatically
             if grep -q "^DOCKER_IMAGE=" .env; then
