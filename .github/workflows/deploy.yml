@@ -55,10 +55,15 @@ jobs:
     steps:
       - name: Deploy to Oracle
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          REGISTRY: ${{ env.REGISTRY }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           host: ${{ secrets.ORACLE_HOST }}
           username: ${{ secrets.ORACLE_USER }}
           key: ${{ secrets.ORACLE_SSH_KEY }}
+          envs: REGISTRY,IMAGE_NAME,GITHUB_TOKEN
           script: |
             cd /opt/realitytunnel/current
             
@@ -72,8 +77,8 @@ jobs:
                 echo "DOCKER_IMAGE=$DOCKER_IMAGE" | sudo tee -a .env
             fi
             
-            # Login to GHCR using a Personal Access Token (PAT) with read:packages scope
-            echo "${{ secrets.GHCR_PAT }}" | sudo docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            # Login to GHCR using the GITHUB_TOKEN
+            echo "$GITHUB_TOKEN" | sudo docker login ghcr.io -u ${{ github.actor }} --password-stdin
             
             # Pull the latest image
             sudo docker compose -p 09a78c2b9503db66b6ac31aed64f650faba94d67 -f docker-compose.prod.yml pull billing-api
