@@ -71,6 +71,47 @@ import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private var pendingServerIp: String? = null
+    
+    // Manual DI Wiring
+    private val clientLogger by lazy { com.overreality.vpn.logging.ClientLogger(applicationContext) }
+    private val apiClient by lazy { com.overreality.vpn.data.OracleApiClient() }
+    private val secureStorage by lazy { com.overreality.vpn.data.SecureStorage(applicationContext) }
+    private val tokenRepository by lazy { com.overreality.vpn.auth.TokenRepository(secureStorage) }
+    private val licenseRepository by lazy { com.overreality.vpn.auth.LicenseRepository(secureStorage) }
+    private val authManager by lazy { com.overreality.vpn.auth.AuthenticationManager(apiClient, tokenRepository, secureStorage, licenseRepository) }
+    private val configProvider by lazy { com.overreality.vpn.data.ConfigurationProvider(applicationContext, licenseRepository, secureStorage, authManager, apiClient) }
+    private val sessionManager by lazy { SessionManager(applicationContext, configProvider) }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+    }
+
+    private val activationMutex = kotlinx.coroutines.sync.Mutex()
+
+    private suspend fun processActivationIntent(intent: Intent?): Boolean {
+        if (!activationMutex.tryLock()) {
+            clientLogger.log(com.overreality.vpn.logging.LogLevel.WARN, "DEEP_LINK", "Concurrent deep link activation attempt ignored")
+            return false
+        }
+        try {
+            val uri = intent?.data ?: return false
+            val exchangeToken = uri.getQueryParameter("exchange_token") ?: return false
+            clientLogger.log(com.overreality.vpn.logging.LogLevel.INFO, "DEEP_LINK", "Processing exchange token from URI")
+            val deviceGuid = secureStorage.getDeviceGuid()
+            val res = apiClient.exchangeToken(exchangeToken, deviceGuid)
+            return if (res is com.overreality.vpn.models.ExchangeResult.Success) {
+                tokenRepository.updateTokens(res.tokens)
+                clientLogger.log(com.overreality.vpn.logging.LogLevel.INFO, "AUTH", "Exchange token redeemed successfully")
+                true
+            } else {
+                clientLogger.log(com.overreality.vpn.logging.LogLevel.ERROR, "AUTH", "Exchange token redemption failed")
+                false
+            }
+        } finally {
+            activationMutex.unlock()
+        }
+    }
 
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -106,12 +147,99 @@ class MainActivity : ComponentActivity() {
         setContent {
             OverREALITYTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
+                    var currentNavState by remember { mutableStateOf(NavigationState.SPLASH) }
                     val uiState by VpnStatusStore.state.collectAsState()
-                    MainScreen(
-                        uiState = uiState,
-                        onConnect = { profile -> requestAndStartVpn(profile) },
-                        onDisconnect = { stopVpnService() },
-                    )
+
+                    LaunchedEffect(Unit) {
+                        clientLogger.log(com.overreality.vpn.logging.LogLevel.INFO, "STARTUP", "Starting explicit 6-step Android initialization sequence")
+                        if (processActivationIntent(intent)) {
+                            currentNavState = NavigationState.MAIN
+                            return@LaunchedEffect
+                        }
+
+                        // 1. Read cached tokens
+                        // 2. Read cached profile
+                        val profile = configProvider.getVpnProfile()
+
+                        // 3. Validate offline license
+                        if (!authManager.isAuthenticated) {
+                            clientLogger.log(com.overreality.vpn.logging.LogLevel.INFO, "AUTH", "No valid authentication state found -> Login")
+                            currentNavState = NavigationState.LOGIN
+                            return@LaunchedEffect
+                        }
+
+                        val tokens = tokenRepository.getCurrentTokens()
+                        if (tokens != null && System.currentTimeMillis() > tokens.expiresAt + 72L * 3600 * 1000) {
+                            clientLogger.log(com.overreality.vpn.logging.LogLevel.WARN, "AUTH", "Offline grace period (72 hours) expired -> Login")
+                            tokenRepository.clearTokens()
+                            currentNavState = NavigationState.LOGIN
+                            return@LaunchedEffect
+                        }
+
+                        // 4. Refresh JWT if required (non-blocking)
+                        launch(Dispatchers.IO) {
+                            try { authManager.getValidAccessToken() }
+                            catch (e: Exception) { clientLogger.log(com.overreality.vpn.logging.LogLevel.WARN, "AUTH", "Background JWT refresh failed") }
+                        }
+
+                        // 5. Background profile refresh
+                        launch(Dispatchers.IO) {
+                            try { configProvider.refreshProfileBackground() }
+                            catch (e: Exception) { clientLogger.log(com.overreality.vpn.logging.LogLevel.WARN, "CONFIG", "Background profile refresh failed") }
+                        }
+
+                        // 6. Navigate with auto-recovery for missing cached profile
+                        var activeProfile = profile
+                        if (activeProfile == null) {
+                            clientLogger.log(com.overreality.vpn.logging.LogLevel.WARN, "CONFIG", "Cached profile missing -> attempting network recovery")
+                            activeProfile = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                                configProvider.fetchVpnProfile()
+                            }
+                        }
+                        if (activeProfile != null) {
+                            clientLogger.log(com.overreality.vpn.logging.LogLevel.INFO, "NAV", "Authenticated and profile available -> Main")
+                            currentNavState = NavigationState.MAIN
+                        } else {
+                            currentNavState = NavigationState.LOGIN
+                        }
+                    }
+
+                    when (currentNavState) {
+                        NavigationState.SPLASH -> {
+                            SplashScreen()
+                        }
+                        NavigationState.LOGIN -> {
+                            LoginScreen(
+                                authManager = authManager,
+                                tokenRepository = tokenRepository,
+                                clientLogger = clientLogger,
+                                onLoginSuccess = { currentNavState = NavigationState.MAIN }
+                            )
+                        }
+                        NavigationState.MAIN -> {
+                            MainScreen(
+                                uiState = uiState,
+                                onConnect = { profile -> requestAndStartVpn(profile) },
+                                onDisconnect = { sessionManager.stopSession() },
+                                onNavigateToProfile = { currentNavState = NavigationState.PROFILE }
+                            )
+                        }
+                        NavigationState.PROFILE -> {
+                            ProfileScreen(
+                                onNavigateBack = { currentNavState = NavigationState.MAIN },
+                                onLogout = {
+                                    authManager.logout()
+                                    sessionManager.stopSession()
+                                    currentNavState = NavigationState.LOGIN
+                                }
+                            )
+                        }
+                        NavigationState.FIRST_TIME_MASTER_TOKEN -> {
+                            SaveMasterTokenScreen(
+                                onComplete = { currentNavState = NavigationState.MAIN }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -125,7 +253,7 @@ class MainActivity : ComponentActivity() {
         if (existing == null) {
             val channel = NotificationChannel(
                 NOTIFICATION_CHANNEL_ID,
-                "OverREALITY VPN",
+                "Stealthy VPN",
                 NotificationManager.IMPORTANCE_DEFAULT,
             )
             nm.createNotificationChannel(channel)
@@ -191,7 +319,9 @@ class MainActivity : ComponentActivity() {
                 if (intent != null) {
                     vpnPermissionLauncher.launch(intent)
                 } else {
-                    startVpnService(cleanServerIp)
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        sessionManager.startSession(cleanServerIp)
+                    }
                 }
             }
         }
@@ -200,29 +330,323 @@ class MainActivity : ComponentActivity() {
     private val vpnPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == RESULT_OK) {
-                pendingServerIp?.let { startVpnService(it) }
+                pendingServerIp?.let { ip ->
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        sessionManager.startSession(ip)
+                    }
+                }
             } else {
                 VpnStatusStore.setState(VpnConnectionState.ERROR, "VPN permission denied")
             }
             pendingServerIp = null
         }
 
-    private fun startVpnService(serverIp: String) {
-        val intent = Intent(this, OverRealityVpnService::class.java)
-            .setAction(OverRealityVpnService.ACTION_START)
-            .putExtra(OverRealityVpnService.EXTRA_SERVER_IP, serverIp)
-        ContextCompat.startForegroundService(this, intent)
-    }
-
-    private fun stopVpnService() {
-        val intent = Intent(this, OverRealityVpnService::class.java)
-            .setAction(OverRealityVpnService.ACTION_STOP)
-        startService(intent)
-    }
-
     companion object {
         private const val PREFLIGHT_CACHE_WINDOW_MS = 90_000L
-        private const val NOTIFICATION_CHANNEL_ID = "overreality_vpn_channel"
+        private const val NOTIFICATION_CHANNEL_ID = "stealthy_vpn_channel"
+    }
+}
+
+enum class NavigationState { SPLASH, LOGIN, MAIN, PROFILE, FIRST_TIME_MASTER_TOKEN }
+
+@Composable
+fun SplashScreen() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Stealthy", fontSize = 28.sp, color = Color.White, fontWeight = FontWeight.Bold)
+            Text("Checking session...", color = Color.Gray)
+        }
+    }
+}
+
+@Composable
+fun LoginScreen(
+    authManager: com.overreality.vpn.auth.AuthenticationManager,
+    tokenRepository: com.overreality.vpn.auth.TokenRepository,
+    clientLogger: com.overreality.vpn.logging.ClientLogger,
+    onLoginSuccess: () -> Unit
+) {
+    val context = LocalContext.current
+    val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+
+    var accountId by remember { mutableStateOf("") }
+    var masterToken by remember { mutableStateOf("") }
+    var rememberDevice by remember { mutableStateOf(true) }
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    var show2FaDialog by remember { mutableStateOf(false) }
+    var tempLoginToken by remember { mutableStateOf("") }
+    var totpCode by remember { mutableStateOf("") }
+
+    var showDeviceLimitDialog by remember { mutableStateOf<com.overreality.vpn.models.DeviceLimitDetails?>(null) }
+    var showSubscriptionExpired by remember { mutableStateOf(false) }
+    var showMandatoryUpdate by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Welcome to Stealthy", fontSize = 24.sp, color = Color.White, fontWeight = FontWeight.Bold)
+
+            errorMessage?.let {
+                Text(it, color = Color.Red, fontSize = 14.sp)
+            }
+
+            OutlinedTextField(
+                value = accountId,
+                onValueChange = { accountId = it },
+                label = { Text("Account ID") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = masterToken,
+                onValueChange = { masterToken = it },
+                label = { Text("Master Token") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                androidx.compose.material3.Checkbox(
+                    checked = rememberDevice,
+                    onCheckedChange = { rememberDevice = it }
+                )
+                Text("Remember this device", color = Color.LightGray)
+            }
+
+            Button(
+                onClick = {
+                    if (accountId.isBlank() || masterToken.isBlank()) {
+                        errorMessage = "Please enter both Account ID and Master Token."
+                        return@Button
+                    }
+                    isLoading = true
+                    errorMessage = null
+                    coroutineScope.launch {
+                        try {
+                            clientLogger.log(com.overreality.vpn.logging.LogLevel.INFO, "AUTH", "Login attempt initiated")
+                            val result = authManager.login(accountId.trim(), masterToken.trim())
+                            when (result) {
+                                is com.overreality.vpn.models.LoginResult.Success -> {
+                                    if (!rememberDevice) {
+                                        tokenRepository.updateTokensInMemoryOnly(result.tokens)
+                                    }
+                                    onLoginSuccess()
+                                }
+                                is com.overreality.vpn.models.LoginResult.Requires2FA -> {
+                                    tempLoginToken = result.temporaryLoginToken
+                                    show2FaDialog = true
+                                }
+                                is com.overreality.vpn.models.LoginResult.DeviceLimitExceeded -> {
+                                    showDeviceLimitDialog = result.details
+                                }
+                                is com.overreality.vpn.models.LoginResult.ReplayDetected -> {
+                                    authManager.logout()
+                                    errorMessage = "Security Alert: A potential replay attack was detected. Session terminated."
+                                }
+                                is com.overreality.vpn.models.LoginResult.SubscriptionExpired -> {
+                                    showSubscriptionExpired = true
+                                }
+                                is com.overreality.vpn.models.LoginResult.MandatoryUpdate -> {
+                                    showMandatoryUpdate = true
+                                }
+                                is com.overreality.vpn.models.LoginResult.MaintenanceMode -> {
+                                    errorMessage = if (result.retryAfterSeconds != null) {
+                                        "Service undergoing scheduled maintenance. Try again in ${result.retryAfterSeconds}s."
+                                    } else {
+                                        "Service undergoing scheduled maintenance. Try again later."
+                                    }
+                                }
+                                is com.overreality.vpn.models.LoginResult.Error -> {
+                                    errorMessage = result.message
+                                }
+                                else -> {
+                                    errorMessage = "Login failed."
+                                }
+                            }
+                        } catch (e: Exception) {
+                            errorMessage = "Connection error: ${e.message}"
+                        } finally {
+                            isLoading = false
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isLoading
+            ) {
+                Text(if (isLoading) "Logging in..." else "Log In")
+            }
+        }
+    }
+
+    if (show2FaDialog) {
+        AlertDialog(
+            onDismissRequest = { show2FaDialog = false },
+            title = { Text("Two-Factor Authentication") },
+            text = {
+                OutlinedTextField(
+                    value = totpCode,
+                    onValueChange = { totpCode = it },
+                    label = { Text("6-digit code") }
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    coroutineScope.launch {
+                        val verified = authManager.verify2Fa(tempLoginToken, totpCode)
+                        if (verified) {
+                            show2FaDialog = false
+                            onLoginSuccess()
+                        } else {
+                            errorMessage = "Invalid 2FA code."
+                            show2FaDialog = false
+                        }
+                    }
+                }) { Text("Verify") }
+            },
+            dismissButton = {
+                TextButton(onClick = { show2FaDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    showDeviceLimitDialog?.let { details ->
+        AlertDialog(
+            onDismissRequest = { showDeviceLimitDialog = null },
+            title = { Text("Device Limit Exceeded") },
+            text = { Text("You have reached your device limit (${details.currentDevices} / ${details.maxDevices}). Please remove a device to continue.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(details.manageDevicesUrl))
+                    context.startActivity(intent)
+                    showDeviceLimitDialog = null
+                }) { Text("Manage Devices") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeviceLimitDialog = null }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showSubscriptionExpired) {
+        AlertDialog(
+            onDismissRequest = { showSubscriptionExpired = false },
+            title = { Text("Subscription Expired") },
+            text = { Text("Your VPN subscription has expired. Please renew to continue using the service.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://stealthy.co.in/account/billing"))
+                    context.startActivity(intent)
+                    showSubscriptionExpired = false
+                }) { Text("Renew") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSubscriptionExpired = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showMandatoryUpdate) {
+        AlertDialog(
+            onDismissRequest = { showMandatoryUpdate = false },
+            title = { Text("Mandatory Update Required") },
+            text = { Text("A critical security update is required to connect.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://stealthy.co.in/download"))
+                    context.startActivity(intent)
+                    showMandatoryUpdate = false
+                }) { Text("Download") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showMandatoryUpdate = false }) { Text("Close") }
+            }
+        )
+    }
+}
+
+@Composable
+fun ProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
+    val context = LocalContext.current
+    
+    Box(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Profile", fontSize = 24.sp, color = Color.White, fontWeight = FontWeight.Bold)
+            
+            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0x1AFFFFFF))) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Plan: Premium", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Devices: 1 / 5", color = Color.LightGray)
+                }
+            }
+
+            Button(
+                onClick = {
+                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://stealthy.co.in/account"))
+                    context.startActivity(intent)
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Manage Subscription")
+            }
+
+            Button(
+                onClick = { onLogout() },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.5f))
+            ) {
+                Text("Log Out")
+            }
+
+            TextButton(onClick = onNavigateBack) {
+                Text("Back to Main")
+            }
+        }
+    }
+}
+
+@Composable
+fun SaveMasterTokenScreen(onComplete: () -> Unit) {
+    val context = LocalContext.current as android.app.Activity
+    
+    // Clear FLAG_SECURE on dispose
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        context.window.setFlags(
+            android.view.WindowManager.LayoutParams.FLAG_SECURE,
+            android.view.WindowManager.LayoutParams.FLAG_SECURE
+        )
+        onDispose {
+            context.window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
+
+    Box(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Save Your Master Token", fontSize = 24.sp, color = Color.White, fontWeight = FontWeight.Bold)
+            Text(
+                "This token is generated once and will never be shown again. Save it securely.",
+                color = Color.LightGray
+            )
+            
+            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0x1AFFFFFF))) {
+                Text("xoxb-...", modifier = Modifier.padding(16.dp), color = Color.White, fontWeight = FontWeight.Bold)
+            }
+
+            Button(onClick = onComplete, modifier = Modifier.fillMaxWidth()) {
+                Text("I have saved it")
+            }
+        }
     }
 }
 
@@ -243,6 +667,7 @@ private fun MainScreen(
     uiState: VpnUiState,
     onConnect: (VpnProfile) -> Unit,
     onDisconnect: () -> Unit,
+    onNavigateToProfile: () -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -285,8 +710,11 @@ private fun MainScreen(
             topBar = {
                 if (!setupRequired) {
                     TopAppBar(
-                        title = { Text("OverREALITY") },
+                        title = { Text("Stealthy") },
                         actions = {
+                            TextButton(onClick = onNavigateToProfile) {
+                                Text("👤", fontSize = 20.sp)
+                            }
                             Box {
                                 TextButton(onClick = { menuExpanded = true }) {
                                     Text("⋮", fontSize = 24.sp)
@@ -600,7 +1028,7 @@ private fun ProfileSetupScreen(
         verticalArrangement = Arrangement.Top,
     ) {
         Text(
-            text = "Set Up OverREALITY",
+            text = "Set Up Stealthy",
             color = Color.White,
             fontSize = 28.sp,
             fontWeight = FontWeight.SemiBold,

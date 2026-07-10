@@ -34,8 +34,17 @@ android {
         }
     }
 
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+
     buildTypes {
+        getByName("debug") {
+            buildConfigField("String", "API_BASE_URL", "\"https://staging-api.stealthy.co.in\"")
+        }
         release {
+            buildConfigField("String", "API_BASE_URL", "\"https://api.stealthy.co.in\"")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -53,10 +62,6 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
-    }
-
-    buildFeatures {
-        compose = true
     }
 
     packaging {
@@ -88,6 +93,12 @@ dependencies {
 
     implementation(composeBom)
     androidTestImplementation(composeBom)
+    
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    
+    // Networking and JSON
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.google.code.gson:gson:2.11.0")
 
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")

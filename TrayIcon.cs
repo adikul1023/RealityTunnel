@@ -131,7 +131,7 @@ public class TrayIcon : IDisposable
             uFlags           = NIF_MSG | NIF_ICON | NIF_TIP,
             uCallbackMessage = WM_APP_TRAY,
             hIcon            = _hGray,
-            szTip            = "OverREALITY — Disconnected"
+            szTip            = "Stealthy — Disconnected"
         };
         Shell_NotifyIcon(NIM_ADD, ref _nid);
     }
@@ -139,7 +139,7 @@ public class TrayIcon : IDisposable
     public void SetConnected(bool connected)
     {
         _nid.hIcon  = connected ? _hGreen : _hGray;
-        _nid.szTip  = connected ? "OverREALITY — Connected" : "OverREALITY — Disconnected";
+        _nid.szTip  = connected ? "Stealthy — Connected" : "Stealthy — Disconnected";
         _nid.uFlags = NIF_ICON | NIF_TIP;
         Shell_NotifyIcon(NIM_MODIFY, ref _nid);
     }
@@ -148,7 +148,7 @@ public class TrayIcon : IDisposable
     {
         _nid.uFlags     = NIF_INFO;
         _nid.szInfo     = message;
-        _nid.szInfoTitle = "OverREALITY";
+        _nid.szInfoTitle = "Stealthy";
         _nid.dwInfoFlags = NIIF_INFO;
         _nid.uTimeout   = 2000;
         Shell_NotifyIcon(NIM_MODIFY, ref _nid);

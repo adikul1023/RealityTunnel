@@ -89,3 +89,24 @@ class InactiveDeviceErrorResponse(BaseModel):
     """
     detail: str = Field(..., description="Instructions to reactivate the device or register a new one")
 
+
+class ExchangeRequest(BaseModel):
+    """Payload for POST /api/auth/exchange."""
+    exchange_token: str = Field(..., description="Single-use exchange token from web redirect")
+    device_guid: str = Field(..., description="Unique hardware or installation identifier")
+
+
+class ExchangeResponse(BaseModel):
+    """Successful exchange token redemption response. NEVER returns Master Token."""
+    access_token: str = Field(..., description="Short-lived Ed25519 signed Access JWT")
+    refresh_token: str = Field(..., description="Long-lived 256-bit CSPRNG refresh token")
+    token_type: str = Field(default="Bearer", description="HTTP authorization scheme")
+    expires_in: int = Field(
+        default=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        description="Access token validity duration in seconds",
+    )
+    is_initial_provisioning: bool = Field(
+        default=False,
+        description="Indicates whether this account was just provisioned for the first time",
+    )
+

@@ -13,7 +13,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.config import settings
 from app.database import engine, verify_db, AsyncSessionLocal
 from app.exceptions import DuplicateEntityError, EntityNotFoundError, RepositoryError
-from app.routers import auth, devices, health, admin_auth, admin, credentials, webhooks, billing, admin_billing, metrics, admin_recovery
+from app.routers import auth, devices, health, admin_auth, admin, credentials, webhooks, billing, admin_billing, metrics, admin_recovery, client
 from app.observability.middleware import RequestObservabilityMiddleware, record_exception_metric
 from app.rate_limit import RateLimitMiddleware, RateLimitExceeded
 from app.security_hardening import (
@@ -105,6 +105,7 @@ app = FastAPI(
 
 app.include_router(health.router)
 app.include_router(auth.router)
+app.include_router(client.router)
 app.include_router(devices.router)
 app.include_router(admin_auth.router)
 app.include_router(admin.router)

@@ -34,10 +34,18 @@ from app.models.account import Account
 from app.models.connection_signal import ConnectionEventType
 from typing import Union
 
+import hashlib
+from datetime import datetime, timezone
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.database import get_db
+from app.models import ExchangeToken
 from app.rate_limit import require_rate_limit, RateLimiter, get_rate_limiter, KeyType
 from app.routers.auth_models import (
     AccountMeResponse,
     DeviceLimitErrorResponse,
+    ExchangeRequest,
+    ExchangeResponse,
     InactiveDeviceErrorResponse,
     LoginRequest,
     LoginResponse,
@@ -412,3 +420,85 @@ async def get_me(
         status=current_account.status,
         subscription_expires_at=current_account.subscription_expires_at,
     )
+
+
+@router.post(
+    "/exchange",
+    summary="Atomically redeem a single-use exchange token for session tokens",
+    response_model=ExchangeResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"description": "Validation error"},
+        410: {"description": "Exchange token expired or already redeemed"},
+        500: {"description": "Unexpected database error"},
+    },
+)
+async def exchange_token(
+    request: ExchangeRequest,
+    http_request: Request,
+    db: AsyncSession = Depends(get_db),
+    jwt_service: JWTService = Depends(get_jwt_service),
+    refresh_service: RefreshTokenService = Depends(get_refresh_service),
+    device_service: DeviceService = Depends(get_device_service),
+    signal_service: ConnectionSignalService = Depends(get_signal_service),
+) -> ExchangeResponse:
+    """
+    Atomically redeem a single-use web exchange token for an authenticated session token pair.
+    The exchange token is invalidated immediately upon redemption.
+    NEVER returns the Master Token.
+    """
+    token_hash = hashlib.sha256(request.exchange_token.encode("utf-8")).hexdigest()
+
+    result = await db.execute(
+        select(ExchangeToken).where(ExchangeToken.token_hash == token_hash).with_for_update()
+    )
+    token_entry = result.scalar_one_or_none()
+
+    if not token_entry or token_entry.is_redeemed or token_entry.expires_at <= datetime.now(timezone.utc):
+        logger.warning("Attempted redemption of invalid, expired, or already redeemed exchange token")
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="Exchange token is invalid, expired, or has already been redeemed",
+        )
+
+    # Atomically invalidate single-use exchange token
+    token_entry.is_redeemed = True
+    await db.commit()
+
+    account_id = token_entry.account_id
+    is_initial = token_entry.is_initial_provisioning
+
+    # Register device and issue tokens
+    try:
+        await device_service.register_device(
+            account_id=account_id,
+            device_guid=request.device_guid,
+            friendly_name=None,
+            client_ip=getattr(http_request.state, "client_ip", "unknown"),
+        )
+    except Exception as exc:
+        logger.error("Device registration during exchange failed: %s", exc)
+
+    access_token = jwt_service.create_access_token(account_id=account_id, role="user")
+    refresh_token = await refresh_service.issue_refresh_token(
+        account_id=account_id,
+        device_guid=request.device_guid,
+    )
+
+    await safe_record_signal(
+        signal_service,
+        account_id=account_id,
+        event_type=ConnectionEventType.LOGIN,
+        success=True,
+        device_guid=request.device_guid,
+        http_request=http_request,
+    )
+
+    return ExchangeResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="Bearer",
+        expires_in=jwt_service.access_token_expire_minutes * 60,
+        is_initial_provisioning=is_initial,
+    )
+

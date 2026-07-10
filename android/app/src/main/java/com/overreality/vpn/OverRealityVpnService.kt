@@ -1,4 +1,4 @@
-﻿package com.overreality.vpn
+package com.overreality.vpn
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -61,7 +61,7 @@ class OverRealityVpnService : VpnService(), PlatformInterface {
 
         val notification = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_vpn)
-            .setContentTitle("OverREALITY")
+            .setContentTitle("Stealthy")
             .setContentText(message)
             .setContentIntent(openPendingIntent)
             .setOngoing(true)
@@ -96,7 +96,7 @@ class OverRealityVpnService : VpnService(), PlatformInterface {
     override fun openTun(options: TunOptions): Int {
         logWithMetadata("openTun: called with MTU=${options.getMTU()}")
         val builder = Builder()
-            .setSession("OverREALITY")
+            .setSession("Stealthy")
             .setMtu(options.getMTU())
 
         val addr4 = options.getInet4Address()
@@ -365,7 +365,7 @@ class OverRealityVpnService : VpnService(), PlatformInterface {
             if (existing == null) {
                 val channel = NotificationChannel(
                     channelId,
-                    "OverREALITY VPN",
+                    "Stealthy VPN",
                     NotificationManager.IMPORTANCE_DEFAULT,
                 )
                 nm.createNotificationChannel(channel)

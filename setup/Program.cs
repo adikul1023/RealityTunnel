@@ -11,10 +11,10 @@ class Program
 {
     static void Main(string[] args)
     {
-        Console.Title = "OverREALITY Client Setup";
+        Console.Title = "Stealthy Client Setup";
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine("=================================================");
-        Console.WriteLine("          OverREALITY VPN Client Setup           ");
+        Console.WriteLine("          Stealthy VPN Client Setup           ");
         Console.WriteLine("=================================================");
         Console.ResetColor();
         Console.WriteLine();
@@ -153,7 +153,7 @@ class Program
         try
         {
             string envContent = 
-                $"# OverREALITY — server credentials\n" +
+                $"# Stealthy — server credentials\n" +
                 $"# Keep this file private. Never commit it to git.\n\n" +
                 $"VPN_UUID={uuid}\n" +
                 $"VPN_PUBLIC_KEY={publicKey}\n" +
@@ -179,7 +179,7 @@ class Program
         try
         {
             string desktopDir = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-            string shortcutPath = Path.Combine(desktopDir, "OverREALITY.lnk");
+            string shortcutPath = Path.Combine(desktopDir, "Stealthy.lnk");
             string targetPath = Path.Combine(installDir, "RealityTunnel.exe");
 
             // Write shortcut using PowerShell script
@@ -217,7 +217,7 @@ class Program
         Console.WriteLine("        Installation Completed Successfully!     ");
         Console.ResetColor();
         Console.WriteLine("=================================================");
-        Console.WriteLine("\nYou can now double-click the 'OverREALITY' shortcut on your Desktop to run the app.");
+        Console.WriteLine("\nYou can now double-click the 'Stealthy' shortcut on your Desktop to run the app.");
         Console.WriteLine("\nPress any key to exit...");
         Console.ReadKey();
     }
