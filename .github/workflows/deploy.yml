@@ -1,0 +1,85 @@
+name: Deploy Billing API to Oracle
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'billing-server/**'
+      - '.github/workflows/deploy.yml'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./billing-server
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    steps:
+      - name: Deploy to Oracle
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ORACLE_HOST }}
+          username: ${{ secrets.ORACLE_USER }}
+          key: ${{ secrets.ORACLE_SSH_KEY }}
+          script: |
+            cd /opt/realitytunnel/current
+            
+            # Export DOCKER_IMAGE explicitly for the docker-compose file
+            export DOCKER_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+            
+            # Use sed to ensure DOCKER_IMAGE is in .env so docker-compose picks it up automatically
+            if grep -q "^DOCKER_IMAGE=" .env; then
+                sudo sed -i "s|^DOCKER_IMAGE=.*|DOCKER_IMAGE=$DOCKER_IMAGE|g" .env
+            else
+                echo "DOCKER_IMAGE=$DOCKER_IMAGE" | sudo tee -a .env
+            fi
+            
+            # Login to GHCR using a Personal Access Token (PAT) with read:packages scope
+            echo "${{ secrets.GHCR_PAT }}" | sudo docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            
+            # Pull the latest image
+            sudo docker compose -p 09a78c2b9503db66b6ac31aed64f650faba94d67 -f docker-compose.prod.yml pull billing-api
+            
+            # Restart the container
+            sudo docker compose -p 09a78c2b9503db66b6ac31aed64f650faba94d67 -f docker-compose.prod.yml up -d --force-recreate billing-api
+            
+            # Clean up dangling images
+            sudo docker image prune -f

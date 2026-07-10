@@ -210,12 +210,19 @@ class LifecycleJobService:
                 await self.session.rollback()
 
         try:
-            payment_ok = await self.payment_service.check_provider_health()
+            from app.core.feature_flags import flags
+            if not flags.payments_enabled:
+                payment_ok = True
+                message = "Payment Gateway disabled via PAYMENTS_ENABLED"
+            else:
+                payment_ok = await self.payment_service.check_provider_health()
+                message = "Payment Gateway reachable" if payment_ok else "Payment Gateway health check failed"
+                
             results["payment_gateway"] = payment_ok
             await self.health_repo.upsert_status(
                 "payment_gateway",
                 status="ok" if payment_ok else "degraded",
-                message="Payment Gateway reachable" if payment_ok else "Payment Gateway health check failed",
+                message=message,
                 checked_at=now,
             )
         except Exception as exc:

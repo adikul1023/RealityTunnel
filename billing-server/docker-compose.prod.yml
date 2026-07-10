@@ -121,11 +121,12 @@ services:
       # Marzban and Razorpay credentials to be present unless these flags are explicitly
       # disabled. Pass them through from the host environment (leave unset/blank and set the
       # corresponding *_ENABLED flag to "false" for any subsystem not yet in use).
-      PAYMENTS_ENABLED: ${PAYMENTS_ENABLED:-true}
+      PAYMENTS_ENABLED: ${PAYMENTS_ENABLED:-false}
       PROVISIONING_ENABLED: ${PROVISIONING_ENABLED:-true}
       WEBHOOKS_ENABLED: ${WEBHOOKS_ENABLED:-true}
       MARZBAN_BASE_URL: ${MARZBAN_BASE_URL:-}
       MARZBAN_API_TOKEN: ${MARZBAN_API_TOKEN:-}
+      MARZBAN_CERT_PATH: ${MARZBAN_CERT_PATH:-}
       RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
       RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
       RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
@@ -154,6 +155,7 @@ services:
     # Caddy is the only public ingress, proxying via Docker network.
     networks:
       - internal_net
+      - ingress_net
     depends_on:
       postgres:
         condition: service_healthy
