@@ -48,7 +48,10 @@ class SecureStorage(context: Context) {
         return try {
             gson.fromJson(json, JwtTokens::class.java)
         } catch (e: Exception) {
-            sharedPrefs.edit().remove("jwt_tokens").apply()
+            sharedPrefs.edit()
+                .putString("jwt_tokens.corrupt", json)
+                .remove("jwt_tokens")
+                .apply()
             null
         }
     }
@@ -62,7 +65,10 @@ class SecureStorage(context: Context) {
         return try {
             gson.fromJson(json, LicenseBlob::class.java)
         } catch (e: Exception) {
-            sharedPrefs.edit().remove("license_blob").apply()
+            sharedPrefs.edit()
+                .putString("license_blob.corrupt", json)
+                .remove("license_blob")
+                .apply()
             null
         }
     }
@@ -76,7 +82,10 @@ class SecureStorage(context: Context) {
         return try {
             gson.fromJson(json, VpnProfileDto::class.java)
         } catch (e: Exception) {
-            sharedPrefs.edit().remove("vpn_profile").apply()
+            sharedPrefs.edit()
+                .putString("vpn_profile.corrupt", json)
+                .remove("vpn_profile")
+                .apply()
             null
         }
     }

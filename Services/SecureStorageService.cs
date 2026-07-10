@@ -51,6 +51,13 @@ public class SecureStorageService
         }
         catch
         {
+            try
+            {
+                string corruptPath = path + ".corrupt";
+                if (File.Exists(corruptPath)) File.Delete(corruptPath);
+                File.Move(path, corruptPath);
+            }
+            catch { }
             return null;
         }
         finally
@@ -124,7 +131,13 @@ public class SecureStorageService
         }
         catch
         {
-            try { File.Delete(path); } catch { }
+            try
+            {
+                string corruptPath = path + ".corrupt";
+                if (File.Exists(corruptPath)) File.Delete(corruptPath);
+                File.Move(path, corruptPath);
+            }
+            catch { }
             return default;
         }
     }
