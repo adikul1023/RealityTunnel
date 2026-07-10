@@ -92,6 +92,7 @@ class Settings(BaseSettings):
     marzban_delete_user_path: str = "/api/user/{username}"  # [Internal Config]
     marzban_reset_user_path: str = "/api/user/{username}/reset"  # [Internal Config]
     marzban_system_stats_path: str = "/api/system"  # [Internal Config]
+    marzban_cert_path: str | None = None  # [Internal Config] path to Marzban's self-signed CA bundle if applicable
 
     # ── Payment Gateway (Razorpay Integration) [Internal Config / Secret] ────
     razorpay_key_id: str = ""  # [Internal Config / Public ID]

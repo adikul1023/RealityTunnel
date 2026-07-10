@@ -76,7 +76,10 @@ class MarzbanProvisioningProvider(ProvisioningProvider):
                         timeout=self.timeout,
                     )
                 else:
-                    async with httpx.AsyncClient(timeout=self.timeout) as client:
+                    async with httpx.AsyncClient(
+                        timeout=self.timeout,
+                        verify=settings.marzban_cert_path if settings.marzban_cert_path else True,
+                    ) as client:
                         response = await client.request(
                             method,
                             url,
