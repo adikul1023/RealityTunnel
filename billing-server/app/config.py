@@ -70,6 +70,12 @@ class Settings(BaseSettings):
     # ── Server [Public Config] ─────────────────────────────────────────────
     host: str = "0.0.0.0"  # [Public Config]
     port: int = 8080  # [Public Config]
+    cors_allowed_origins: list[str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://stealthy.co.in",
+        "https://www.stealthy.co.in",
+    ]  # [Public Config]
 
     # ── Security [Security Secret / Public Config] ───────────────────────────
     # secret_key is reserved for future HMAC-based operations (e.g., cookie signing).
@@ -166,7 +172,7 @@ class Settings(BaseSettings):
         "geolocation=(), microphone=(), camera=()"  # [Operational Parameter]
     )
     security_coop: str = "same-origin"  # [Operational Parameter]
-    security_corp: str = "same-origin"  # [Operational Parameter]
+    security_corp: str = "cross-origin"  # [Operational Parameter]
     security_coep: str = "require-corp"  # [Operational Parameter]
     max_payload_size_bytes: int = 1048576  # [Operational Parameter] 1 MB default
     csrf_allowed_origins: str = "http://localhost:8080,http://127.0.0.1:8080"  # [Internal Config] comma-separated
