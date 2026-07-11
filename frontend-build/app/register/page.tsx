@@ -7,6 +7,7 @@ import {
   Download,
   CheckCircle2,
   AlertCircle,
+  RefreshCw,
 } from 'lucide-react'
 import { StealthyLogo } from '@/components/ui/logo'
 
