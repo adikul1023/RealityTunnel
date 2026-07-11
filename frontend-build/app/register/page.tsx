@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import { StealthyLogo } from '@/components/ui/logo'
 import { useRouter } from 'next/navigation'
-import { api, getOrCreateDeviceGuid, ApiError } from '@/lib/api'
+import { api, getOrCreateDeviceGuid, setSession, isAuthenticated, ApiError } from '@/lib/api'
 import TwoFactorPanel from '@/components/ui/TwoFactorPanel'
 
 export default function RegisterPage() {
@@ -44,13 +44,21 @@ export default function RegisterPage() {
       // Automatically authenticate so optional 2FA setup can be performed immediately
       try {
         const deviceGuid = getOrCreateDeviceGuid()
-        await api.login({
+        const loginRes = await api.login({
           account_id: res.account_id,
           master_token: res.master_token,
           device_guid: deviceGuid,
         })
+        // Store session so TwoFactorPanel (and any other auth-gated calls on
+        // this page) can immediately make authenticated API requests.
+        setSession({
+          accessToken: loginRes.access_token,
+          refreshToken: loginRes.refresh_token,
+          expiresAt: Date.now() + loginRes.expires_in * 1000,
+          accountId: res.account_id,
+        })
       } catch {
-        // Continue even if immediate auto-login fails
+        // Non-fatal: user can still proceed and log in manually on /login
       }
 
       setStep('confirm')
@@ -87,9 +95,13 @@ export default function RegisterPage() {
   }
 
   function handleContinue() {
-    router.push(
-      `/login?registered=1&credential=${encodeURIComponent(combinedCredential)}`
-    )
+    // If auto-login succeeded a session is already stored — go straight to dashboard.
+    // If it failed (network error, etc.) fall back to login with the credential pre-filled.
+    if (isAuthenticated()) {
+      router.push('/dashboard')
+    } else {
+      router.push(`/login?registered=1&credential=${encodeURIComponent(combinedCredential)}`)
+    }
   }
 
   return (
