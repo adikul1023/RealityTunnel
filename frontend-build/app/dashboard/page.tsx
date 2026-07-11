@@ -309,9 +309,15 @@ function DevicesTab({
 
 // ─── Tab: Billing History ─────────────────────────────────────────────────────
 function BillingTab({ transactions }: { transactions: BillingPaymentDto[] }) {
-  const totalPaid = transactions
-    .filter((t) => t.status.toLowerCase() === 'paid')
-    .reduce((s, t) => s + (t.amount || 0), 0)
+  const list = Array.isArray(transactions)
+    ? transactions
+    : Array.isArray((transactions as any)?.payments)
+    ? (transactions as any).payments
+    : []
+
+  const totalPaid = list
+    .filter((t) => (t?.status || '').toLowerCase() === 'paid')
+    .reduce((s, t) => s + (t?.amount || 0), 0)
 
   return (
     <div className="space-y-5">
@@ -335,15 +341,15 @@ function BillingTab({ transactions }: { transactions: BillingPaymentDto[] }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {transactions.length === 0 ? (
+              {list.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-6 py-10 text-center text-muted-foreground">
                     No payment transactions recorded.
                   </td>
                 </tr>
               ) : (
-                transactions.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-muted/20 transition-colors">
+                list.map((tx, idx) => (
+                  <tr key={tx.id || (tx as any).payment_id || idx} className="hover:bg-muted/20 transition-colors">
                     <td className="px-6 py-3 text-muted-foreground whitespace-nowrap">{formatDate(tx.created_at)}</td>
                     <td className="px-6 py-3 text-foreground">{tx.description || 'Subscription Payment'}</td>
                     <td className="px-6 py-3 text-right font-medium text-foreground whitespace-nowrap">
@@ -527,11 +533,16 @@ export default function DashboardPage() {
 
       const profileData = results[0].status === 'fulfilled' ? results[0].value : null
       const devicesRes = results[1].status === 'fulfilled' ? results[1].value : { devices: [] }
-      const billingRes = results[2].status === 'fulfilled' ? results[2].value : []
+      const rawBilling = results[2].status === 'fulfilled' ? results[2].value : []
+      const billingList = Array.isArray(rawBilling)
+        ? rawBilling
+        : Array.isArray((rawBilling as any)?.payments)
+        ? (rawBilling as any).payments
+        : []
 
       if (profileData) setProfile(profileData)
-      setDevices(devicesRes?.devices || [])
-      setTransactions(billingRes || [])
+      setDevices(Array.isArray(devicesRes?.devices) ? devicesRes.devices : [])
+      setTransactions(billingList)
 
       if (results[0].status === 'rejected') {
         const err = results[0].reason
