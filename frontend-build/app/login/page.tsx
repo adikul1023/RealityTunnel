@@ -66,8 +66,8 @@ export default function LoginPage() {
     const trimmed = value.trim()
     const colonIdx = trimmed.indexOf(':')
     if (colonIdx === -1) return null
-    const accountId = trimmed.slice(0, colonIdx).trim().toUpperCase()
-    const masterToken = trimmed.slice(colonIdx + 1).trim()
+    const accountId = trimmed.slice(0, colonIdx).replace(/\s+/g, '').toUpperCase()
+    const masterToken = trimmed.slice(colonIdx + 1).replace(/\s+/g, '')
     if (!accountId || !masterToken) return null
     return { accountId, masterToken }
   }

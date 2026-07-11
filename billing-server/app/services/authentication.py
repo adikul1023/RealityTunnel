@@ -38,10 +38,11 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from app.exceptions import RepositoryError
+from app.config import settings
 from app.models.account import Account
 from app.models.base import SubscriptionStatus
 from app.repositories.account_repository import AccountRepository
-from app.security import verify_master_token, SHA256_HEX_LENGTH
+from app.security import hash_master_token, verify_master_token, SHA256_HEX_LENGTH
 from app.services.exceptions import AuthenticationServiceError, AccountNotActiveError
 
 logger = logging.getLogger(__name__)
@@ -145,9 +146,12 @@ class AuthenticationService:
         LOGGING INVARIANT:
         Never logs Account IDs, Master Tokens, or token hashes. Logs only generic outcome descriptions.
         """
+        account_id_clean = account_id.strip().upper() if isinstance(account_id, str) else account_id
+        master_token_clean = master_token.strip() if isinstance(master_token, str) else master_token
+
         # Step 1: Find Account via repository
         try:
-            account = await self.account_repo.get_by_account_id(account_id)
+            account = await self.account_repo.get_by_account_id(account_id_clean)
         except RepositoryError as e:
             logger.error("Authentication failed due to repository error")
             raise AuthenticationServiceError("Database error during authentication lookup") from e
@@ -161,7 +165,7 @@ class AuthenticationService:
             # Always execute verify_master_token against a dummy hash so that hashing and constant-time
             # comparison execute even when the account does not exist. This prevents account enumeration
             # based on response timing differences.
-            verify_master_token(master_token, DUMMY_MASTER_TOKEN_HASH)
+            verify_master_token(master_token_clean, DUMMY_MASTER_TOKEN_HASH)
             logger.info("Authentication failed: invalid credentials")
             return AuthenticationResult(
                 success=False,
@@ -170,7 +174,16 @@ class AuthenticationService:
             )
 
         # Step 3: Verify Master Token
-        if not verify_master_token(master_token, account.master_token_hash):
+        matched = verify_master_token(master_token_clean, account.master_token_hash)
+        if settings.environment.lower() != "production":
+            computed_hash = hash_master_token(master_token_clean)
+            logger.debug(
+                "DEV AUDIT [Login]: computed_hash=%s, stored_hash=%s, matched=%s",
+                computed_hash,
+                account.master_token_hash,
+                matched,
+            )
+        if not matched:
             logger.info("Authentication failed: invalid credentials")
             return AuthenticationResult(
                 success=False,

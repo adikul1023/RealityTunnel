@@ -74,3 +74,10 @@ def test_verify_master_token():
     assert verify_master_token(token, "0000000000000000000000000000000000000000000000000000000000000000") is False
     assert verify_master_token(12345, expected_hash) is False # type: ignore
     assert verify_master_token(token, None) is False # type: ignore
+
+
+def test_verify_master_token_whitespace_and_case():
+    """Verify verify_master_token handles trailing/leading whitespace and case formatting."""
+    token = "raw_master_token_value"
+    expected_hash = hash_master_token(token)
+    assert verify_master_token(f"  {token} \n", expected_hash.upper()) is True

@@ -61,11 +61,13 @@ def verify_master_token(token: str, expected_hash: str) -> bool:
     """
     if not isinstance(token, str) or not isinstance(expected_hash, str):
         return False
+    token_clean = token.strip()
+    expected_clean = expected_hash.strip().lower()
     try:
-        computed_hash = hash_master_token(token)
+        computed_hash = hash_master_token(token_clean).lower()
     except (TypeError, ValueError):
         return False
-    return compare_secrets(computed_hash, expected_hash)
+    return compare_secrets(computed_hash, expected_clean)
 
 
 def hash_refresh_token(token: str) -> str:

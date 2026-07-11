@@ -46,6 +46,15 @@ from app.services import (
     TOTPService,
 )
 from app.models.admin_user import AdminUser
+from app.services.exceptions import (
+    AccountNotActiveError,
+    InvalidAudienceError,
+    InvalidIssuerError,
+    InvalidSignatureError,
+    InvalidTokenError,
+    TokenExpiredError,
+    TokenNotYetValidError,
+)
 
 
 
@@ -171,44 +180,80 @@ async def get_current_account(
     """
     auth_header = request.headers.get("Authorization")
     if not auth_header:
-        logger.info("Authentication failed")
+        logger.info("Authentication failed: Missing Authorization header")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication failed or token invalid",
+            detail="Missing Authorization header",
         )
 
     parts = auth_header.split()
     if len(parts) != 2 or parts[0] != "Bearer":
-        logger.info("Authentication failed")
+        logger.info("Authentication failed: Invalid Authorization header format")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication failed or token invalid",
+            detail="Invalid Authorization header format. Expected Bearer token",
         )
 
     token = parts[1].strip()
     if not token:
-        logger.info("Authentication failed")
+        logger.info("Authentication failed: Empty Bearer token")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication failed or token invalid",
+            detail="Missing Bearer token",
         )
 
     try:
         claims = jwt_service.verify_access_token(token)
-    except Exception:
-        logger.info("Token invalid")
+    except TokenExpiredError:
+        logger.info("Authentication failed: Token expired")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication failed or token invalid",
+            detail="Access token has expired",
+        )
+    except TokenNotYetValidError:
+        logger.info("Authentication failed: Token not yet valid")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Access token is not yet valid",
+        )
+    except InvalidSignatureError:
+        logger.info("Authentication failed: Invalid signature")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid access token signature",
+        )
+    except InvalidIssuerError:
+        logger.info("Authentication failed: Wrong issuer")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid access token issuer",
+        )
+    except InvalidAudienceError:
+        logger.info("Authentication failed: Wrong audience")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid access token audience",
+        )
+    except Exception as exc:
+        logger.info("Authentication failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid access token",
         )
 
     try:
         account = await auth_service.get_active_account_by_uuid(uuid.UUID(claims.sub))
-    except Exception:
-        logger.info("Authentication failed")
+    except AccountNotActiveError as exc:
+        logger.info("Authentication failed: Account inactive (%s)", exc)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication failed or token invalid",
+            detail=f"Account inactive: {exc}",
+        )
+    except Exception as exc:
+        logger.info("Authentication failed: Account lookup error (%s)", exc)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed or account invalid",
         )
 
     logger.info("Authentication succeeded")

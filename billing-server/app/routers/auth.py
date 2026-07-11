@@ -40,9 +40,11 @@ import string
 from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.config import settings
 from app.database import get_db
 from app.models import ExchangeToken
 from app.models.base import SubscriptionStatus
+from app.security import hash_master_token
 from app.rate_limit import require_rate_limit, RateLimiter, get_rate_limiter, KeyType
 from app.routers.auth_models import (
     AccountMeResponse,
@@ -139,7 +141,9 @@ async def register_account(
         account_id = f"ST-{uuid.uuid4().hex[:8].upper()}"
 
     master_token = secrets.token_hex(32)
-    master_token_hash = hashlib.sha256(master_token.encode("utf-8")).hexdigest()
+    master_token_hash = hash_master_token(master_token)
+    if settings.environment.lower() != "production":
+        logger.debug("DEV AUDIT [Register]: generated_hash=%s", master_token_hash)
 
     account = Account(
         account_id=account_id,
