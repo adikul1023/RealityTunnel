@@ -151,7 +151,7 @@ export default function TwoFactorPanel({
 
   const downloadBackupCodes = (codes: string[]) => {
     const text = [
-      'RealityTunnel Two-Factor Authentication Backup Codes',
+      'Stealthy Two-Factor Authentication Backup Codes',
       '==================================================',
       'Store these codes in a safe, offline location.',
       'Each code can only be used ONCE.',
@@ -163,7 +163,7 @@ export default function TwoFactorPanel({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'realitytunnel-backup-codes.txt';
+    a.download = 'stealthy-backup-codes.txt';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

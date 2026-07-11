@@ -22,6 +22,16 @@ class LoginRequest(BaseModel):
         json_schema_extra={"writeOnly": True},
     )
     device_guid: str = Field(..., description="Unique hardware or installation identifier")
+    two_fa_code: str | None = Field(
+        default=None,
+        description="Optional 6-digit TOTP code or backup code, required when Two-Factor Authentication is enabled",
+    )
+
+
+class LoginChallengeResponse(BaseModel):
+    """Response returned when Two-Factor Authentication is required to complete login (HTTP 401)."""
+    detail: str = Field(default="Two-factor authentication required")
+    requires_2fa: bool = Field(default=True, description="Indicates TOTP code must be provided to proceed")
 
 
 class RegisterAccountRequest(BaseModel):

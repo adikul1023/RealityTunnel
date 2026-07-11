@@ -21,6 +21,7 @@ import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 
 from app.dependencies import (
     get_auth_service,
@@ -29,6 +30,7 @@ from app.dependencies import (
     get_jwt_service,
     get_refresh_service,
     get_signal_service,
+    get_totp_service,
 )
 from app.models.account import Account
 from app.models.connection_signal import ConnectionEventType
@@ -52,6 +54,7 @@ from app.routers.auth_models import (
     ExchangeRequest,
     ExchangeResponse,
     InactiveDeviceErrorResponse,
+    LoginChallengeResponse,
     LoginRequest,
     LoginResponse,
     LogoutRequest,
@@ -187,7 +190,9 @@ async def login(
     device_service: DeviceService = Depends(get_device_service),
     signal_service: ConnectionSignalService = Depends(get_signal_service),
     limiter: RateLimiter = Depends(get_rate_limiter),
-) -> LoginResponse:
+    db: AsyncSession = Depends(get_db),
+    totp_service=Depends(get_totp_service),
+) -> Union[LoginResponse, JSONResponse]:
     """
     Authenticate Account ID and Master Token credential pair.
     On success, issues a short-lived Ed25519 Access JWT and a long-lived rotated Refresh Token.
@@ -214,6 +219,64 @@ async def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication failed: invalid credentials or inactive account",
         )
+
+    # ── Two-Factor Authentication check ─────────────────────────────────────
+    # This check runs AFTER credential verification so we don't leak whether 2FA is
+    # enabled on an account that doesn't even have valid credentials.
+    account = result.account
+    if account.totp_enabled:
+        if not request.two_fa_code:
+            # Credentials are valid but TOTP code has not been provided yet.
+            # Signal the frontend to show the TOTP input field and await a second request.
+            logger.info("Login challenge: Two-factor authentication required")
+            return JSONResponse(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                content={
+                    "detail": "Two-factor authentication required",
+                    "requires_2fa": True,
+                },
+            )
+
+        # A TOTP code was provided — verify it.
+        totp_verified = False
+        code_str = request.two_fa_code.strip()
+
+        # Try live TOTP first (6-digit numeric code).
+        if account.totp_secret_encrypted:
+            try:
+                secret = totp_service.decrypt_secret(account.totp_secret_encrypted)
+                if totp_service.verify_totp(secret, code_str):
+                    totp_verified = True
+            except Exception as exc:
+                logger.error("Failed to decrypt TOTP secret during login for account (id redacted): %s", type(exc).__name__)
+
+        # If live TOTP failed, try backup code (consumes it if valid).
+        if not totp_verified and account.totp_backup_codes_json:
+            backup_valid, updated_hashes_json = totp_service.verify_and_consume_backup_code(
+                account.totp_backup_codes_json, code_str
+            )
+            if backup_valid:
+                totp_verified = True
+                # Consume the backup code — persist the updated (shorter) list.
+                account.totp_backup_codes_json = updated_hashes_json
+                db.add(account)
+                await db.commit()
+                logger.info("Login: backup code consumed")
+
+        if not totp_verified:
+            logger.info("Login failed: invalid two-factor authentication code")
+            await safe_record_signal(
+                signal_service,
+                account_id=account.id,
+                event_type=ConnectionEventType.LOGIN,
+                success=False,
+                device_guid=request.device_guid,
+                http_request=http_request,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication failed: invalid two-factor authentication code",
+            )
 
     try:
         await device_service.register_device(
