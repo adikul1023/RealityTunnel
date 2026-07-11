@@ -519,19 +519,27 @@ export default function DashboardPage() {
     setLoading(true)
     setError('')
     try {
-      const [profileData, devicesRes, billingRes] = await Promise.all([
+      const results = await Promise.allSettled([
         api.getClientMe(),
-        api.listDevices().catch(() => ({ devices: [] })),
-        api.getBillingHistory().catch(() => []),
+        api.listDevices(),
+        api.getBillingHistory(),
       ])
-      setProfile(profileData)
-      setDevices(devicesRes.devices || [])
+
+      const profileData = results[0].status === 'fulfilled' ? results[0].value : null
+      const devicesRes = results[1].status === 'fulfilled' ? results[1].value : { devices: [] }
+      const billingRes = results[2].status === 'fulfilled' ? results[2].value : []
+
+      if (profileData) setProfile(profileData)
+      setDevices(devicesRes?.devices || [])
       setTransactions(billingRes || [])
-    } catch (err: any) {
-      if (err instanceof ApiError && err.status === 401) {
-        router.replace('/login')
-      } else {
-        setError(err.message || 'Failed to connect to Oracle Billing Server.')
+
+      if (results[0].status === 'rejected') {
+        const err = results[0].reason
+        if (err instanceof ApiError && err.status === 401) {
+          router.replace('/login')
+          return
+        }
+        setError(err?.message || 'Could not load profile from Oracle Billing Server.')
       }
     } finally {
       setLoading(false)

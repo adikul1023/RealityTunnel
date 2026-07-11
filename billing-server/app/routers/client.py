@@ -8,9 +8,13 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+from sqlalchemy import select, func
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database import get_db
 from app.dependencies import get_current_account
 from app.models.account import Account
+from app.models.device import Device
 from app.security import JWTService
 
 router = APIRouter(prefix="/api/client", tags=["Client"])
@@ -84,16 +88,28 @@ class ClientMeResponse(BaseModel):
 )
 async def get_client_me(
     current_account: Account = Depends(get_current_account),
+    db: AsyncSession = Depends(get_db),
 ) -> ClientMeResponse:
     """
     Supersedes /api/auth/me by providing additional UI-specific details like device count and 2FA status.
     """
+    res = await db.execute(
+        select(func.count(Device.id)).where(Device.account_id == current_account.id)
+    )
+    device_count = res.scalar() or 0
+
+    status_val = (
+        current_account.status.value
+        if hasattr(current_account.status, "value")
+        else str(current_account.status)
+    )
+
     return ClientMeResponse(
         account_id=current_account.account_id,
-        status=current_account.status.value,
+        status=status_val,
         subscription_expires_at=current_account.subscription_expires_at,
-        device_count=len(current_account.devices) if current_account.devices else 0,
-        plan=current_account.plan_id,
+        device_count=device_count,
+        plan=current_account.plan_id or "free",
         email=getattr(current_account, "email", None),
         two_factor_enabled=getattr(current_account, "totp_secret", None) is not None,
     )
