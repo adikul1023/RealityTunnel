@@ -93,5 +93,9 @@ jobs:
             # Restart the container
             sudo docker compose -p 09a78c2b9503db66b6ac31aed64f650faba94d67 -f docker-compose.prod.yml up -d --force-recreate billing-api
             
+            # Wait for container initialization and apply database migrations
+            sleep 5
+            sudo docker compose -p 09a78c2b9503db66b6ac31aed64f650faba94d67 -f docker-compose.prod.yml exec -T billing-api alembic upgrade head
+            
             # Clean up dangling images
             sudo docker image prune -f
