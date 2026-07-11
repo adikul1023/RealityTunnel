@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import { StealthyLogo } from '@/components/ui/logo'
 import { useRouter } from 'next/navigation'
-import { api, getOrCreateDeviceGuid, setSession, isAuthenticated, ApiError } from '@/lib/api'
+import { api, rotateDeviceGuid, setSession, isAuthenticated, ApiError } from '@/lib/api'
 import TwoFactorPanel from '@/components/ui/TwoFactorPanel'
 
 export default function RegisterPage() {
@@ -43,7 +43,7 @@ export default function RegisterPage() {
 
       // Automatically authenticate so optional 2FA setup can be performed immediately
       try {
-        const deviceGuid = getOrCreateDeviceGuid()
+        const deviceGuid = rotateDeviceGuid()
         const loginRes = await api.login({
           account_id: res.account_id,
           master_token: res.master_token,

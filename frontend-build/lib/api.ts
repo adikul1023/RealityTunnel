@@ -22,7 +22,12 @@ export interface AuthSession {
   expiresAt: number; // Unix timestamp in ms
   accountId: string;
 }
-
+export function rotateDeviceGuid(): string {
+  if (typeof window === 'undefined') return 'server-side-render';
+  const guid = 'WEB-' + Math.random().toString(36).substring(2, 10).toUpperCase() + '-' + Date.now().toString(36).toUpperCase();
+  localStorage.setItem(DEVICE_GUID_KEY, guid);
+  return guid;
+}
 const SESSION_KEY = 'stealthy_auth_session';
 
 export function getSession(): AuthSession | null {
