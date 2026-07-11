@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'Stealthy — Secure Private Network Access',
   description:
-    'Stealthy provides encrypted, private network access with no activity logs. Anonymous account-key authentication, no email required.',
+    'Stealthy provides encrypted, private network access with no activity logs. Anonymous master-token authentication, no email required.',
   generator: 'v0.app',
   keywords: [
     'secure connection',
@@ -17,6 +17,9 @@ export const metadata: Metadata = {
     'privacy layer',
     'anonymous',
   ],
+  other: {
+    'darkreader-lock': 'true',
+  },
 }
 
 export const viewport: Viewport = {
@@ -30,8 +33,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="bg-background">
-      <body className={`${inter.className} antialiased`}>
+    <html lang="en" className="bg-background" suppressHydrationWarning>
+      <body className={`${inter.className} antialiased`} suppressHydrationWarning>
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>

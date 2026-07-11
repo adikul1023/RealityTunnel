@@ -27,15 +27,15 @@ export default function TermsPage() {
               <p className="text-sm text-muted-foreground leading-relaxed">
                 Stealthy provides a private network access service that encrypts your internet traffic and
                 routes it through our server infrastructure. The service is provided on a subscription basis.
-                Access requires a valid 32-character account key and an active paid plan.
+                Access requires a valid 32-character master token and an active paid plan.
               </p>
             </LegalSection>
 
-            <LegalSection title="3. Account key and authentication">
+            <LegalSection title="3. Master token and authentication">
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Your account key is your sole authentication credential. It is generated on your device and
+                Your master token is your sole authentication credential. It is generated on your device and
                 is your responsibility to store securely. Stealthy does not retain a copy of your plaintext
-                account key and cannot recover it under any circumstances. Loss of your account key means
+                master token and cannot recover it under any circumstances. Loss of your master token means
                 permanent loss of access to the associated account and any remaining subscription period.
               </p>
             </LegalSection>
@@ -84,7 +84,7 @@ export default function TermsPage() {
               <p className="text-sm text-muted-foreground leading-relaxed">
                 We reserve the right to suspend or terminate accounts that violate these Terms. You may
                 cancel your subscription at any time, subject to the terms in our Refund &amp; Cancellation
-                Policy. On termination, your account key is invalidated and access is revoked.
+                Policy. On termination, your master token is invalidated and access is revoked.
               </p>
             </LegalSection>
 

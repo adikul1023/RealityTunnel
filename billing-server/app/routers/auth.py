@@ -35,11 +35,14 @@ from app.models.connection_signal import ConnectionEventType
 from typing import Union
 
 import hashlib
+import secrets
+import string
 from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models import ExchangeToken
+from app.models.base import SubscriptionStatus
 from app.rate_limit import require_rate_limit, RateLimiter, get_rate_limiter, KeyType
 from app.routers.auth_models import (
     AccountMeResponse,
@@ -52,6 +55,8 @@ from app.routers.auth_models import (
     LogoutRequest,
     RefreshRequest,
     RefreshResponse,
+    RegisterAccountRequest,
+    RegisterAccountResponse,
     SuccessResponse,
 )
 from app.security import JWTService
@@ -100,6 +105,56 @@ async def safe_record_signal(
         )
     except Exception as exc:
         logger.error("Failed to record connection signal: %s", exc)
+
+
+@router.post(
+    "/register",
+    summary="Create a new customer account and return one-time credentials",
+    response_model=RegisterAccountResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"description": "Validation error"},
+        429: {"description": "Rate limit exceeded"},
+        500: {"description": "Unexpected database error"},
+    },
+)
+async def register_account(
+    request: RegisterAccountRequest,
+    db: AsyncSession = Depends(get_db),
+) -> RegisterAccountResponse:
+    """
+    Create a new account with generated Account ID and secret Master Token.
+    Returns credentials exactly once for user download/acknowledgement.
+    """
+    alphabet = string.ascii_uppercase + string.digits
+    for _ in range(5):
+        block1 = "".join(secrets.choice(alphabet) for _ in range(4))
+        block2 = "".join(secrets.choice(alphabet) for _ in range(4))
+        candidate_id = f"RT-{block1}-{block2}"
+        existing = await db.execute(select(Account).where(Account.account_id == candidate_id))
+        if existing.scalar_one_or_none() is None:
+            account_id = candidate_id
+            break
+    else:
+        account_id = f"RT-{uuid.uuid4().hex[:8].upper()}"
+
+    master_token = secrets.token_hex(32)
+    master_token_hash = hashlib.sha256(master_token.encode("utf-8")).hexdigest()
+
+    account = Account(
+        account_id=account_id,
+        master_token_hash=master_token_hash,
+        plan_id=request.plan_id,
+        status=SubscriptionStatus.ACTIVE,
+    )
+    db.add(account)
+    await db.commit()
+    logger.info("Account registration succeeded")
+
+    return RegisterAccountResponse(
+        account_id=account_id,
+        master_token=master_token,
+    )
 
 
 @router.post(

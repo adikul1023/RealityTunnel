@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Shield } from 'lucide-react'
+import { StealthyLogo } from '@/components/ui/logo'
 
 export function Footer() {
   return (
@@ -8,9 +8,7 @@ export function Footer() {
         <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
           <div className="col-span-2 md:col-span-1">
             <Link href="/" className="flex items-center gap-2 mb-3">
-              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/15 ring-1 ring-primary/30">
-                <Shield className="h-3.5 w-3.5 text-primary" />
-              </div>
+              <StealthyLogo className="h-6 w-6" />
               <span className="font-semibold text-foreground">Stealthy</span>
             </Link>
             <p className="text-xs text-muted-foreground leading-relaxed max-w-xs">

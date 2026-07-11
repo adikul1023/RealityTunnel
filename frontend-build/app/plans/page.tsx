@@ -4,18 +4,17 @@ import { Nav } from '@/components/nav'
 import { Footer } from '@/components/footer'
 
 const features = [
-  { label: 'Encrypted private network access', monthly: true, yearly: true },
-  { label: 'No activity logs', monthly: true, yearly: true },
-  { label: 'Anonymous account key login', monthly: true, yearly: true },
-  { label: 'Windows client', monthly: true, yearly: true },
-  { label: 'Android client', monthly: true, yearly: true },
-  { label: 'Monthly data included', monthly: '30 GB', yearly: '40 GB' },
-  { label: 'Additional data rate', monthly: '₹10/GB', yearly: '₹10/GB' },
-  { label: 'Connected device slots', monthly: '3 devices', yearly: '5 devices' },
-  { label: 'India & global infrastructure', monthly: true, yearly: true },
-  { label: '2FA support', monthly: true, yearly: true },
-  { label: 'Priority support', monthly: false, yearly: true },
-  { label: 'Annual billing discount', monthly: false, yearly: 'Save ~18%' },
+  { label: 'Encrypted private network access', basic: true, standard: true, quarterly: true },
+  { label: 'No activity logs', basic: true, standard: true, quarterly: true },
+  { label: 'Anonymous master token login', basic: true, standard: true, quarterly: true },
+  { label: 'Windows client', basic: true, standard: true, quarterly: true },
+  { label: 'Android client', basic: true, standard: true, quarterly: true },
+  { label: 'Data included', basic: '40 GB / mo', standard: '50 GB / mo', quarterly: '150 GB / qtr' },
+  { label: 'Additional data rate', basic: '₹10/GB', standard: '₹10/GB', quarterly: '₹10/GB' },
+  { label: 'Connected device slots', basic: '1 device', standard: '2 devices', quarterly: '1 device' },
+  { label: 'India & global infrastructure', basic: true, standard: true, quarterly: true },
+  { label: '2FA support', basic: true, standard: true, quarterly: true },
+  { label: 'Priority support', basic: false, standard: false, quarterly: true },
 ]
 
 function FeatureCell({ value }: { value: boolean | string }) {
@@ -45,11 +44,11 @@ export default function PlansPage() {
           </div>
 
           {/* Pricing cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-12">
-            {/* Monthly */}
-            <div className="rounded-xl border border-border bg-card p-8 flex flex-col">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-12">
+            {/* Basic Monthly */}
+            <div className="rounded-xl border border-border bg-card p-6 flex flex-col">
               <div className="mb-6">
-                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">Monthly</p>
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">Basic Monthly</p>
                 <div className="flex items-end gap-1">
                   <span className="text-4xl font-bold text-foreground">₹69</span>
                   <span className="text-muted-foreground pb-1">/month</span>
@@ -58,7 +57,7 @@ export default function PlansPage() {
               </div>
 
               <ul className="space-y-2.5 mb-8 flex-1">
-                {['30 GB data per month', '3 connected device slots', 'All platform clients', 'Encrypted private access', 'No activity logs'].map((f) => (
+                {['40 GB data per month', '1 connected device slot', 'All platform clients', 'Encrypted private access', 'No activity logs'].map((f) => (
                   <li key={f} className="flex items-center gap-2 text-sm text-foreground">
                     <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
                     {f}
@@ -74,28 +73,60 @@ export default function PlansPage() {
                 href="/register"
                 className="block text-center rounded-md border border-border px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-muted transition-colors"
               >
-                Get started — Monthly
+                Get started
               </Link>
             </div>
 
-            {/* Yearly */}
-            <div className="rounded-xl border border-primary/40 bg-card p-8 flex flex-col relative overflow-hidden">
+            {/* Standard Monthly */}
+            <div className="rounded-xl border border-border bg-card p-6 flex flex-col">
+              <div className="mb-6">
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">Standard Monthly</p>
+                <div className="flex items-end gap-1">
+                  <span className="text-4xl font-bold text-foreground">₹99</span>
+                  <span className="text-muted-foreground pb-1">/month</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">GST included</p>
+              </div>
+
+              <ul className="space-y-2.5 mb-8 flex-1">
+                {['50 GB data per month', '2 connected device slots', 'All platform clients', 'Encrypted private access', 'No activity logs'].map((f) => (
+                  <li key={f} className="flex items-center gap-2 text-sm text-foreground">
+                    <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                    {f}
+                  </li>
+                ))}
+                <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <CheckCircle2 className="h-4 w-4 text-muted/50 flex-shrink-0" />
+                  Additional data at ₹10/GB
+                </li>
+              </ul>
+
+              <Link
+                href="/register"
+                className="block text-center rounded-md border border-border px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-muted transition-colors"
+              >
+                Get started
+              </Link>
+            </div>
+
+            {/* Quarterly */}
+            <div className="rounded-xl border border-primary/40 bg-card p-6 flex flex-col relative overflow-hidden">
               <div className="absolute top-4 right-4 flex items-center gap-1 rounded-full bg-primary/15 border border-primary/30 px-2.5 py-0.5 text-xs font-medium text-primary">
                 <Zap className="h-3 w-3" />
                 Best value
               </div>
 
               <div className="mb-6">
-                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">Yearly</p>
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">Quarterly</p>
                 <div className="flex items-end gap-1">
-                  <span className="text-4xl font-bold text-foreground">₹680</span>
-                  <span className="text-muted-foreground pb-1">/year</span>
+                  <span className="text-4xl font-bold text-foreground">₹179</span>
+                  <span className="text-muted-foreground pb-1">/quarter</span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">GST included · ≈ ₹56.67/month</p>
+                <p className="text-xs text-muted-foreground mt-1">GST included · ≈ ₹59.67/month</p>
               </div>
 
               <ul className="space-y-2.5 mb-8 flex-1">
-                {['40 GB data per month', '5 connected device slots', 'All platform clients', 'Encrypted private access', 'No activity logs', 'Priority support'].map((f) => (
+                {['150 GB data per 3 months', '1 connected device slot', 'All platform clients', 'Encrypted private access', 'No activity logs', 'Priority support'].map((f) => (
                   <li key={f} className="flex items-center gap-2 text-sm text-foreground">
                     <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
                     {f}
@@ -111,7 +142,7 @@ export default function PlansPage() {
                 href="/register"
                 className="block text-center rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
               >
-                Get started — Yearly
+                Get started
               </Link>
             </div>
           </div>
@@ -129,10 +160,13 @@ export default function PlansPage() {
                       Feature
                     </th>
                     <th className="text-center px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Monthly
+                      ₹69 Basic
+                    </th>
+                    <th className="text-center px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      ₹99 Standard
                     </th>
                     <th className="text-center px-6 py-3 text-xs font-medium text-primary uppercase tracking-wider">
-                      Yearly
+                      ₹179 Quarterly
                     </th>
                   </tr>
                 </thead>
@@ -141,10 +175,13 @@ export default function PlansPage() {
                     <tr key={row.label} className="hover:bg-muted/20 transition-colors">
                       <td className="px-6 py-3 text-foreground">{row.label}</td>
                       <td className="px-6 py-3">
-                        <FeatureCell value={row.monthly} />
+                        <FeatureCell value={row.basic} />
                       </td>
                       <td className="px-6 py-3">
-                        <FeatureCell value={row.yearly} />
+                        <FeatureCell value={row.standard} />
+                      </td>
+                      <td className="px-6 py-3">
+                        <FeatureCell value={row.quarterly} />
                       </td>
                     </tr>
                   ))}

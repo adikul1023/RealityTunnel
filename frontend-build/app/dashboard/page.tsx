@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   Shield,
@@ -19,66 +20,30 @@ import {
   Laptop,
   AlertTriangle,
   Download,
-  Linux,
+  RefreshCw,
 } from 'lucide-react'
 import { Nav } from '@/components/nav'
 import { Footer } from '@/components/footer'
+import { config } from '@/lib/config'
+import {
+  api,
+  isAuthenticated,
+  AccountMeResponse,
+  DeviceDto,
+  BillingPaymentDto,
+  ApiError,
+} from '@/lib/api'
 
-// ─── Mock data — TODO: connect to backend API ────────────────────────────────
-const MOCK_ACCOUNT = {
-  plan: 'Yearly',
-  renewalDate: '2027-07-06',
-  autoRenew: true,
-  usedGB: 23.4,
-  totalGB: 40,
-  daysLeft: 14,
-}
-
-const INITIAL_DEVICES: Device[] = [
-  { id: '1', name: 'DESKTOP-WORK', platform: 'windows', lastActive: '2026-07-06T09:15:00Z' },
-  { id: '2', name: 'Pixel 8 Pro', platform: 'android', lastActive: '2026-07-05T22:43:00Z' },
-  { id: '3', name: 'ThinkPad X1', platform: 'windows', lastActive: '2026-07-04T14:22:00Z' },
-]
-
-const PLAN_DEVICE_LIMIT = 5
-
-const TRANSACTIONS = [
-  { id: 'TXN-001', date: '2026-07-01', description: 'Yearly Plan — Renewal', amount: 680, status: 'paid', devices: 3 },
-  { id: 'TXN-002', date: '2026-06-15', description: '20 GB Data Add-on', amount: 200, status: 'paid', devices: 3 },
-  { id: 'TXN-003', date: '2026-05-28', description: '10 GB Data Add-on', amount: 100, status: 'paid', devices: 2 },
-  { id: 'TXN-004', date: '2026-05-01', description: 'Yearly Plan — Renewal', amount: 680, status: 'paid', devices: 2 },
-  { id: 'TXN-005', date: '2026-04-12', description: '5 GB Data Add-on', amount: 50, status: 'failed', devices: 2 },
-  { id: 'TXN-006', date: '2026-03-19', description: '30 GB Data Add-on', amount: 300, status: 'paid', devices: 1 },
-  { id: 'TXN-007', date: '2026-03-01', description: 'Monthly Plan — March', amount: 69, status: 'pending', devices: 1 },
-  { id: 'TXN-008', date: '2026-02-10', description: 'Yearly Plan — Renewal', amount: 680, status: 'paid', devices: 2 },
-]
-
-// For design tweak: Row 8 in the billing table should display "2 devices" in the devices column
-// and amount should show as ₹680. The JSON requests specified changes to match this state.
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-type Tab = 'credits' | 'devices' | 'billing' | 'downloads'
-type PaymentState = 'idle' | 'open' | 'processing' | 'success' | 'failed'
-type Platform = 'windows' | 'android' | 'macos'
-type TxStatus = 'paid' | 'failed' | 'pending'
-
-interface Device {
-  id: string
-  name: string
-  platform: Platform
-  lastActive: string
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-async function mockPayment(
-  _type: 'add-data' | 'upgrade' | 'downgrade',
-  _amount: number,
-): Promise<{ success: boolean }> {
-  await new Promise((r) => setTimeout(r, 1200))
-  return { success: Math.random() > 0.3 }
+function getPlanLimit(plan: string): number {
+  const lower = (plan || '').toLowerCase()
+  if (lower.includes('standard')) return 2
+  if (lower.includes('quarterly')) return 3
+  if (lower.includes('yearly')) return 5
+  return 1
 }
 
 function formatRelative(iso: string): string {
+  if (!iso) return 'Unknown'
   const diff = (Date.now() - new Date(iso).getTime()) / 1000
   if (diff < 60) return 'Just now'
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
@@ -87,22 +52,29 @@ function formatRelative(iso: string): string {
 }
 
 function formatDate(iso: string) {
+  if (!iso) return '—'
   return new Date(iso).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
+type Tab = 'credits' | 'devices' | 'billing' | 'downloads'
+type Platform = 'windows' | 'android' | 'macos' | string
+type TxStatus = 'paid' | 'failed' | 'pending' | string
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 function PlatformIcon({ platform }: { platform: Platform }) {
-  if (platform === 'android') return <Smartphone className="h-5 w-5 text-primary" />
-  if (platform === 'macos') return <Laptop className="h-5 w-5 text-primary" />
+  const lower = (platform || '').toLowerCase()
+  if (lower === 'android') return <Smartphone className="h-5 w-5 text-primary" />
+  if (lower === 'macos' || lower === 'ios') return <Laptop className="h-5 w-5 text-primary" />
   return <Monitor className="h-5 w-5 text-primary" />
 }
 
 function StatusBadge({ status }: { status: TxStatus }) {
-  const config = {
-    paid: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: 'Paid', cls: 'text-primary bg-primary/10 border-primary/20' },
-    failed: { icon: <AlertCircle className="h-3.5 w-3.5" />, label: 'Failed', cls: 'text-destructive bg-destructive/10 border-destructive/20' },
-    pending: { icon: <Clock className="h-3.5 w-3.5" />, label: 'Pending', cls: 'text-muted-foreground bg-muted border-border' },
-  }[status]
+  const s = (status || '').toLowerCase()
+  const config = s === 'paid' || s === 'success'
+    ? { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: 'Paid', cls: 'text-primary bg-primary/10 border-primary/20' }
+    : s === 'failed'
+    ? { icon: <AlertCircle className="h-3.5 w-3.5" />, label: 'Failed', cls: 'text-destructive bg-destructive/10 border-destructive/20' }
+    : { icon: <Clock className="h-3.5 w-3.5" />, label: status || 'Pending', cls: 'text-muted-foreground bg-muted border-border' }
 
   return (
     <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${config.cls}`}>
@@ -112,308 +84,137 @@ function StatusBadge({ status }: { status: TxStatus }) {
   )
 }
 
-function MockDownloadButton({ label }: { label: string }) {
+function RealDownloadButton({ label, href }: { label: string; href: string }) {
   return (
-    <button
-      type="button"
-      onClick={() => alert('TODO: connect to backend API — download link not yet available')}
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
       className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
     >
       <Download className="h-4 w-4" />
       {label}
-    </button>
+    </a>
   )
 }
 
 // ─── Tab: My Credits ──────────────────────────────────────────────────────────
-function CreditsTab() {
-  const [autoRenew, setAutoRenew] = useState(MOCK_ACCOUNT.autoRenew)
-  const [gbQty, setGbQty] = useState(5)
-  const [paymentState, setPaymentState] = useState<PaymentState>('idle')
-  const [paymentType, setPaymentType] = useState<'add-data' | 'upgrade' | 'downgrade'>('add-data')
-  const [paymentAmount, setPaymentAmount] = useState(0)
-
-  const usedPct = Math.min((MOCK_ACCOUNT.usedGB / MOCK_ACCOUNT.totalGB) * 100, 100)
-  const pricePerGB = 10
-
-  function openPayment(type: 'add-data' | 'upgrade' | 'downgrade', amount: number) {
-    setPaymentType(type)
-    setPaymentAmount(amount)
-    setPaymentState('open')
-  }
-
-  async function handlePay() {
-    setPaymentState('processing')
-    const result = await mockPayment(paymentType, paymentAmount)
-    setPaymentState(result.success ? 'success' : 'failed')
-  }
+function CreditsTab({ profile }: { profile: AccountMeResponse | null }) {
+  const plan = profile?.plan || 'Free'
+  const expiresAt = profile?.subscription_expires_at
+  const status = profile?.status || 'Active'
 
   return (
-    <>
-      <div className="space-y-5">
-        {/* Usage meter */}
-        <div className="rounded-xl border border-border bg-card p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-foreground">Data usage</h2>
-            <span className="text-sm text-muted-foreground">{MOCK_ACCOUNT.daysLeft} days remaining until renewal</span>
-          </div>
-          <div
-            className="h-2.5 w-full rounded-full bg-muted overflow-hidden mb-2"
-            role="progressbar"
-            aria-valuenow={MOCK_ACCOUNT.usedGB}
-            aria-valuemax={MOCK_ACCOUNT.totalGB}
-            aria-label="Data usage"
-          >
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{
-                width: `${usedPct}%`,
-                background: usedPct > 85 ? 'oklch(0.65 0.22 25)' : 'oklch(0.72 0.16 195)',
-              }}
-            />
-          </div>
-          <p className="text-sm text-muted-foreground">
-            {MOCK_ACCOUNT.usedGB} GB of {MOCK_ACCOUNT.totalGB} GB used this cycle
-          </p>
-        </div>
-
-        {/* Plan info */}
-        <div className="rounded-xl border border-border bg-card p-6">
-          <div className="flex items-start justify-between flex-wrap gap-4">
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Current plan</p>
-              <div className="flex items-center gap-2">
-                <Shield className="h-4 w-4 text-primary" />
-                <span className="font-semibold text-foreground">{MOCK_ACCOUNT.plan} Plan</span>
-              </div>
-              <p className="text-sm text-muted-foreground mt-1">
-                Renews on{' '}
-                {new Date(MOCK_ACCOUNT.renewalDate).toLocaleDateString('en-IN', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}{' '}
-                · ₹{MOCK_ACCOUNT.plan === 'Monthly' ? '69/month' : '680/year'} +GST
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Auto-renew</span>
-              <button
-                onClick={() => setAutoRenew(!autoRenew)}
-                className="flex items-center text-primary hover:opacity-80 transition-opacity"
-                aria-label={`Auto-renew is ${autoRenew ? 'on' : 'off'}`}
-                aria-pressed={autoRenew}
-              >
-                {autoRenew
-                  ? <ToggleRight className="h-7 w-7" />
-                  : <ToggleLeft className="h-7 w-7 text-muted-foreground" />}
-              </button>
-            </div>
-          </div>
-          <div className="mt-5 flex flex-wrap gap-2">
-            {MOCK_ACCOUNT.plan === 'Monthly' ? (
-              <button
-                onClick={() => openPayment('upgrade', 680)}
-                className="flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-              >
-                <Zap className="h-4 w-4" />
-                Upgrade to Yearly — ₹680
-              </button>
-            ) : (
-              <button
-                onClick={() => openPayment('downgrade', 69)}
-                className="flex items-center gap-1.5 rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
-              >
-                Downgrade to Monthly
-              </button>
-            )}
-            <Link
-              href="/plans"
-              className="flex items-center gap-1.5 rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
-            >
-              View all plans <ArrowUpRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-        </div>
-
-        {/* Buy more data */}
-        <div className="rounded-xl border border-border bg-card p-6">
-          <h2 className="font-semibold text-foreground mb-1">Buy more data</h2>
-          <p className="text-sm text-muted-foreground mb-5">
-            Extra data at ₹10/GB, added instantly to this cycle.
-          </p>
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setGbQty(Math.max(1, gbQty - 1))}
-                className="flex h-8 w-8 items-center justify-center rounded-md border border-border hover:bg-muted transition-colors"
-                aria-label="Decrease"
-              >
-                <Minus className="h-4 w-4" />
-              </button>
-              <span className="w-16 text-center font-semibold text-foreground">{gbQty} GB</span>
-              <button
-                onClick={() => setGbQty(Math.min(100, gbQty + 1))}
-                className="flex h-8 w-8 items-center justify-center rounded-md border border-border hover:bg-muted transition-colors"
-                aria-label="Increase"
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-            </div>
-            <span className="text-xl font-bold text-foreground">₹{gbQty * pricePerGB}</span>
-            <button
-              onClick={() => openPayment('add-data', gbQty * pricePerGB)}
-              className="ml-auto flex items-center gap-1.5 rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
-            >
-              Pay &amp; add data
-            </button>
-          </div>
+    <div className="space-y-5">
+      {/* Read-Only Billing Mode Notice */}
+      <div className="rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm text-foreground flex items-center gap-3">
+        <Shield className="h-5 w-5 text-primary flex-shrink-0" />
+        <div>
+          <strong className="font-semibold">Read-Only Billing Mode:</strong> Online payments and instant plan modifications are disabled during Phase 9.1.
         </div>
       </div>
 
-      {/* Payment Modal */}
-      {paymentState !== 'idle' && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="w-full max-w-sm rounded-xl border border-border bg-card shadow-xl p-6">
-            {paymentState === 'open' && (
-              <>
-                <div className="flex items-center justify-between mb-5">
-                  <h3 className="font-semibold text-foreground">Complete Payment</h3>
-                  <button onClick={() => setPaymentState('idle')} aria-label="Close">
-                    <X className="h-5 w-5 text-muted-foreground hover:text-foreground" />
-                  </button>
-                </div>
-                <div className="rounded-lg border border-border bg-muted p-4 mb-5">
-                  <p className="text-xs text-muted-foreground mb-1">
-                    {paymentType === 'add-data' ? `${gbQty} GB data top-up` : paymentType === 'upgrade' ? 'Upgrade to Yearly Plan' : 'Downgrade to Monthly Plan'}
-                  </p>
-                  <p className="text-3xl font-bold text-foreground">₹{paymentAmount}</p>
-                  <p className="text-xs text-muted-foreground mt-1">GST included</p>
-                </div>
-                <div className="rounded-lg border border-dashed border-border bg-muted/40 p-4 mb-5 text-center text-sm text-muted-foreground">
-                  {/* TODO: connect to backend API — integrate real payment gateway here */}
-                  UPI / Card / Netbanking fields would appear here
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={handlePay}
-                    className="flex-1 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
-                  >
-                    Pay ₹{paymentAmount}
-                  </button>
-                  <button
-                    onClick={() => setPaymentState('idle')}
-                    className="rounded-md border border-border px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </>
-            )}
+      {/* Subscription Status & Usage */}
+      <div className="rounded-xl border border-border bg-card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-semibold text-foreground">Subscription Status</h2>
+          <span className="text-sm font-medium text-primary">{status}</span>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Your account is currently active under the <strong className="text-foreground">{plan} Plan</strong>.
+        </p>
+      </div>
 
-            {paymentState === 'processing' && (
-              <div className="flex flex-col items-center py-8 gap-4">
-                <div className="h-10 w-10 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                <p className="text-sm text-muted-foreground">Processing payment…</p>
-              </div>
-            )}
-
-            {paymentState === 'success' && (
-              <div className="flex flex-col items-center py-8 gap-4 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/15">
-                  <CheckCircle2 className="h-7 w-7 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-foreground mb-1">Payment successful</h3>
-                  <p className="text-sm text-muted-foreground">Your account has been updated.</p>
-                </div>
-                <button
-                  onClick={() => setPaymentState('idle')}
-                  className="rounded-md bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
-                >
-                  Done
-                </button>
-              </div>
-            )}
-
-            {paymentState === 'failed' && (
-              <div className="flex flex-col items-center py-8 gap-4 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-destructive/15">
-                  <AlertCircle className="h-7 w-7 text-destructive" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-foreground mb-1">Payment failed</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Something went wrong. Please try again or use a different payment method.
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setPaymentState('open')}
-                    className="rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
-                  >
-                    Try again
-                  </button>
-                  <button
-                    onClick={() => setPaymentState('idle')}
-                    className="rounded-md border border-border px-5 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
+      {/* Plan info */}
+      <div className="rounded-xl border border-border bg-card p-6">
+        <div className="flex items-start justify-between flex-wrap gap-4">
+          <div>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Current plan</p>
+            <div className="flex items-center gap-2">
+              <Shield className="h-4 w-4 text-primary" />
+              <span className="font-semibold text-foreground">{plan} Plan</span>
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">
+              Expires on {expiresAt ? formatDate(expiresAt) : 'No expiration date'}
+            </p>
           </div>
         </div>
-      )}
-    </>
+        <div className="mt-5">
+          <button
+            type="button"
+            disabled
+            className="rounded-md bg-muted px-4 py-2 text-sm font-semibold text-muted-foreground cursor-not-allowed"
+          >
+            Payments Disabled (Read-Only Mode)
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
 // ─── Tab: My Devices ──────────────────────────────────────────────────────────
-function DevicesTab() {
-  const [devices, setDevices] = useState<Device[]>(INITIAL_DEVICES)
+function DevicesTab({
+  devices,
+  profile,
+  onRemoveDevice,
+}: {
+  devices: DeviceDto[]
+  profile: AccountMeResponse | null
+  onRemoveDevice: (guid: string) => Promise<void>
+}) {
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [removing, setRemoving] = useState<string | null>(null)
+  const [error, setError] = useState('')
 
-  async function handleRemove(id: string) {
-    setRemoving(id)
-    // TODO: connect to backend API — remove device session
-    await new Promise((r) => setTimeout(r, 600))
-    setDevices((prev) => prev.filter((d) => d.id !== id))
-    setConfirmId(null)
-    setRemoving(null)
+  const planName = profile?.plan || 'Free'
+  const planLimit = getPlanLimit(planName)
+
+  async function handleRemove(guid: string) {
+    setRemoving(guid)
+    setError('')
+    try {
+      await onRemoveDevice(guid)
+      setConfirmId(null)
+    } catch (err: any) {
+      setError(err instanceof ApiError ? err.message : 'Failed to remove device.')
+    } finally {
+      setRemoving(null)
+    }
   }
 
-  const deviceToRemove = devices.find((d) => d.id === confirmId)
+  const deviceToRemove = devices.find((d) => d.device_guid === confirmId)
 
   return (
     <>
       <div className="space-y-5">
+        {error && (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 flex-shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
         {/* Slot usage bar */}
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm text-muted-foreground">Device slots</span>
-            <span className="text-sm font-medium text-foreground">{devices.length} / {PLAN_DEVICE_LIMIT}</span>
+            <span className="text-sm font-medium text-foreground">{devices.length} / {planLimit}</span>
           </div>
           <div
             className="h-2 w-full rounded-full bg-muted overflow-hidden"
             role="progressbar"
             aria-valuenow={devices.length}
-            aria-valuemax={PLAN_DEVICE_LIMIT}
+            aria-valuemax={planLimit}
             aria-label="Device slots used"
           >
             <div
               className="h-full rounded-full bg-primary transition-all"
-              style={{ width: `${(devices.length / PLAN_DEVICE_LIMIT) * 100}%` }}
+              style={{ width: `${Math.min((devices.length / planLimit) * 100, 100)}%` }}
             />
           </div>
           <p className="text-xs text-muted-foreground mt-2">
-            {PLAN_DEVICE_LIMIT - devices.length} slot{PLAN_DEVICE_LIMIT - devices.length !== 1 ? 's' : ''} remaining on your {MOCK_ACCOUNT.plan} Plan
+            {Math.max(planLimit - devices.length, 0)} slot{Math.max(planLimit - devices.length, 0) !== 1 ? 's' : ''} remaining on your {planName} Plan
           </p>
         </div>
 
@@ -426,20 +227,22 @@ function DevicesTab() {
             </div>
           ) : (
             devices.map((device) => (
-              <div key={device.id} className="flex items-center gap-4 px-5 py-4">
+              <div key={device.device_guid} className="flex items-center gap-4 px-5 py-4">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
-                  <PlatformIcon platform={device.platform} />
+                  <PlatformIcon platform={device.friendly_name || 'windows'} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-foreground truncate">{device.name}</p>
-                  <p className="text-xs text-muted-foreground capitalize">
-                    {device.platform} · Last active {formatRelative(device.lastActive)}
+                  <p className="font-medium text-foreground truncate">
+                    {device.friendly_name || device.device_guid}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Last active {formatRelative(device.last_seen_at)}
                   </p>
                 </div>
                 <button
-                  onClick={() => setConfirmId(device.id)}
+                  onClick={() => setConfirmId(device.device_guid)}
                   className="flex-shrink-0 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-destructive/10 hover:border-destructive/30 hover:text-destructive transition-colors"
-                  aria-label={`Remove ${device.name}`}
+                  aria-label={`Remove device`}
                 >
                   Remove
                 </button>
@@ -455,7 +258,7 @@ function DevicesTab() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
           role="dialog"
           aria-modal="true"
-          aria-label={`Remove ${deviceToRemove.name}`}
+          aria-label="Remove device confirmation"
         >
           <div className="w-full max-w-sm rounded-xl border border-border bg-card shadow-xl p-6">
             <div className="flex items-center gap-3 mb-4">
@@ -464,7 +267,7 @@ function DevicesTab() {
               </div>
               <div>
                 <h3 className="font-semibold text-foreground">Remove device?</h3>
-                <p className="text-sm text-muted-foreground">This will end the session for this device.</p>
+                <p className="text-sm text-muted-foreground">This will revoke the session for this device.</p>
               </div>
               <button
                 onClick={() => setConfirmId(null)}
@@ -475,10 +278,11 @@ function DevicesTab() {
               </button>
             </div>
             <div className="rounded-lg border border-border bg-muted px-4 py-3 mb-5 flex items-center gap-3">
-              <PlatformIcon platform={deviceToRemove.platform} />
+              <PlatformIcon platform={deviceToRemove.friendly_name || 'windows'} />
               <div>
-                <p className="text-sm font-medium text-foreground">{deviceToRemove.name}</p>
-                <p className="text-xs text-muted-foreground capitalize">{deviceToRemove.platform}</p>
+                <p className="text-sm font-medium text-foreground">
+                  {deviceToRemove.friendly_name || deviceToRemove.device_guid}
+                </p>
               </div>
             </div>
             <div className="flex gap-2">
@@ -504,15 +308,17 @@ function DevicesTab() {
 }
 
 // ─── Tab: Billing History ─────────────────────────────────────────────────────
-function BillingTab() {
-  const totalPaid = TRANSACTIONS.filter((t) => t.status === 'paid').reduce((s, t) => s + t.amount, 0)
+function BillingTab({ transactions }: { transactions: BillingPaymentDto[] }) {
+  const totalPaid = transactions
+    .filter((t) => t.status.toLowerCase() === 'paid')
+    .reduce((s, t) => s + (t.amount || 0), 0)
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <p className="text-sm text-muted-foreground">Your past transactions and invoices</p>
         <div className="text-right">
-          <p className="text-xs text-muted-foreground">Total paid (all time)</p>
+          <p className="text-xs text-muted-foreground">Total paid</p>
           <p className="text-xl font-bold text-foreground">₹{totalPaid.toLocaleString('en-IN')}</p>
         </div>
       </div>
@@ -524,43 +330,31 @@ function BillingTab() {
               <tr className="border-b border-border bg-muted/40">
                 <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Date</th>
                 <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Description</th>
-                <th className="text-center px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Devices</th>
                 <th className="text-right px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Amount</th>
                 <th className="text-center px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
-                <th className="text-center px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Invoice</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {TRANSACTIONS.map((tx) => (
-                <tr key={tx.id} className="hover:bg-muted/20 transition-colors">
-                  <td className="px-6 py-3 text-muted-foreground whitespace-nowrap">{formatDate(tx.date)}</td>
-                  <td className="px-6 py-3 text-foreground">{tx.description}</td>
-                  <td className="px-6 py-3 text-center">
-                    <span className="text-sm text-foreground font-medium text-center block">{tx.devices} device{tx.devices !== 1 ? 's' : ''}</span>
-                  </td>
-                  <td className="px-6 py-3 text-right font-medium text-foreground whitespace-nowrap">
-                    ₹{tx.amount.toLocaleString('en-IN')}
-                  </td>
-                  <td className="px-6 py-3 text-center">
-                    <StatusBadge status={tx.status as TxStatus} />
-                  </td>
-                  <td className="px-6 py-3 text-center">
-                    {tx.status === 'paid' ? (
-                      <button
-                        type="button"
-                        onClick={() => alert(`TODO: connect to backend API — download invoice ${tx.id}`)}
-                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                        aria-label={`Download invoice for ${tx.id}`}
-                      >
-                        <Download className="h-3 w-3" />
-                        Invoice
-                      </button>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
+              {transactions.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-6 py-10 text-center text-muted-foreground">
+                    No payment transactions recorded.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                transactions.map((tx) => (
+                  <tr key={tx.id} className="hover:bg-muted/20 transition-colors">
+                    <td className="px-6 py-3 text-muted-foreground whitespace-nowrap">{formatDate(tx.created_at)}</td>
+                    <td className="px-6 py-3 text-foreground">{tx.description || 'Subscription Payment'}</td>
+                    <td className="px-6 py-3 text-right font-medium text-foreground whitespace-nowrap">
+                      ₹{(tx.amount || 0).toLocaleString('en-IN')}
+                    </td>
+                    <td className="px-6 py-3 text-center">
+                      <StatusBadge status={tx.status} />
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -577,39 +371,37 @@ const DOWNLOAD_PLATFORMS = [
   {
     icon: Monitor,
     name: 'Windows',
-    version: 'v2.4.1',
+    version: 'v1.0.0-rc1',
     requirements: 'Windows 10 or later (64-bit)',
     size: '~18 MB',
     available: true,
     steps: [
-      'Download the installer (.exe) and run it.',
+      'Download the installer (StealthySetup.exe) and run it.',
       'Accept the license agreement and complete installation.',
       'Launch Stealthy from your Start menu or desktop shortcut.',
-      'Enter your 32-character account key when prompted.',
+      'Enter your 32-character master token when prompted.',
       'Select a server region and click Connect.',
     ],
     downloads: [
-      { label: 'Installer (.exe)', sublabel: '~18 MB' },
-      { label: 'Portable (.zip)', sublabel: '~20 MB' },
+      { label: 'Windows Installer', sublabel: 'StealthySetup.exe (~18 MB)', href: `${config.downloadUrl}/StealthySetup.exe` },
     ],
   },
   {
     icon: Smartphone,
     name: 'Android',
-    version: 'v2.3.8',
+    version: 'v1.0.0-rc1',
     requirements: 'Android 8.0 (Oreo) or later',
     size: '~12 MB',
     available: true,
     steps: [
-      'Download the APK file to your Android device.',
+      'Download the APK file (Stealthy.apk) to your Android device.',
       'Enable "Install from unknown sources" in device settings if prompted.',
       'Open the downloaded APK and follow the installation prompts.',
-      'Launch Stealthy and enter your 32-character account key.',
+      'Launch Stealthy and enter your 32-character master token.',
       'Grant VPN permissions when the system dialog appears, then tap Connect.',
     ],
     downloads: [
-      { label: 'APK (arm64-v8a)', sublabel: '~12 MB' },
-      { label: 'APK (armeabi-v7a)', sublabel: '~11 MB' },
+      { label: 'Android Package', sublabel: 'Stealthy.apk (~12 MB)', href: `${config.downloadUrl}/Stealthy.apk` },
     ],
   },
   {
@@ -628,7 +420,7 @@ function DownloadsTab() {
   return (
     <div className="space-y-5">
       <p className="text-sm text-muted-foreground">
-        Download the Stealthy client for your platform. Your account key is required to connect.
+        Download the Stealthy client for your platform. Your master token is required to connect.
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -658,7 +450,7 @@ function DownloadsTab() {
                     <p className="text-sm font-medium text-foreground">{dl.label}</p>
                     <p className="text-xs text-muted-foreground">{dl.sublabel}</p>
                   </div>
-                  <MockDownloadButton label="Download" />
+                  <RealDownloadButton label="Download" href={dl.href} />
                 </div>
               ))}
             </div>
@@ -711,7 +503,49 @@ const TABS: { id: Tab; label: string }[] = [
 ]
 
 export default function DashboardPage() {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<Tab>('credits')
+  const [profile, setProfile] = useState<AccountMeResponse | null>(null)
+  const [devices, setDevices] = useState<DeviceDto[]>([])
+  const [transactions, setTransactions] = useState<BillingPaymentDto[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  const fetchDashboardData = useCallback(async () => {
+    if (!isAuthenticated()) {
+      router.replace('/login')
+      return
+    }
+    setLoading(true)
+    setError('')
+    try {
+      const [profileData, devicesRes, billingRes] = await Promise.all([
+        api.getClientMe(),
+        api.listDevices().catch(() => ({ devices: [] })),
+        api.getBillingHistory().catch(() => []),
+      ])
+      setProfile(profileData)
+      setDevices(devicesRes.devices || [])
+      setTransactions(billingRes || [])
+    } catch (err: any) {
+      if (err instanceof ApiError && err.status === 401) {
+        router.replace('/login')
+      } else {
+        setError(err.message || 'Failed to connect to Oracle Billing Server.')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [router])
+
+  useEffect(() => {
+    fetchDashboardData()
+  }, [fetchDashboardData])
+
+  async function handleRemoveDevice(guid: string) {
+    await api.deactivateDevice(guid)
+    setDevices((prev) => prev.filter((d) => d.device_guid !== guid))
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -719,6 +553,39 @@ export default function DashboardPage() {
 
       <main className="flex-1 pt-20 pb-20 px-4 sm:px-6">
         <div className="mx-auto max-w-3xl">
+          {/* Header Info */}
+          {profile && (
+            <div className="mb-6 rounded-xl border border-border bg-card p-4 flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Account ID</p>
+                <p className="text-sm font-mono font-medium text-foreground">{profile.account_id}</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                  {profile.plan}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Error Banner with Retry */}
+          {error && (
+            <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/10 p-4 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 text-sm text-destructive">
+                <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                <span>{error}</span>
+              </div>
+              <button
+                type="button"
+                onClick={fetchDashboardData}
+                className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-xs font-semibold text-destructive-foreground hover:opacity-90 transition-opacity"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Retry
+              </button>
+            </div>
+          )}
+
           {/* Tab bar */}
           <div className="flex gap-1 border-b border-border mb-7 overflow-x-auto">
             {TABS.map((tab) => (
@@ -736,11 +603,27 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          {/* Tab content */}
-          {activeTab === 'credits' && <CreditsTab />}
-          {activeTab === 'devices' && <DevicesTab />}
-          {activeTab === 'billing' && <BillingTab />}
-          {activeTab === 'downloads' && <DownloadsTab />}
+          {/* Loading State */}
+          {loading && !profile ? (
+            <div className="py-20 text-center space-y-3">
+              <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              <p className="text-sm text-muted-foreground">Loading account data from server…</p>
+            </div>
+          ) : (
+            <>
+              {/* Tab content */}
+              {activeTab === 'credits' && <CreditsTab profile={profile} />}
+              {activeTab === 'devices' && (
+                <DevicesTab
+                  devices={devices}
+                  profile={profile}
+                  onRemoveDevice={handleRemoveDevice}
+                />
+              )}
+              {activeTab === 'billing' && <BillingTab transactions={transactions} />}
+              {activeTab === 'downloads' && <DownloadsTab />}
+            </>
+          )}
         </div>
       </main>
 

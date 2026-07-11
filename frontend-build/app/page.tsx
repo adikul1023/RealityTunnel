@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Shield, Lock, Wifi, Eye, Server, Globe, ChevronRight, CheckCircle2 } from 'lucide-react'
+import { Shield, Lock, Wifi, Server, ChevronRight } from 'lucide-react'
 import { Nav } from '@/components/nav'
 import { Footer } from '@/components/footer'
 
@@ -9,12 +9,6 @@ const features = [
     title: 'End-to-End Encrypted Tunnel',
     description:
       'All traffic between your device and our servers is wrapped in encryption. Nobody intercepts your data in transit — not even us.',
-  },
-  {
-    icon: Eye,
-    title: 'Zero Activity Logs',
-    description:
-      'We do not log, monitor, or retain the websites you visit or the content of your traffic. Only connection metadata is retained where legally required.',
   },
   {
     icon: Wifi,
@@ -34,26 +28,11 @@ const features = [
     description:
       'Connect your laptop, phone, or tablet. Your plan includes a defined number of concurrent device slots — add or remove devices any time.',
   },
-  {
-    icon: Globe,
-    title: 'India & Global Infrastructure',
-    description:
-      'Servers across India and international regions. Non-India routing is not subject to domestic data retention requirements.',
-  },
-]
-
-const trustBadges = [
-  'No activity logs',
-  'Anonymous accounts',
-  'GST included in pricing',
-  'India-based infrastructure',
-  'No email required',
-  'Transparent data policy',
 ]
 
 export default function HomePage() {
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col" suppressHydrationWarning>
       <Nav />
 
       <main className="flex-1">
@@ -67,11 +46,13 @@ export default function HomePage() {
               backgroundSize: '60px 60px',
             }}
             aria-hidden="true"
+            suppressHydrationWarning
           />
           <div
             className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px] rounded-full blur-[140px] opacity-10"
             style={{ background: 'oklch(0.72 0.16 195)' }}
             aria-hidden="true"
+            suppressHydrationWarning
           />
 
           <div className="relative mx-auto max-w-4xl text-center">
@@ -90,7 +71,7 @@ export default function HomePage() {
 
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-10 text-pretty">
               Stealthy provides a secure, encrypted tunnel for your internet traffic. No email.
-              No personal data. Anonymous account-key authentication — your identity stays yours.
+              No personal data. Anonymous master-token authentication — your identity stays yours.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -117,19 +98,6 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Trust badges */}
-        <section className="border-y border-border bg-muted/30 py-4 px-4 sm:px-6">
-          <div className="mx-auto max-w-7xl">
-            <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2">
-              {trustBadges.map((badge) => (
-                <span key={badge} className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-primary flex-shrink-0" />
-                  {badge}
-                </span>
-              ))}
-            </div>
-          </div>
-        </section>
 
         {/* Features */}
         <section className="py-24 px-4 sm:px-6">
@@ -176,8 +144,8 @@ export default function HomePage() {
               {[
                 {
                   step: '01',
-                  title: 'Generate your account key',
-                  desc: 'A 32-character alphanumeric key is generated in your browser. No email, no password — save it somewhere secure.',
+                  title: 'Generate your master token',
+                  desc: 'A 32-character alphanumeric token is generated in your browser. No email, no password — save it somewhere secure.',
                 },
                 {
                   step: '02',
@@ -187,7 +155,7 @@ export default function HomePage() {
                 {
                   step: '03',
                   title: 'Install and connect',
-                  desc: 'Download the client for Windows or Android. Enter your account key and establish a secure private network connection.',
+                  desc: 'Download the client for Windows or Android. Enter your master token and establish a secure private network connection.',
                 },
               ].map((item) => (
                 <div key={item.step}>

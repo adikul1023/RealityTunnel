@@ -93,9 +93,9 @@ async def get_client_me(
         status=current_account.status.value,
         subscription_expires_at=current_account.subscription_expires_at,
         device_count=len(current_account.devices) if current_account.devices else 0,
-        plan="premium",  # Hardcoded for now
-        email=current_account.email,
-        two_factor_enabled=current_account.totp_secret is not None
+        plan=current_account.plan_id,
+        email=getattr(current_account, "email", None),
+        two_factor_enabled=getattr(current_account, "totp_secret", None) is not None,
     )
 
 

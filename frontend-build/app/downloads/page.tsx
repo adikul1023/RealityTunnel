@@ -3,18 +3,17 @@
 import { Monitor, Smartphone, Download, CheckCircle2 } from 'lucide-react'
 import { Nav } from '@/components/nav'
 import { Footer } from '@/components/footer'
+import { config } from '@/lib/config'
 
-// TODO: connect to backend API — replace with real download links
-function MockDownloadButton({ label }: { label: string }) {
+function DownloadButton({ href, label }: { href: string; label: string }) {
   return (
-    <button
-      type="button"
-      onClick={() => alert('TODO: connect to backend API — download link not yet available')}
+    <a
+      href={href}
       className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
     >
       <Download className="h-4 w-4" />
       {label}
-    </button>
+    </a>
   )
 }
 
@@ -22,37 +21,35 @@ const platforms = [
   {
     icon: Monitor,
     name: 'Windows',
-    version: 'v2.4.1',
+    version: 'v1.0.0-rc1',
     requirements: 'Windows 10 or later (64-bit)',
     size: '~18 MB',
     steps: [
-      'Download the installer (.exe) and run it.',
+      'Download the installer (StealthySetup.exe) and run it.',
       'Accept the license agreement and complete installation.',
       'Launch Stealthy from your Start menu or desktop shortcut.',
-      'Enter your 32-character account key when prompted.',
+      'Enter your 32-character master token when prompted.',
       'Select a server region and click Connect.',
     ],
     downloads: [
-      { label: 'Installer (.exe)', sublabel: '~18 MB' },
-      { label: 'Portable (.zip)', sublabel: '~20 MB' },
+      { label: 'Windows Installer', sublabel: 'StealthySetup.exe (~18 MB)', href: `${config.downloadUrl}/StealthySetup.exe` },
     ],
   },
   {
     icon: Smartphone,
     name: 'Android',
-    version: 'v2.3.8',
+    version: 'v1.0.0-rc1',
     requirements: 'Android 8.0 (Oreo) or later',
     size: '~12 MB',
     steps: [
-      'Download the APK file to your Android device.',
+      'Download the APK file (Stealthy.apk) to your Android device.',
       'Enable "Install from unknown sources" in your device settings if prompted.',
       'Open the downloaded APK and follow the installation prompts.',
-      'Launch Stealthy and enter your 32-character account key.',
+      'Launch Stealthy and enter your 32-character master token.',
       'Grant VPN permissions when the system dialog appears, then tap Connect.',
     ],
     downloads: [
-      { label: 'APK (arm64-v8a)', sublabel: '~12 MB' },
-      { label: 'APK (armeabi-v7a)', sublabel: '~11 MB' },
+      { label: 'Android Package', sublabel: 'Stealthy.apk (~12 MB)', href: `${config.downloadUrl}/Stealthy.apk` },
     ],
   },
 ]
@@ -69,7 +66,7 @@ export default function DownloadsPage() {
               Downloads &amp; Setup
             </h1>
             <p className="text-muted-foreground max-w-lg mx-auto text-pretty">
-              Download the Stealthy client for your platform. You will need an active account key
+              Download the Stealthy client for your platform. You will need an active master token
               to connect.
             </p>
           </div>
@@ -106,7 +103,7 @@ export default function DownloadsPage() {
                         <p className="text-sm font-medium text-foreground">{dl.label}</p>
                         <p className="text-xs text-muted-foreground">{dl.sublabel}</p>
                       </div>
-                      <MockDownloadButton label="Download" />
+                        <DownloadButton href={dl.href} label="Download" />
                     </div>
                   ))}
                 </div>
@@ -158,7 +155,7 @@ export default function DownloadsPage() {
                 You need an active account and subscription to connect. Creating an account takes
                 under a minute — no email required.{' '}
                 <a href="/register" className="text-primary hover:underline">
-                  Generate your account key →
+                  Generate your master token →
                 </a>
               </p>
             </div>

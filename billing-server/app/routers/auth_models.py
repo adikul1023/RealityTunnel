@@ -24,6 +24,17 @@ class LoginRequest(BaseModel):
     device_guid: str = Field(..., description="Unique hardware or installation identifier")
 
 
+class RegisterAccountRequest(BaseModel):
+    """Payload for POST /api/auth/register."""
+    plan_id: str = Field(default="free", description="Initial subscription plan ID")
+
+
+class RegisterAccountResponse(BaseModel):
+    """Response for POST /api/auth/register containing one-time display credentials."""
+    account_id: str = Field(..., description="Public human-readable Account ID (e.g. RT-XXXX-XXXX)")
+    master_token: str = Field(..., description="Secret Master Token — shown only once")
+
+
 class RefreshRequest(BaseModel):
     """Payload for POST /api/auth/refresh."""
     refresh_token: str = Field(..., description="Active 64-character hexadecimal refresh token")

@@ -220,7 +220,7 @@ export default function RefundPage() {
                   FAQ &amp; Support page
                 </Link>{' '}
                 within the eligible window. Include your transaction reference ID (visible in your
-                Billing History) and account key. Refunds are processed to the original payment
+                Billing History) and master token. Refunds are processed to the original payment
                 method within 3–7 business days.
               </p>
             </LegalSection>

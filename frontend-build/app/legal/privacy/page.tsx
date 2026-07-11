@@ -108,7 +108,7 @@ export default function PrivacyPolicyPage() {
 
             <LegalSection title="6. Data security">
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Account keys are stored in a hashed form and cannot be recovered. Our servers use industry-standard
+                Master tokens are stored in a hashed form and cannot be recovered. Our servers use industry-standard
                 encryption for data in transit and at rest. Access to infrastructure is restricted and logged.
               </p>
             </LegalSection>
@@ -116,7 +116,7 @@ export default function PrivacyPolicyPage() {
             <LegalSection title="7. Data retention periods">
               <p className="text-sm text-muted-foreground leading-relaxed">
                 Connection metadata for India-routed sessions is retained for the period mandated by applicable
-                Indian law. Account data (account key hash, subscription status) is retained for the lifetime
+                Indian law. Account data (master token hash, subscription status) is retained for the lifetime
                 of your account and for a reasonable period thereafter for billing dispute resolution. Payment
                 transaction records are retained as required by GST and applicable tax law.
               </p>

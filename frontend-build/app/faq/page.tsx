@@ -11,20 +11,20 @@ const categories = [
     label: 'Account & Security',
     questions: [
       {
-        q: 'What happens if I lose my account key?',
-        a: 'Your account key cannot be recovered under any circumstances. There is no email-based reset, no security question, and no support escalation path that can retrieve it. This is intentional — it means no one, including us, can gain access to your account by impersonating you. If you lose your key, you will need to create a new account. We strongly recommend copying your key to at least two secure, offline locations (for example, a password manager and a printed backup in a safe place).',
+        q: 'What happens if I lose my master token?',
+        a: 'Your master token cannot be recovered under any circumstances. There is no email-based reset, no security question, and no support escalation path that can retrieve it. This is intentional — it means no one, including us, can gain access to your account by impersonating you. If you lose your token, you will need to create a new account. We strongly recommend copying your token to at least two secure, offline locations (for example, a password manager and a printed backup in a safe place).',
       },
       {
-        q: 'How does the account key system work?',
-        a: 'When you register, a 32-character alphanumeric key is generated in your browser. This key is the only credential for your account — there is no associated email address, phone number, or personal identity. You use this key to log in across all devices. We store only a cryptographic hash of the key on our servers; your plaintext key is never transmitted after account creation.',
+        q: 'How does the master token system work?',
+        a: 'When you register, a 32-character alphanumeric token is generated in your browser. This token is the secret credential for your account — there is no associated email address, phone number, or personal identity. You use this token to log in across all devices. We store only a cryptographic hash of the token on our servers; your plaintext token is never transmitted after account creation.',
       },
       {
         q: 'Is two-factor authentication (2FA) available?',
-        a: 'Yes. During registration you can optionally set up TOTP-based 2FA using any standard authenticator app (Google Authenticator, Aegis, Authy, etc.). You will also be given 8 one-time backup codes — save these separately from your account key, as they are your only fallback if you lose access to your authenticator device.',
+        a: 'Yes. During registration you can optionally set up TOTP-based 2FA using any standard authenticator app (Google Authenticator, Aegis, Authy, etc.). You will also be given 8 one-time backup codes — save these separately from your master token, as they are your only fallback if you lose access to your authenticator device.',
       },
       {
         q: 'Can I have multiple accounts?',
-        a: 'Yes. Since there is no email or personal identity linked to accounts, you may create as many accounts as you wish. Each requires a separate subscription and account key.',
+        a: 'Yes. Since there is no email or personal identity linked to accounts, you may create as many accounts as you wish. Each requires a separate subscription and master token.',
       },
     ],
   },
@@ -45,7 +45,7 @@ const categories = [
       },
       {
         q: 'What happens to my data if I delete my account?',
-        a: 'Deleting your account removes your account key hash and subscription records from our active databases. Legally mandated connection metadata for India-routed sessions is retained for the period required by law, after which it is deleted. Payment records are retained as required by GST and tax law.',
+        a: 'Deleting your account removes your master token hash and subscription records from our active databases. Legally mandated connection metadata for India-routed sessions is retained for the period required by law, after which it is deleted. Payment records are retained as required by GST and tax law.',
       },
     ],
   },
@@ -54,15 +54,15 @@ const categories = [
     questions: [
       {
         q: 'What does "GST included" mean for pricing?',
-        a: 'Our listed prices (₹69/month, ₹680/year, ₹10/GB) are the total amount you pay — GST is already factored in. There are no additional taxes added at checkout.',
+        a: 'Our listed prices (₹69/month, ₹99/month, ₹179/quarter, ₹10/GB) are the total amount you pay — GST is already factored in. There are no additional taxes added at checkout.',
       },
       {
         q: 'What happens when I run out of data?',
         a: 'When your monthly data allowance is exhausted, your encrypted connection will be paused until you purchase additional data or your next billing cycle begins. You can top up at any time from the My Credits dashboard at ₹10/GB.',
       },
       {
-        q: 'Can I switch between monthly and yearly plans?',
-        a: 'Yes. You can upgrade to yearly or downgrade to monthly from your My Credits dashboard. Upgrades take effect immediately. Downgrades take effect at the end of your current billing period.',
+        q: 'Can I switch between monthly and quarterly plans?',
+        a: 'Yes. You can upgrade or downgrade your plans from your dashboard. Upgrades take effect immediately. Downgrades take effect at the end of your current billing period.',
       },
       {
         q: 'How do I get a refund?',
@@ -87,7 +87,7 @@ const categories = [
       },
       {
         q: 'What should I do if I cannot connect?',
-        a: 'First verify that your account key is entered correctly and that your subscription is active. Check your data balance on the My Credits page. If the issue persists, try selecting a different server region in the client. For further help, contact support through this page.',
+        a: 'First verify that your master token is entered correctly and that your subscription is active. Check your data balance on the My Credits page. If the issue persists, try selecting a different server region in the client. For further help, contact support through this page.',
       },
     ],
   },

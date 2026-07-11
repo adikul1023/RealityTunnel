@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import {
-  Shield,
   Copy,
   Download,
   CheckCircle2,
@@ -12,27 +11,21 @@ import {
   ChevronUp,
   AlertCircle,
 } from 'lucide-react'
+import { StealthyLogo } from '@/components/ui/logo'
 
-// TODO: connect to backend API — replace with a server-generated key
-function generateMockKey(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-  return Array.from({ length: 32 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
-}
+import { useRouter } from 'next/navigation'
+import { api, getOrCreateDeviceGuid, ApiError } from '@/lib/api'
 
 const MOCK_BACKUP_CODES = [
   'AAAA-1111-XXXX', 'BBBB-2222-YYYY', 'CCCC-3333-ZZZZ', 'DDDD-4444-WWWW',
   'EEEE-5555-VVVV', 'FFFF-6666-UUUU', 'GGGG-7777-TTTT', 'HHHH-8888-SSSS',
 ]
 
-// TODO: connect to backend API
-async function mockRegisterAccount(_key: string, _twoFaCode?: string): Promise<{ success: boolean }> {
-  await new Promise((r) => setTimeout(r, 800))
-  return { success: true }
-}
-
 export default function RegisterPage() {
+  const router = useRouter()
   const [step, setStep] = useState<'generate' | 'confirm' | '2fa'>('generate')
-  const [accountKey, setAccountKey] = useState('')
+  const [accountId, setAccountId] = useState('')
+  const [masterToken, setMasterToken] = useState('')
   const [keyCopied, setKeyCopied] = useState(false)
   const [keySaved, setKeySaved] = useState(false)
   const [show2FA, setShow2FA] = useState(false)
@@ -41,29 +34,42 @@ export default function RegisterPage() {
   const [backupSaved, setBackupSaved] = useState(false)
   const [loading, setLoading] = useState(false)
   const [twoFaError, setTwoFaError] = useState('')
+  const [apiError, setApiError] = useState('')
 
-  function handleGenerate() {
-    setAccountKey(generateMockKey())
-    setKeySaved(false)
-    setKeyCopied(false)
-    setStep('confirm')
+  async function handleGenerate() {
+    setLoading(true)
+    setApiError('')
+    try {
+      const res = await api.registerAccount({ plan_id: 'free' })
+      setAccountId(res.account_id)
+      setMasterToken(res.master_token)
+      setKeySaved(false)
+      setKeyCopied(false)
+      setStep('confirm')
+    } catch (err: any) {
+      setApiError(err instanceof ApiError ? err.message : 'Failed to create account. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  function handleCopyKey() {
-    navigator.clipboard.writeText(accountKey)
+  function handleCopyCredentials() {
+    navigator.clipboard.writeText(`Account ID: ${accountId}\nMaster Token: ${masterToken}`)
     setKeyCopied(true)
     setTimeout(() => setKeyCopied(false), 2000)
   }
 
-  function handleDownloadKey() {
+  function handleDownloadCredentials() {
     const blob = new Blob(
-      [`Stealthy Account Key\n\n${accountKey}\n\nGenerated: ${new Date().toISOString()}\n\nKEEP THIS FILE SECURE. It cannot be recovered if lost.`],
+      [
+        `Stealthy Authentication Credentials\n\nAccount ID (Public Identifier):\n${accountId}\n\nMaster Token (Secret Credential):\n${masterToken}\n\nGenerated: ${new Date().toISOString()}\n\nKEEP THIS FILE SECURE. Your Master Token cannot be recovered if lost.`,
+      ],
       { type: 'text/plain' }
     )
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'stealthy-account-key.txt'
+    a.download = 'stealthy-master-token.txt'
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -93,10 +99,17 @@ export default function RegisterPage() {
       return
     }
     setLoading(true)
+    setApiError('')
     try {
-      // TODO: connect to backend API
-      await mockRegisterAccount(accountKey, show2FA ? twoFaCode : undefined)
-      // TODO: redirect to dashboard on success
+      await api.login({
+        account_id: accountId,
+        master_token: masterToken,
+        device_guid: getOrCreateDeviceGuid(),
+        two_fa_code: show2FA ? twoFaCode : undefined,
+      })
+      router.push('/dashboard')
+    } catch (err: any) {
+      setApiError(err instanceof ApiError ? err.message : 'Login failed after registration.')
     } finally {
       setLoading(false)
     }
@@ -107,76 +120,101 @@ export default function RegisterPage() {
       <div className="w-full max-w-lg">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <Link href="/" className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15 ring-1 ring-primary/30 mb-3">
-            <Shield className="h-6 w-6 text-primary" />
+          <Link href="/" className="mb-3">
+            <StealthyLogo className="h-12 w-12 text-primary" />
           </Link>
           <h1 className="text-xl font-semibold text-foreground">Create your account</h1>
           <p className="text-sm text-muted-foreground mt-1">No email or personal data required</p>
         </div>
 
+        {/* Error Display */}
+        {apiError && (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 flex-shrink-0" />
+            <span>{apiError}</span>
+          </div>
+        )}
+
         {/* Step: Generate */}
         {step === 'generate' && (
           <div className="rounded-xl border border-border bg-card p-6 space-y-4">
             <div>
-              <h2 className="font-semibold text-foreground mb-1">Step 1 — Generate your account key</h2>
+              <h2 className="font-semibold text-foreground mb-1">Step 1 — Generate your credentials</h2>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Your account key is a randomly generated 32-character string. It is the only
-                credential for your account — no email or password. Save it somewhere secure
-                before continuing.
+                We use an anonymous two-part authentication model: your public <strong className="text-foreground">Account ID</strong> and secret <strong className="text-foreground">Master Token</strong>. No email or password required.
               </p>
             </div>
             <button
               onClick={handleGenerate}
-              className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+              disabled={loading}
+              className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
-              Generate Account Key
+              {loading ? 'Generating Credentials...' : 'Generate Credentials'}
             </button>
           </div>
         )}
 
-        {/* Step: Confirm / Save key */}
+        {/* Step: Confirm / Save credentials */}
         {step === 'confirm' && (
           <div className="space-y-4">
             <div className="rounded-xl border border-border bg-card p-6 space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-foreground">Your account key</h2>
+                <h2 className="font-semibold text-foreground">Your Authentication Credentials</h2>
                 <button
                   onClick={handleGenerate}
                   className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  title="Regenerate key"
+                  title="Regenerate credentials"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
                   Regenerate
                 </button>
               </div>
 
-              {/* Key display */}
-              <div className="rounded-lg border border-border bg-muted px-4 py-3">
-                <p className="font-mono text-sm text-foreground break-all tracking-widest leading-relaxed">
-                  {accountKey}
-                </p>
+              {/* Account ID display */}
+              <div className="space-y-1">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Account ID (Public Identifier)</span>
+                <div className="rounded-lg border border-border bg-muted px-4 py-2.5">
+                  <p className="font-mono text-sm text-foreground font-semibold tracking-wider">
+                    {accountId}
+                  </p>
+                </div>
               </div>
 
-              {/* Actions */}
-              <div className="flex gap-2">
+              {/* Master Token display */}
+              <div className="space-y-1">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Master Token (Secret Credential)</span>
+                <div className="rounded-lg border border-border bg-muted px-4 py-2.5">
+                  <p className="font-mono text-xs text-foreground break-all tracking-wide leading-relaxed">
+                    {masterToken}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={handleCopyKey}
-                  className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                  onClick={handleCopyCredentials}
+                  className="flex items-center justify-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-xs font-medium text-foreground hover:bg-muted transition-colors"
                 >
-                  {keyCopied ? <CheckCircle2 className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
-                  {keyCopied ? 'Copied!' : 'Copy'}
+                  {keyCopied ? (
+                    <>
+                      <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5" /> Copy Credentials
+                    </>
+                  )}
                 </button>
                 <button
-                  onClick={handleDownloadKey}
-                  className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                  onClick={handleDownloadCredentials}
+                  className="flex items-center justify-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-xs font-medium text-foreground hover:bg-muted transition-colors"
                 >
-                  <Download className="h-4 w-4" />
-                  Download .txt
+                  <Download className="h-3.5 w-3.5" /> Save file (.txt)
                 </button>
               </div>
 
               {/* Mandatory confirmation */}
-              <label className="flex items-start gap-2.5 cursor-pointer">
+              <label className="flex items-start gap-2.5 cursor-pointer pt-2">
                 <input
                   type="checkbox"
                   checked={keySaved}
@@ -184,7 +222,7 @@ export default function RegisterPage() {
                   className="mt-0.5 h-4 w-4 rounded border-input accent-primary flex-shrink-0"
                 />
                 <span className="text-sm text-foreground">
-                  I have securely saved my account key. I understand it{' '}
+                  I have securely saved my Account ID and Master Token. I understand the Master Token{' '}
                   <strong className="text-foreground">cannot be recovered</strong> if lost.
                 </span>
               </label>
@@ -311,7 +349,7 @@ export default function RegisterPage() {
               disabled={!keySaved || (show2FA && !backupSaved) || loading}
               className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {loading ? 'Creating account…' : 'Continue to Plans'}
+              {loading ? 'Signing in…' : 'Continue to Dashboard'}
             </button>
 
             <p className="text-xs text-center text-muted-foreground">
