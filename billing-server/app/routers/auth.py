@@ -145,16 +145,6 @@ async def register_account(
 
     master_token = secrets.token_hex(32)
     master_token_hash = hash_master_token(master_token)
-
-    # ── PHASE 9.1.5 AUDIT LOGGING (remove after root cause confirmed) ──────────
-    logger.warning(
-        "AUDIT [register] account_id=%r token_len=%d "
-        "hash_prefix=%s hash_suffix=%s",
-        account_id, len(master_token),
-        master_token_hash[:8], master_token_hash[-8:],
-    )
-    # ── END AUDIT LOGGING ────────────────────────────────────────────────────────
-
     if settings.environment.lower() != "production":
         logger.debug("DEV AUDIT [Register]: generated_hash=%s", master_token_hash)
 
@@ -172,7 +162,6 @@ async def register_account(
         account_id=account_id,
         master_token=master_token,
     )
-
 
 
 @router.post(

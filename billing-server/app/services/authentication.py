@@ -149,18 +149,6 @@ class AuthenticationService:
         account_id_clean = account_id.strip().upper() if isinstance(account_id, str) else account_id
         master_token_clean = master_token.strip() if isinstance(master_token, str) else master_token
 
-        # ── PHASE 9.1.5 AUDIT LOGGING (remove after root cause confirmed) ──────
-        logger.warning(
-            "AUDIT [authenticate] account_id_received=%r len=%d "
-            "account_id_clean=%r clean_len=%d "
-            "token_len=%d token_first4_codes=%s",
-            account_id, len(str(account_id)),
-            account_id_clean, len(str(account_id_clean)),
-            len(master_token_clean),
-            [ord(c) for c in master_token_clean[:4]] if master_token_clean else [],
-        )
-        # ── END AUDIT LOGGING ────────────────────────────────────────────────────
-
         # Step 1: Find Account via repository
         try:
             account = await self.account_repo.get_by_account_id(account_id_clean)
@@ -171,12 +159,12 @@ class AuthenticationService:
             logger.error("Authentication failed due to unexpected database error")
             raise AuthenticationServiceError("Unexpected database error during authentication lookup") from e
 
-        # ── PHASE 9.1.5 AUDIT LOGGING ───────────────────────────────────────────
-        logger.warning("AUDIT [authenticate] account_found=%s", account is not None)
-        # ── END AUDIT LOGGING ────────────────────────────────────────────────────
-
         # Step 2: Not Found check with Timing Attack Defense
         if account is None:
+            # TIMING ATTACK DEFENSE:
+            # Always execute verify_master_token against a dummy hash so that hashing and constant-time
+            # comparison execute even when the account does not exist. This prevents account enumeration
+            # based on response timing differences.
             verify_master_token(master_token_clean, DUMMY_MASTER_TOKEN_HASH)
             logger.info("Authentication failed: invalid credentials")
             return AuthenticationResult(
@@ -186,23 +174,9 @@ class AuthenticationService:
             )
 
         # Step 3: Verify Master Token
-        computed_hash = hash_master_token(master_token_clean)
         matched = verify_master_token(master_token_clean, account.master_token_hash)
-
-        # ── PHASE 9.1.5 AUDIT LOGGING ───────────────────────────────────────────
-        logger.warning(
-            "AUDIT [authenticate] token_len=%d "
-            "computed_hash_prefix=%s stored_hash_prefix=%s "
-            "computed_hash_suffix=%s stored_hash_suffix=%s "
-            "matched=%s",
-            len(master_token_clean),
-            computed_hash[:8], account.master_token_hash[:8],
-            computed_hash[-8:], account.master_token_hash[-8:],
-            matched,
-        )
-        # ── END AUDIT LOGGING ────────────────────────────────────────────────────
-
         if settings.environment.lower() != "production":
+            computed_hash = hash_master_token(master_token_clean)
             logger.debug(
                 "DEV AUDIT [Login]: computed_hash=%s, stored_hash=%s, matched=%s",
                 computed_hash,

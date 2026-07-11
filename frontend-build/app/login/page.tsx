@@ -103,19 +103,6 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
     try {
-    // ── DEV DIAGNOSTICS (Phase 9.1.5 audit — remove after root cause confirmed) ──
-    console.group('[Auth Audit] Login attempt')
-    console.log('raw credential state length:', credential.length)
-    console.log('raw credential char codes (first 5):', [...credential.slice(0, 5)].map(c => c.charCodeAt(0)))
-    console.log('parsed accountId:', parsed.accountId)
-    console.log('parsed accountId length:', parsed.accountId.length)
-    console.log('parsed masterToken length:', parsed.masterToken.length)
-    console.log('masterToken first 8 chars:', parsed.masterToken.slice(0, 8))
-    console.log('masterToken last 8 chars:', parsed.masterToken.slice(-8))
-    console.log('masterToken char codes (first 4):', [...parsed.masterToken.slice(0, 4)].map(c => c.charCodeAt(0)))
-    console.log('masterToken char codes (last 4):', [...parsed.masterToken.slice(-4)].map(c => c.charCodeAt(0)))
-    console.groupEnd()
-    // ── END DEV DIAGNOSTICS ──
       const res = await api.login({
         account_id: parsed.accountId,
         master_token: parsed.masterToken,
