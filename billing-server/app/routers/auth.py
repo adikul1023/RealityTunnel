@@ -130,13 +130,13 @@ async def register_account(
     for _ in range(5):
         block1 = "".join(secrets.choice(alphabet) for _ in range(4))
         block2 = "".join(secrets.choice(alphabet) for _ in range(4))
-        candidate_id = f"RT-{block1}-{block2}"
+        candidate_id = f"ST-{block1}-{block2}"
         existing = await db.execute(select(Account).where(Account.account_id == candidate_id))
         if existing.scalar_one_or_none() is None:
             account_id = candidate_id
             break
     else:
-        account_id = f"RT-{uuid.uuid4().hex[:8].upper()}"
+        account_id = f"ST-{uuid.uuid4().hex[:8].upper()}"
 
     master_token = secrets.token_hex(32)
     master_token_hash = hashlib.sha256(master_token.encode("utf-8")).hexdigest()

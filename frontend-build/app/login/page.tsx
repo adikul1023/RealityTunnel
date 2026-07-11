@@ -128,6 +128,19 @@ export default function LoginPage() {
     }
   }
 
+  const [registeredNotice, setRegisteredNotice] = useState(false)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      if (params.get('registered') === '1') {
+        setRegisteredNotice(true)
+        const id = params.get('account_id')
+        if (id) setAccountId(id)
+      }
+    }
+  }, [])
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-4 py-16 bg-background">
       <div className="w-full max-w-sm">
@@ -139,6 +152,15 @@ export default function LoginPage() {
           <h1 className="text-xl font-semibold text-foreground">Log in to Stealthy</h1>
           <p className="text-sm text-muted-foreground mt-1">Enter your Account ID and Master Token</p>
         </div>
+
+        {registeredNotice && (
+          <div className="mb-5 rounded-lg border border-primary/30 bg-primary/10 p-3.5 text-sm text-foreground">
+            <p className="font-semibold text-primary mb-0.5">Registration complete!</p>
+            <p className="text-xs text-muted-foreground">
+              Please enter your newly saved Master Token to verify your credentials and sign in.
+            </p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           {/* Account ID */}

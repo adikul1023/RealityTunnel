@@ -246,9 +246,14 @@ export async function apiRequest<T = any>(endpoint: string, options: RequestOpti
     // Check for specific security or business error codes
     let code = 'Error';
     if (response.status === 403) {
-      if (detailMessage.toLowerCase().includes('replay')) code = 'ReplayDetected';
-      else if (detailMessage.toLowerCase().includes('limit')) code = 'DeviceLimitExceeded';
-      else code = 'Forbidden';
+      if (detailMessage.toLowerCase().includes('replay')) {
+        code = 'ReplayDetected';
+        clearSession();
+      } else if (detailMessage.toLowerCase().includes('limit')) {
+        code = 'DeviceLimitExceeded';
+      } else {
+        code = 'Forbidden';
+      }
     }
 
     throw new ApiError(detailMessage, response.status, code, data);

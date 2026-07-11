@@ -93,26 +93,8 @@ export default function RegisterPage() {
     URL.revokeObjectURL(url)
   }
 
-  async function handleContinue() {
-    if (show2FA && !/^\d{6}$/.test(twoFaCode)) {
-      setTwoFaError('Enter a valid 6-digit verification code.')
-      return
-    }
-    setLoading(true)
-    setApiError('')
-    try {
-      await api.login({
-        account_id: accountId,
-        master_token: masterToken,
-        device_guid: getOrCreateDeviceGuid(),
-        two_fa_code: show2FA ? twoFaCode : undefined,
-      })
-      router.push('/dashboard')
-    } catch (err: any) {
-      setApiError(err instanceof ApiError ? err.message : 'Login failed after registration.')
-    } finally {
-      setLoading(false)
-    }
+  function handleContinue() {
+    router.push(`/login?registered=1&account_id=${encodeURIComponent(accountId)}`)
   }
 
   return (
