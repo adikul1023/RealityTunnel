@@ -95,6 +95,13 @@ from app.services.payment import (
 )
 from app.services.credential_service import CredentialService
 from app.services.lifecycle_job_service import LifecycleJobService
+from app.services.totp_service import TOTPService
+from app.services.totp_dtos import (
+    TotpSetupResponse,
+    TotpStatusResponse,
+    TotpVerificationRequest,
+    TotpRegenerateResponse,
+)
 from app.services.billing_service import BillingService
 from app.services.billing_dtos import (
     SubscriptionDTO,
@@ -221,6 +228,11 @@ __all__ = [
     "AdminRetryQueueDTO",
     "AdminComponentHealthDTO",
     "AdminSystemHealthDTO",
+    "TOTPService",
+    "TotpSetupResponse",
+    "TotpStatusResponse",
+    "TotpVerificationRequest",
+    "TotpRegenerateResponse",
 ]
 
 

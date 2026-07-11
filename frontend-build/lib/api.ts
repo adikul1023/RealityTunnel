@@ -318,6 +318,20 @@ export interface BillingPaymentDto {
   description?: string;
 }
 
+export interface TotpStatusResponse {
+  enabled: boolean;
+}
+
+export interface TotpSetupResponse {
+  qr_data_uri: string;
+  secret: string;
+  backup_codes: string[];
+}
+
+export interface TotpRegenerateResponse {
+  backup_codes: string[];
+}
+
 export const api = {
   // Authentication & Registration
   registerAccount: (payload: RegisterAccountPayload = { plan_id: 'free' }) =>
@@ -362,4 +376,26 @@ export const api = {
 
   // Read-only Billing History
   getBillingHistory: () => apiRequest<BillingPaymentDto[]>('/api/billing/payments'),
+
+  // Two-Factor Authentication
+  get2FaStatus: () => apiRequest<TotpStatusResponse>('/api/account/2fa/status'),
+  setup2Fa: () =>
+    apiRequest<TotpSetupResponse>('/api/account/2fa/setup', {
+      method: 'POST',
+    }),
+  enable2Fa: (code: string) =>
+    apiRequest<TotpStatusResponse>('/api/account/2fa/enable', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
+  disable2Fa: (code: string) =>
+    apiRequest<TotpStatusResponse>('/api/account/2fa/disable', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
+  regenerate2FaBackups: (code: string) =>
+    apiRequest<TotpRegenerateResponse>('/api/account/2fa/regenerate-backups', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
 };

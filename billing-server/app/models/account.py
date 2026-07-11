@@ -6,7 +6,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
-from sqlalchemy import String, DateTime, Enum as SQLEnum, text
+from sqlalchemy import String, DateTime, Boolean, Text, Enum as SQLEnum, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import Uuid
 
@@ -66,6 +66,16 @@ class Account(Base, TimestampMixin):
     )
     subscription_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), index=True, nullable=True
+    )
+
+    totp_secret_encrypted: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )
+    totp_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    totp_backup_codes_json: Mapped[str | None] = mapped_column(
+        Text, nullable=True
     )
 
     # Relationships

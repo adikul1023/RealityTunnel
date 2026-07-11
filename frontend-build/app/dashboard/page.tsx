@@ -33,6 +33,7 @@ import {
   BillingPaymentDto,
   ApiError,
 } from '@/lib/api'
+import TwoFactorPanel from '@/components/ui/TwoFactorPanel'
 
 function getPlanLimit(plan: string): number {
   const lower = (plan || '').toLowerCase()
@@ -56,7 +57,7 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
-type Tab = 'credits' | 'devices' | 'billing' | 'downloads'
+type Tab = 'credits' | 'devices' | 'billing' | 'downloads' | 'security'
 type Platform = 'windows' | 'android' | 'macos' | string
 type TxStatus = 'paid' | 'failed' | 'pending' | string
 
@@ -500,12 +501,27 @@ function DownloadsTab() {
   )
 }
 
+function SecurityTab() {
+  return (
+    <div className="space-y-6 max-w-2xl">
+      <div>
+        <h2 className="text-lg font-semibold text-foreground">Security & 2FA</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Add an extra layer of protection to your Stealthy account with Two-Factor Authentication (TOTP).
+        </p>
+      </div>
+      <TwoFactorPanel />
+    </div>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 const TABS: { id: Tab; label: string }[] = [
   { id: 'credits', label: 'My Credits' },
   { id: 'devices', label: 'My Devices' },
   { id: 'billing', label: 'Billing History' },
   { id: 'downloads', label: 'Downloads' },
+  { id: 'security', label: 'Security & 2FA' },
 ]
 
 export default function DashboardPage() {
@@ -641,6 +657,7 @@ export default function DashboardPage() {
               )}
               {activeTab === 'billing' && <BillingTab transactions={transactions} />}
               {activeTab === 'downloads' && <DownloadsTab />}
+              {activeTab === 'security' && <SecurityTab />}
             </>
           )}
         </div>

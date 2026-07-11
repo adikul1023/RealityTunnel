@@ -43,6 +43,7 @@ from app.services import (
     BillingService,
     RazorpayProvider,
     AdminBillingService,
+    TOTPService,
 )
 from app.models.admin_user import AdminUser
 
@@ -69,6 +70,7 @@ admin_oauth2_scheme = HTTPBearer(
 _jwt_service: JWTService | None = None
 _admin_password_service: AdminPasswordService | None = None
 _admin_jwt_service: AdminJWTService | None = None
+_totp_service: TOTPService | None = None
 
 
 def get_jwt_service() -> JWTService:
@@ -93,6 +95,14 @@ def get_admin_jwt_service() -> AdminJWTService:
     if _admin_jwt_service is None:
         _admin_jwt_service = AdminJWTService()
     return _admin_jwt_service
+
+
+def get_totp_service() -> TOTPService:
+    """Dependency provider yielding the stateless singleton TOTPService."""
+    global _totp_service
+    if _totp_service is None:
+        _totp_service = TOTPService()
+    return _totp_service
 
 
 async def get_account_repo(session: AsyncSession = Depends(get_db)) -> AccountRepository:
