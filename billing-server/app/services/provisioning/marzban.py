@@ -78,7 +78,7 @@ class MarzbanProvisioningProvider(ProvisioningProvider):
                 else:
                     async with httpx.AsyncClient(
                         timeout=self.timeout,
-                        verify=settings.marzban_cert_path if settings.marzban_cert_path else True,
+                        verify=False,
                     ) as client:
                         response = await client.request(
                             method,
@@ -172,12 +172,18 @@ class MarzbanProvisioningProvider(ProvisioningProvider):
 
     def _parse_user_dto(self, data: dict[str, Any], fallback_username: str) -> ProvisionedUserDTO:
         """Parse raw JSON payload into a clean ProvisionedUserDTO without logging sensitive links."""
+        uuid = None
+        proxies = data.get("proxies", {})
+        if isinstance(proxies, dict) and "vless" in proxies:
+            uuid = proxies["vless"].get("id")
+
         return ProvisionedUserDTO(
             remote_user_id=str(data.get("username", fallback_username)),
             status=str(data.get("status", "active")),
             data_limit=data.get("data_limit"),
             data_used=data.get("data_used"),
             expire_at=data.get("expire"),
+            uuid=uuid,
             links=data.get("links", []),
         )
 
@@ -189,7 +195,11 @@ class MarzbanProvisioningProvider(ProvisioningProvider):
     ) -> ProvisionedUserDTO:
         """Create a new VPN user in Marzban."""
         path = settings.marzban_create_user_path
-        payload: dict[str, Any] = {"username": username, "status": "active"}
+        payload: dict[str, Any] = {
+            "username": username, 
+            "status": "active",
+            "proxies": {"vless": {}}
+        }
         if data_limit is not None:
             payload["data_limit"] = data_limit
         if expire_at is not None:
@@ -215,7 +225,7 @@ class MarzbanProvisioningProvider(ProvisioningProvider):
     ) -> ProvisionedUserDTO:
         """Update existing user in Marzban."""
         path = settings.marzban_update_user_path.format(username=username)
-        payload: dict[str, Any] = {}
+        payload: dict[str, Any] = {"proxies": {"vless": {}}}
         if data_limit is not None:
             payload["data_limit"] = data_limit
         if expire_at is not None:
