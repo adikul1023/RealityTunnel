@@ -24,11 +24,20 @@
 
 ## Database Schema & Migrations
 - **Current DB:** PostgreSQL (db: `billing`)
-- **Alembic Migration Status:** `c9a8b7d6e5f4 (head)`
+- **Alembic Migration Status:** `a1b2c3d4e5f0 (head)`
+
+## Architecture Change Notes
+Before Phase 10.3C:
+- **Remove Device** -> `is_active = false` (soft deactivate)
+
+After Phase 10.3C:
+- **Remove Device** -> `DELETE row` (hard delete) + token revocation (`DEVICE_REMOVED`)
+- **Suspend Device** -> `is_active = false` (admin/suspension only)
+- **Reactivate Device** -> `is_active = true`
 
 ## Active Phases
 - **Current Phase:** End-to-end VPN connection.
-- **Completed:** Production login, JWT, Refresh, 2FA, Secure credential storage, UI modernization, Single-instance application, Backend-driven VPN configuration, Removal of local `.env` dependency.
+- **Completed:** Production login, JWT, Refresh, 2FA, Secure credential storage, UI modernization, Single-instance application, Backend-driven VPN configuration, Removal of local `.env` dependency, Hard-delete device removal & legacy inactive device migration (`a1b2c3d4e5f0`).
 
 ## Known Bugs
 - *To be discovered/documented*
@@ -37,7 +46,9 @@
 - UI modernization (first iteration)
 - Single-instance application constraints
 - Removal of `.env` dependency for VPN configuration
+- Device lifecycle architectural split (Remove = Hard Delete vs Suspend = Soft Deactivate)
 
 ## Pending Work
 - End-to-end VPN connection for the Windows Client.
 - Android Client (Future Phase 3).
+
