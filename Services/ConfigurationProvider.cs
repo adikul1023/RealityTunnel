@@ -47,11 +47,16 @@ public class ConfigurationProvider
         {
             try
             {
-                var remoteProfile = await _apiClient.FetchVpnProfileAsync(token);
-                if (remoteProfile != null)
+                string deviceGuid = _storage.GetDeviceGuid();
+                var config = await _apiClient.FetchClientConfigAsync(token, deviceGuid);
+                if (config != null)
                 {
-                    _storage.SaveVpnProfile(remoteProfile);
-                    return remoteProfile;
+                    _storage.SaveVpnProfile(config.VpnProfile);
+                    // Also save the license blob for offline validation
+                    var licenseBlob = new LicenseBlob(config.LicenseBlob.Payload, config.LicenseBlob.Signature);
+                    _storage.SaveLicenseBlob(licenseBlob);
+                    
+                    return config.VpnProfile;
                 }
             }
             catch
@@ -59,20 +64,6 @@ public class ConfigurationProvider
                 // Network error, fallback to cache
             }
         }
-
-#if DEBUG
-        var settings = AppSettings.Load();
-        if (!string.IsNullOrWhiteSpace(settings.ServerIp))
-        {
-            return new VpnProfile 
-            { 
-                ServerIp = settings.ServerIp,
-                Uuid = "00000000-0000-0000-0000-000000000000",
-                PublicKey = "dummy-key",
-                Sni = "www.microsoft.com"
-            };
-        }
-#endif
 
         return null;
     }

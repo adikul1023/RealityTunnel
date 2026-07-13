@@ -54,7 +54,8 @@ from typing import TYPE_CHECKING
 
 from app.exceptions import DatabaseOperationError, RepositoryError
 from app.models import RefreshToken
-from app.repositories import RefreshTokenRepository
+from app.models.base import RevocationReason
+from app.repositories import RefreshTokenRepository, DeviceRepository
 from app.security import (
     generate_refresh_token,
     hash_refresh_token,
@@ -67,6 +68,7 @@ from app.services.exceptions import (
     RefreshTokenExpiredError,
     RefreshTokenRevokedError,
     RefreshTokenReplayError,
+    DeviceRevokedError,
 )
 
 if TYPE_CHECKING:
@@ -110,8 +112,9 @@ class RefreshTokenService:
     device binding, and replay attack detection.
     """
 
-    def __init__(self, repo: RefreshTokenRepository) -> None:
+    def __init__(self, repo: RefreshTokenRepository, device_repo: DeviceRepository) -> None:
         self.repo = repo
+        self.device_repo = device_repo
 
     async def _get_and_validate_token(self, plaintext_token: str, *, for_update: bool = False) -> RefreshToken:
         """
@@ -140,6 +143,13 @@ class RefreshTokenService:
             raise RefreshTokenNotFoundError("Refresh token not found or unrecognized")
 
         if entity.is_revoked:
+            if entity.revoked_reason == RevocationReason.DEVICE_REMOVED:
+                raise DeviceRevokedError(
+                    "Device was removed by the user.",
+                    account_id=entity.account_id,
+                    device_guid=entity.device_guid,
+                )
+            
             # Replay detection: reuse of a legitimately issued token that was previously revoked!
             logger.warning("Replay detected! Revoking all sessions for account.")
             try:
@@ -151,6 +161,18 @@ class RefreshTokenService:
                 account_id=entity.account_id,
                 device_guid=entity.device_guid,
             )
+
+        # Defense-in-depth: check if device is still active
+        try:
+            device = await self.device_repo.get_by_guid(entity.device_guid)
+            if device is not None and not device.is_active:
+                raise DeviceRevokedError(
+                    "Device is deactivated.",
+                    account_id=entity.account_id,
+                    device_guid=entity.device_guid,
+                )
+        except RepositoryError as exc:
+            raise RefreshTokenServiceError("Database error checking device status") from exc
 
         # Defensive timezone normalization: DateTime(timezone=True) should always return
         # tz-aware datetimes, but guard against driver-layer inconsistencies.
@@ -281,4 +303,17 @@ class RefreshTokenService:
 
         if count > 0:
             logger.info("All sessions revoked")
+        return count
+
+    async def revoke_all_for_device(self, account_id: uuid.UUID, device_guid: str, reason: str = RevocationReason.DEVICE_REMOVED) -> int:
+        """
+        Revoke all active refresh tokens for a specific device.
+        """
+        try:
+            count = await self.repo.revoke_all_for_device(account_id, device_guid, reason)
+        except RepositoryError as exc:
+            raise RefreshTokenServiceError("Database error revoking sessions for device") from exc
+
+        if count > 0:
+            logger.info(f"All sessions revoked for device {device_guid}")
         return count

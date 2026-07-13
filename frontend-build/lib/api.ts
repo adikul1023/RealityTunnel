@@ -372,7 +372,14 @@ export const api = {
   getClientMe: () => apiRequest<AccountMeResponse>('/api/client/me'),
 
   // Devices
-  listDevices: () => apiRequest<DeviceListResponse>('/api/devices'),
+  listDevices: () => apiRequest<DeviceListResponse>('/api/devices', {
+    cache: 'no-store',
+    headers: {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    },
+  }),
 
   deactivateDevice: (deviceGuid: string) =>
     apiRequest<{ success: boolean }>(`/api/devices/${encodeURIComponent(deviceGuid)}`, {

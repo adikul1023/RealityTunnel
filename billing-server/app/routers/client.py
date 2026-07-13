@@ -22,10 +22,12 @@ router = APIRouter(prefix="/api/client", tags=["Client"])
 
 class VpnProfileDto(BaseModel):
     uuid: str = Field(..., description="VLESS UUID")
-    server_ip: str = Field(..., description="VPN Server IP")
+    server_host: str = Field(..., description="VPN Server Hostname")
+    server_port: int = Field(..., description="VPN Server Port")
     public_key: str = Field(..., description="REALITY Public Key")
+    short_id: str = Field(..., description="REALITY Short ID")
     sni: str = Field(..., description="Server Name Indication")
-    dns: str | None = Field(None, description="DNS Server IP")
+    preferred_dns: str | None = Field(None, description="DNS Server IP")
 
 
 class LicenseBlobDto(BaseModel):
@@ -38,6 +40,12 @@ class ClientConfigResponse(BaseModel):
     license_blob: LicenseBlobDto
 
 
+from fastapi import Header
+from app.services.provisioning.service import ProvisioningService
+from app.dependencies import get_provisioning_service
+from app.config import settings
+from app.models.base import SubscriptionStatus
+
 @router.get(
     "/config",
     summary="Fetch VPN configuration and offline license blob",
@@ -45,23 +53,39 @@ class ClientConfigResponse(BaseModel):
     status_code=status.HTTP_200_OK,
 )
 async def get_client_config(
+    x_device_id: str | None = Header(None, alias="X-Device-ID", description="Registered device ID"),
     current_account: Account = Depends(get_current_account),
+    provisioning: ProvisioningService = Depends(get_provisioning_service),
+    db: AsyncSession = Depends(get_db),
 ) -> ClientConfigResponse:
     """
     Returns the VPN profile (for the client's VPN engine) and an offline License Blob 
     (for offline authorization when Oracle is unreachable).
     """
-    # TODO: In a real implementation, these values would come from the provisioning system
-    # and the License Blob would be signed by the backend's Ed25519 private key.
-    # For Phase 8.3 integration testing, we return stubbed valid data.
+    # Verify Device
+    if not x_device_id:
+        raise HTTPException(status_code=400, detail="Missing X-Device-ID header")
+    
+    device_res = await db.execute(select(Device).where(Device.device_id == x_device_id, Device.account_id == current_account.id))
+    if not device_res.scalar_one_or_none():
+        raise HTTPException(status_code=401, detail="Device not registered")
+        
+    # Verify Active Subscription
+    if current_account.status != SubscriptionStatus.ACTIVE:
+        raise HTTPException(status_code=403, detail="Account requires an active subscription")
+
+    # Retrieve cached VPN identity (lazy-syncing legacy users if needed)
+    identity = await provisioning.get_vpn_identity(current_account.id)
     
     return ClientConfigResponse(
         vpn_profile=VpnProfileDto(
-            uuid="b8398dbd-a7b2-4d24-87dc-7bbf1cf033de",
-            server_ip="144.24.153.180", # Example Contabo IP
-            public_key="some-reality-public-key",
-            sni="www.microsoft.com",
-            dns="1.1.1.1"
+            uuid=identity.uuid,
+            server_host=settings.vpn_edge_host,
+            server_port=settings.vpn_edge_port,
+            public_key=settings.vpn_edge_reality_public_key,
+            short_id=settings.vpn_edge_reality_short_id,
+            sni=settings.vpn_edge_reality_sni,
+            preferred_dns=settings.vpn_preferred_dns,
         ),
         license_blob=LicenseBlobDto(
             payload="mock-payload",

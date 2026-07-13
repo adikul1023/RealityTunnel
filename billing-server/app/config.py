@@ -87,7 +87,7 @@ class Settings(BaseSettings):
     admin_jwt_audience: str = "RealityTunnel Admin Panel"  # [Public Config]
 
     # ── VPN Provisioning (Marzban Integration) [Internal Config / Secret] ────
-    marzban_base_url: str = "http://localhost:8000"  # [Internal Config / Public ID]
+    marzban_base_url: str = "http://marzban:8000"  # [Internal Config / Public ID]
     marzban_rpc_url: str | None = None  # [Internal Config] Backend-to-backend RPC url.
     marzban_api_token: SecretStr = SecretStr("")  # [Infrastructure Secret]
     marzban_timeout_seconds: float = 10.0  # [Operational Parameter]
@@ -99,6 +99,14 @@ class Settings(BaseSettings):
     marzban_reset_user_path: str = "/api/user/{username}/reset"  # [Internal Config]
     marzban_system_stats_path: str = "/api/system"  # [Internal Config]
     marzban_cert_path: str | None = None  # [Internal Config] path to Marzban's self-signed CA bundle if applicable
+
+    # ── VPN Edge Profile (Phase 10.3A) ────────────────────────────────────────
+    vpn_edge_host: str = "edge.stealthy.co.in"
+    vpn_edge_port: int = 443
+    vpn_edge_reality_public_key: str = "kbc_idEgRtnpR74HjzGE0uhGSPXSxZS3b6XLBT4G930"
+    vpn_edge_reality_short_id: str = ""
+    vpn_edge_reality_sni: str = "dl.google.com"
+    vpn_preferred_dns: str = "1.1.1.1"
 
     # ── Payment Gateway (Razorpay Integration) [Internal Config / Secret] ────
     razorpay_key_id: str = ""  # [Internal Config / Public ID]

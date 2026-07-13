@@ -99,6 +99,14 @@ class RefreshTokenReplayError(RefreshTokenServiceError):
     pass
 
 
+class DeviceRevokedError(RefreshTokenServiceError):
+    """
+    Raised when a refresh token operation fails because the device was explicitly removed or deactivated.
+    Unlike ReplayError, this does not trigger an account-wide logout.
+    """
+    pass
+
+
 class DeviceServiceError(ServiceError):
     """Base exception for device registration and management operations."""
     pass

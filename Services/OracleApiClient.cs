@@ -148,9 +148,18 @@ public class OracleApiClient
             return null;
         }
         
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            var json = await response.Content.ReadAsStringAsync();
+            if (json.Contains("\"DEVICE_REVOKED\"") || json.Contains("\"REPLAY_DETECTED\""))
+            {
+                throw new SessionRevokedException();
+            }
+        }
+        
         if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
         {
-            throw new UnauthorizedAccessException("ReplayDetected");
+            throw new SessionRevokedException("ReplayDetected"); // Keep this for backwards compatibility if needed
         }
         
         return null;

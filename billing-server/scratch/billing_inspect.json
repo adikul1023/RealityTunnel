@@ -1,0 +1,365 @@
+[
+    {
+        "Id": "c7d49627d18fca6eeef819fad4738034b3ba14cb9d9785a4b51f83bbbf1e2515",
+        "Created": "2026-07-09T14:43:46.424588928Z",
+        "Path": "/usr/bin/tini",
+        "Args": [
+            "--",
+            "uvicorn",
+            "app.main:app",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "8080",
+            "--workers",
+            "1"
+        ],
+        "State": {
+            "Status": "running",
+            "Running": true,
+            "Paused": false,
+            "Restarting": false,
+            "OOMKilled": false,
+            "Dead": false,
+            "Pid": 100182,
+            "ExitCode": 0,
+            "Error": "",
+            "StartedAt": "2026-07-09T14:43:48.496876884Z",
+            "FinishedAt": "0001-01-01T00:00:00Z",
+            "Health": {
+                "Status": "healthy",
+                "FailingStreak": 0,
+                "Log": [
+                    {
+                        "Start": "2026-07-09T20:17:48.006803023+05:30",
+                        "End": "2026-07-09T20:17:48.525465462+05:30",
+                        "ExitCode": 0,
+                        "Output": ""
+                    },
+                    {
+                        "Start": "2026-07-09T20:18:03.530559566+05:30",
+                        "End": "2026-07-09T20:18:03.993223637+05:30",
+                        "ExitCode": 0,
+                        "Output": ""
+                    },
+                    {
+                        "Start": "2026-07-09T20:18:18.995098916+05:30",
+                        "End": "2026-07-09T20:18:19.692096088+05:30",
+                        "ExitCode": 0,
+                        "Output": ""
+                    },
+                    {
+                        "Start": "2026-07-09T20:18:34.692643772+05:30",
+                        "End": "2026-07-09T20:18:35.264933051+05:30",
+                        "ExitCode": 0,
+                        "Output": ""
+                    },
+                    {
+                        "Start": "2026-07-09T20:18:50.265835418+05:30",
+                        "End": "2026-07-09T20:18:50.719524414+05:30",
+                        "ExitCode": 0,
+                        "Output": ""
+                    }
+                ]
+            }
+        },
+        "Image": "sha256:923415c54b6982951e69eec7890d15ef28a09e1efc6199506732ccd80d2164cc",
+        "ResolvConfPath": "/home/ak/.local/share/docker/containers/c7d49627d18fca6eeef819fad4738034b3ba14cb9d9785a4b51f83bbbf1e2515/resolv.conf",
+        "HostnamePath": "/home/ak/.local/share/docker/containers/c7d49627d18fca6eeef819fad4738034b3ba14cb9d9785a4b51f83bbbf1e2515/hostname",
+        "HostsPath": "/home/ak/.local/share/docker/containers/c7d49627d18fca6eeef819fad4738034b3ba14cb9d9785a4b51f83bbbf1e2515/hosts",
+        "LogPath": "/home/ak/.local/share/docker/containers/c7d49627d18fca6eeef819fad4738034b3ba14cb9d9785a4b51f83bbbf1e2515/c7d49627d18fca6eeef819fad4738034b3ba14cb9d9785a4b51f83bbbf1e2515-json.log",
+        "Name": "/billing-billing-api-1",
+        "RestartCount": 0,
+        "Driver": "overlayfs",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+            "Binds": [
+                "billing_backup_data_prod:/app/backups:rw",
+                "billing_brain_data_prod:/app/brain:rw",
+                "/opt/realitytunnel/secrets/jwt:/app/dev_keys:ro"
+            ],
+            "ContainerIDFile": "",
+            "LogConfig": {
+                "Type": "json-file",
+                "Config": {
+                    "max-file": "5",
+                    "max-size": "10m"
+                }
+            },
+            "NetworkMode": "billing_internal_net",
+            "PortBindings": {},
+            "RestartPolicy": {
+                "Name": "unless-stopped",
+                "MaximumRetryCount": 0
+            },
+            "AutoRemove": false,
+            "VolumeDriver": "",
+            "VolumesFrom": null,
+            "ConsoleSize": [
+                0,
+                0
+            ],
+            "CapAdd": null,
+            "CapDrop": [
+                "ALL"
+            ],
+            "CgroupnsMode": "private",
+            "Dns": null,
+            "DnsOptions": null,
+            "DnsSearch": null,
+            "ExtraHosts": [],
+            "GroupAdd": null,
+            "IpcMode": "private",
+            "Cgroup": "",
+            "Links": null,
+            "OomScoreAdj": 200,
+            "PidMode": "",
+            "Privileged": false,
+            "PublishAllPorts": false,
+            "ReadonlyRootfs": true,
+            "SecurityOpt": [
+                "no-new-privileges:true"
+            ],
+            "Tmpfs": {
+                "/tmp": ""
+            },
+            "UTSMode": "",
+            "UsernsMode": "",
+            "ShmSize": 67108864,
+            "Runtime": "runc",
+            "Isolation": "",
+            "CpuShares": 0,
+            "Memory": 1610612736,
+            "NanoCpus": 1500000000,
+            "CgroupParent": "",
+            "BlkioWeight": 0,
+            "BlkioWeightDevice": null,
+            "BlkioDeviceReadBps": null,
+            "BlkioDeviceWriteBps": null,
+            "BlkioDeviceReadIOps": null,
+            "BlkioDeviceWriteIOps": null,
+            "CpuPeriod": 0,
+            "CpuQuota": 0,
+            "CpuRealtimePeriod": 0,
+            "CpuRealtimeRuntime": 0,
+            "CpusetCpus": "",
+            "CpusetMems": "",
+            "Devices": null,
+            "DeviceCgroupRules": null,
+            "DeviceRequests": null,
+            "MemoryReservation": 536870912,
+            "MemorySwap": 3221225472,
+            "MemorySwappiness": null,
+            "OomKillDisable": null,
+            "PidsLimit": null,
+            "Ulimits": null,
+            "CpuCount": 0,
+            "CpuPercent": 0,
+            "IOMaximumIOps": 0,
+            "IOMaximumBandwidth": 0,
+            "MaskedPaths": [
+                "/proc/acpi",
+                "/proc/asound",
+                "/proc/interrupts",
+                "/proc/kcore",
+                "/proc/keys",
+                "/proc/latency_stats",
+                "/proc/sched_debug",
+                "/proc/scsi",
+                "/proc/timer_list",
+                "/proc/timer_stats",
+                "/sys/devices/virtual/powercap",
+                "/sys/firmware"
+            ],
+            "ReadonlyPaths": [
+                "/proc/bus",
+                "/proc/fs",
+                "/proc/irq",
+                "/proc/sys",
+                "/proc/sysrq-trigger"
+            ]
+        },
+        "Storage": {
+            "RootFS": {
+                "Snapshot": {
+                    "Name": "overlayfs"
+                }
+            }
+        },
+        "Mounts": [
+            {
+                "Type": "volume",
+                "Name": "billing_backup_data_prod",
+                "Source": "/home/ak/.local/share/docker/volumes/billing_backup_data_prod/_data",
+                "Destination": "/app/backups",
+                "Driver": "local",
+                "Mode": "rw",
+                "RW": true,
+                "Propagation": ""
+            },
+            {
+                "Type": "volume",
+                "Name": "billing_brain_data_prod",
+                "Source": "/home/ak/.local/share/docker/volumes/billing_brain_data_prod/_data",
+                "Destination": "/app/brain",
+                "Driver": "local",
+                "Mode": "rw",
+                "RW": true,
+                "Propagation": ""
+            },
+            {
+                "Type": "bind",
+                "Source": "/opt/realitytunnel/secrets/jwt",
+                "Destination": "/app/dev_keys",
+                "Mode": "ro",
+                "RW": false,
+                "Propagation": "rprivate"
+            }
+        ],
+        "Config": {
+            "Hostname": "c7d49627d18f",
+            "Domainname": "",
+            "User": "billing",
+            "AttachStdin": false,
+            "AttachStdout": true,
+            "AttachStderr": true,
+            "ExposedPorts": {
+                "8080/tcp": {}
+            },
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+                "DEBUG=false",
+                "DOCKER_IMAGE=billing-server-billing-api:latest",
+                "POSTGRES_PASSWORD=390b1b903df5fa402e082c8f4370716019a677b9a185bb5f2acc0ce5624df4c8",
+                "PAYMENTS_ENABLED=False",
+                "REDIS_URL=redis://redis:6379/0",
+                "TRUSTED_PROXY_IPS=172.28.0.0/16",
+                "ADMIN_JWT_PUBLIC_KEY_PATH=/app/dev_keys/jwt_ed25519.pub",
+                "SECRET_KEY=734daf46cdc1f0486574a9e2bb7f2a955c3112494ce4ad72e653f14f5130bb3f",
+                "POSTGRES_DB=billing",
+                "LOG_LEVEL=INFO",
+                "POSTGRES_HOST=postgres",
+                "POSTGRES_USER=billing",
+                "RAZORPAY_KEY_ID=DUMMY_rzp_live_abc123",
+                "JWT_PRIVATE_KEY_PATH=/app/dev_keys/jwt_ed25519.pem",
+                "TRUST_PROXY=true",
+                "RAZORPAY_KEY_SECRET=DUMMY_rzp_live_secret",
+                "RAZORPAY_WEBHOOK_SECRET=DUMMY_rzp_live_webhook",
+                "ADMIN_JWT_PRIVATE_KEY_PATH=/app/dev_keys/jwt_ed25519.pem",
+                "APP_VERSION=1.0.0",
+                "JWT_PUBLIC_KEY_PATH=/app/dev_keys/jwt_ed25519.pub",
+                "GIT_COMMIT=unknown",
+                "ENVIRONMENT=production",
+                "MARZBAN_API_TOKEN=placeholder_marzban_token",
+                "WEBHOOKS_ENABLED=true",
+                "BUILD_DATE=unknown",
+                "RATE_LIMIT_BACKEND=redis",
+                "MARZBAN_BASE_URL=https://marzban:8000",
+                "PROVISIONING_ENABLED=true",
+                "POSTGRES_PORT=5432",
+                "PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "LANG=C.UTF-8",
+                "GPG_KEY=7169605F62C751356D054A26A821E680E5FA6305",
+                "PYTHON_VERSION=3.12.13",
+                "PYTHON_SHA256=c08bc65a81971c1dd5783182826503369466c7e67374d1646519adf05207b684"
+            ],
+            "Cmd": [
+                "uvicorn",
+                "app.main:app",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8080",
+                "--workers",
+                "1"
+            ],
+            "Healthcheck": {
+                "Test": [
+                    "CMD-SHELL",
+                    "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/health')\""
+                ],
+                "Interval": 15000000000,
+                "Timeout": 5000000000,
+                "StartPeriod": 20000000000,
+                "Retries": 5
+            },
+            "Image": "billing-server-billing-api:latest",
+            "Volumes": null,
+            "WorkingDir": "/app",
+            "Entrypoint": [
+                "/usr/bin/tini",
+                "--"
+            ],
+            "Labels": {
+                "com.docker.compose.config-hash": "4df752d44f5cc988d49ead93a3dbba41e05feab12fbe3dcb06ccc97333c1d6f2",
+                "com.docker.compose.container-number": "1",
+                "com.docker.compose.depends_on": "redis:service_healthy:false,postgres:service_healthy:false",
+                "com.docker.compose.image": "sha256:923415c54b6982951e69eec7890d15ef28a09e1efc6199506732ccd80d2164cc",
+                "com.docker.compose.oneoff": "False",
+                "com.docker.compose.project": "billing",
+                "com.docker.compose.project.config_files": "/opt/realitytunnel/billing/current/docker-compose.yml,/opt/realitytunnel/billing/current/docker-compose.prod.yml",
+                "com.docker.compose.project.environment_file": "/opt/realitytunnel/secrets/env/.env.production",
+                "com.docker.compose.project.working_dir": "/opt/realitytunnel/billing/current",
+                "com.docker.compose.replace": "billing-api-1",
+                "com.docker.compose.service": "billing-api",
+                "com.docker.compose.version": "5.3.1",
+                "org.opencontainers.image.created": "unknown",
+                "org.opencontainers.image.description": "High-performance VPN billing, subscription, and authentication backend",
+                "org.opencontainers.image.licenses": "MIT",
+                "org.opencontainers.image.revision": "unknown",
+                "org.opencontainers.image.source": "https://github.com/adikul1023/RealityTunnel",
+                "org.opencontainers.image.title": "RealityTunnel Billing & Authentication Service",
+                "org.opencontainers.image.vendor": "OverREALITY",
+                "org.opencontainers.image.version": "1.0.0"
+            }
+        },
+        "NetworkSettings": {
+            "SandboxID": "ee49e38e609a51fa0dc26e5e79ead21a29bf3e88c75561028aab3dd1771420c7",
+            "SandboxKey": "/run/user/1000/docker/netns/ee49e38e609a",
+            "Ports": {
+                "8080/tcp": null
+            },
+            "Networks": {
+                "billing_internal_net": {
+                    "IPAMConfig": null,
+                    "Links": null,
+                    "Aliases": [
+                        "billing-billing-api-1",
+                        "billing-api"
+                    ],
+                    "DriverOpts": null,
+                    "GwPriority": 0,
+                    "NetworkID": "e2ac517bea440f859a677193e0c77c69bbb55f526b4a4ce8c97fdb0f30b1d10e",
+                    "EndpointID": "381f0c3c47152dce182d5d0c5fb4bfd7c0170f531d41e4df75b3d5ddcdcbd5d9",
+                    "Gateway": "",
+                    "IPAddress": "172.28.0.4",
+                    "MacAddress": "06:18:63:e9:9f:fe",
+                    "IPPrefixLen": 16,
+                    "IPv6Gateway": "",
+                    "GlobalIPv6Address": "",
+                    "GlobalIPv6PrefixLen": 0,
+                    "DNSNames": [
+                        "billing-billing-api-1",
+                        "billing-api",
+                        "c7d49627d18f"
+                    ]
+                }
+            }
+        },
+        "ImageManifestDescriptor": {
+            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+            "digest": "sha256:658f1281629a33944fea909af2d703db44a85831b16b00a3ca909395df270cea",
+            "size": 2008,
+            "platform": {
+                "architecture": "amd64",
+                "os": "linux"
+            }
+        }
+    }
+]

@@ -136,6 +136,11 @@ public class AuthenticationService
                 return newTokens.AccessToken;
             }
         }
+        catch (SessionRevokedException)
+        {
+            _tokenService.ClearTokens();
+            throw;
+        }
         catch (UnauthorizedAccessException ex) when (ex.Message == "ReplayDetected")
         {
             _tokenService.HandleReplayDetected();

@@ -557,7 +557,10 @@ export default function DashboardPage() {
         : []
 
       if (profileData) setProfile(profileData)
-      setDevices(Array.isArray(devicesRes?.devices) ? devicesRes.devices : [])
+      const activeDevices = Array.isArray(devicesRes?.devices) 
+        ? devicesRes.devices.filter((d: any) => d.is_active) 
+        : []
+      setDevices(activeDevices)
       setTransactions(billingList)
 
       if (results[0].status === 'rejected') {

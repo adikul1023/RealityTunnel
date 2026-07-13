@@ -32,9 +32,6 @@ public class LoginResult
     // For DeviceLimitExceeded
     public DeviceLimitDetails? DeviceLimitDetails { get; set; }
     
-    // For Requires2FA
-    public string? TemporaryLoginToken { get; set; }
-    
     // For MaintenanceMode
     public int? RetryAfterSeconds { get; set; }
     
@@ -53,21 +50,15 @@ public class DeviceLimitDetails
     public string ManageDevicesUrl { get; set; } = "";
 }
 
-public class Verify2FaRequest
-{
-    [JsonPropertyName("temporary_login_token")]
-    public string TemporaryLoginToken { get; set; } = "";
-    
-    [JsonPropertyName("totp_code")]
-    public string TotpCode { get; set; } = "";
-}
 
 public class ApiErrorResponse
 {
-    [JsonPropertyName("error")]
-    public string Error { get; set; } = "";
+    [JsonPropertyName("detail")]
+    public string? Detail { get; set; }
+
+    [JsonPropertyName("requires_2fa")]
+    public bool? Requires2Fa { get; set; }
     
-    // Only populated when error is "device_limit_exceeded"
     [JsonPropertyName("current_devices")]
     public int? CurrentDevices { get; set; }
     
@@ -76,10 +67,6 @@ public class ApiErrorResponse
     
     [JsonPropertyName("manage_devices_url")]
     public string? ManageDevicesUrl { get; set; }
-    
-    // Only populated when error is "requires_2fa"
-    [JsonPropertyName("temporary_login_token")]
-    public string? TemporaryLoginToken { get; set; }
 }
 
 public class ExchangeRequestDto

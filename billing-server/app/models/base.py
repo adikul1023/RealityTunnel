@@ -31,6 +31,19 @@ class SubscriptionLifecycleStatus(str, enum.Enum):
     CANCELLED = "CANCELLED"
 
 
+class RevocationReason(str, enum.Enum):
+    """
+    Reason a refresh token was revoked.
+    """
+    ROTATED = "ROTATED"
+    DEVICE_REMOVED = "DEVICE_REMOVED"
+    USER_LOGOUT = "USER_LOGOUT"
+    REPLAY_DETECTED = "REPLAY_DETECTED"
+    PASSWORD_RESET = "PASSWORD_RESET"
+    ACCOUNT_DISABLED = "ACCOUNT_DISABLED"
+    SUBSCRIPTION_REVOKED = "SUBSCRIPTION_REVOKED"
+
+
 class TimestampMixin:
     """
     Mixin that provides automatic created_at and updated_at timestamps

@@ -21,8 +21,8 @@
     {
       "type": "vless",
       "tag": "proxy",
-      "server": "{{SERVER_IP}}",
-      "server_port": 443,
+      "server": "{{SERVER_HOST}}",
+      "server_port": {{SERVER_PORT}},
       "uuid": "{{VPN_UUID}}",
       "flow": "xtls-rprx-vision",
       "packet_encoding": "",

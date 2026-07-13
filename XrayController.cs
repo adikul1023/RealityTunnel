@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Threading;
+using RealityTunnel.Models;
 
 namespace RealityTunnel;
 
@@ -20,7 +22,7 @@ public class XrayController
     private const string TunAddress  = "10.0.85.2";
     private const string AdapterName = "singbox_tun";
 
-    public void Start(string serverIp)
+    public void Start(VpnProfile profile)
     {
         if (IsRunning())
             throw new InvalidOperationException("Already running.");
@@ -40,12 +42,23 @@ public class XrayController
 
         _realGateway = GetDefaultGateway()
             ?? throw new InvalidOperationException("Cannot determine default gateway.");
-        _serverIp = serverIp;
+            
+        // Resolve hostname to IP for routing purposes
+        var addresses = Dns.GetHostAddresses(profile.ServerHost);
+        if (addresses == null || addresses.Length == 0)
+        {
+            throw new InvalidOperationException($"Could not resolve {profile.ServerHost}");
+        }
+        _serverIp = addresses[0].ToString();
 
-        var envVars = LoadDotEnv(appDir);
-        string config = File.ReadAllText(templatePath).Replace("{{SERVER_IP}}", serverIp);
-        foreach (var kv in envVars)
-            config = config.Replace($"{{{{{kv.Key}}}}}", kv.Value);
+        string config = File.ReadAllText(templatePath)
+            .Replace("{{SERVER_HOST}}", profile.ServerHost)
+            .Replace("{{SERVER_PORT}}", profile.ServerPort.ToString())
+            .Replace("{{VPN_UUID}}", profile.Uuid)
+            .Replace("{{VPN_SNI}}", profile.Sni)
+            .Replace("{{VPN_PUBLIC_KEY}}", profile.PublicKey)
+            .Replace("{{VPN_SHORT_ID}}", profile.ShortId);
+            
         File.WriteAllText(configPath, config);
 
         foreach (var orphan in Process.GetProcessesByName("sing-box"))
@@ -75,7 +88,7 @@ public class XrayController
             throw new InvalidOperationException($"sing-box exited immediately.\n\nLog:\n{log}");
         }
 
-        try   { SetupRoutes(serverIp); }
+        try   { SetupRoutes(_serverIp); }
         catch { Stop(); throw; }
     }
 

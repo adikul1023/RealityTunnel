@@ -23,6 +23,10 @@ from app.services.exceptions import (
 )
 from app.services.subscription_plan import SubscriptionPlanService
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from app.services.refresh_tokens import RefreshTokenService
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,10 +40,12 @@ class DeviceService:
         self,
         device_repository: DeviceRepository,
         account_repository: AccountRepository,
+        refresh_service: 'RefreshTokenService' = None,
         plan_service: SubscriptionPlanService | None = None,
     ) -> None:
         self.device_repo = device_repository
         self.account_repo = account_repository
+        self.refresh_service = refresh_service
         self.plan_service = plan_service or SubscriptionPlanService()
 
     def _validate_friendly_name(self, name: str | None) -> str | None:
@@ -263,6 +269,8 @@ class DeviceService:
         device.is_active = False
         try:
             updated = await self.device_repo.update(device)
+            if self.refresh_service:
+                await self.refresh_service.revoke_all_for_device(account_id, device_guid)
             return self._normalize_device_timestamps(updated)
         except RepositoryError as exc:
             logger.error("Repository error deactivating device")

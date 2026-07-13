@@ -75,6 +75,9 @@ class ProvisioningProfile(Base, TimestampMixin):
     last_error: Mapped[str | None] = mapped_column(
         String(500), nullable=True
     )
+    vpn_uuid: Mapped[str | None] = mapped_column(
+        String(36), nullable=True, index=True
+    )
 
     account: Mapped["Account"] = relationship(
         "Account",

@@ -82,3 +82,32 @@ class RefreshTokenRepository(BaseRepository[RefreshToken]):
             raise DatabaseOperationError(
                 "Database error revoking all refresh tokens for account"
             ) from exc
+
+    async def revoke_all_for_device(self, account_id: uuid.UUID, device_guid: str, reason: str, *, commit: bool = True) -> int:
+        """
+        Revoke all active refresh tokens for a specific device under a given account.
+        Returns the number of sessions that were newly revoked.
+        If commit=False, flushes the session without committing the transaction.
+        """
+        try:
+            from sqlalchemy import func
+            stmt = (
+                update(RefreshToken)
+                .where(
+                    RefreshToken.account_id == account_id,
+                    RefreshToken.device_guid == device_guid,
+                    RefreshToken.is_revoked == False
+                )
+                .values(is_revoked=True, revoked_reason=reason, revoked_at=func.now())
+            )
+            result = await self.session.execute(stmt)
+            if commit:
+                await self.session.commit()
+            else:
+                await self.session.flush()
+            return result.rowcount
+        except SQLAlchemyError as exc:
+            await self.session.rollback()
+            raise DatabaseOperationError(
+                "Database error revoking all refresh tokens for device"
+            ) from exc

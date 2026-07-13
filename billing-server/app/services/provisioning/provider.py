@@ -22,6 +22,7 @@ class ProvisionedUserDTO:
     data_limit: int | None = None
     data_used: int | None = None
     expire_at: int | None = None
+    uuid: str | None = None
     links: list[str] = field(default_factory=list)
 
 

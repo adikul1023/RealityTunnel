@@ -6,11 +6,12 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
-from sqlalchemy import String, DateTime, Boolean, ForeignKey, func, text
+from sqlalchemy import String, DateTime, Boolean, ForeignKey, func, text, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import Uuid
 
 from app.database import Base
+from app.models.base import RevocationReason
 
 if TYPE_CHECKING:
     from app.models.account import Account
@@ -46,6 +47,12 @@ class RefreshToken(Base):
     )
     is_revoked: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False, index=True
+    )
+    revoked_reason: Mapped[RevocationReason | None] = mapped_column(
+        Enum(RevocationReason, name="revocation_reason_enum"), nullable=True, index=True
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

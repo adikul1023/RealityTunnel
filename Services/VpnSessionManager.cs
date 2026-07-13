@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using RealityTunnel.Models;
 
 namespace RealityTunnel.Services;
 
@@ -24,21 +25,16 @@ public class VpnSessionManager
 
     public bool IsRunning => _xrayController.IsRunning();
 
-    public async Task StartSessionAsync(string? manualIp = null)
+    public async Task StartSessionAsync()
     {
         _userDisconnected = false;
         _retryCount = 0;
         
-        string ip = manualIp ?? string.Empty;
-        if (string.IsNullOrEmpty(ip))
-        {
-            var profile = await _configProvider.GetVpnProfileAsync();
-            ip = profile?.ServerIp ?? string.Empty;
-        }
+        var profile = await _configProvider.GetVpnProfileAsync();
 
-        if (!string.IsNullOrEmpty(ip))
+        if (profile != null && !string.IsNullOrEmpty(profile.ServerHost))
         {
-            await ConnectInternalAsync(ip);
+            await ConnectInternalAsync(profile);
         }
         else
         {
@@ -46,7 +42,7 @@ public class VpnSessionManager
         }
     }
 
-    private async Task ConnectInternalAsync(string ip)
+    private async Task ConnectInternalAsync(VpnProfile profile)
     {
         OnStateChanged?.Invoke("Connecting\u2026");
         if (_retryCount > 0)
@@ -56,7 +52,7 @@ public class VpnSessionManager
 
         try
         {
-            await Task.Run(() => _xrayController.Start(ip));
+            await Task.Run(() => _xrayController.Start(profile));
             OnStateChanged?.Invoke("Connected");
             OnConnectedChanged?.Invoke(true);
             _retryCts = null;
@@ -68,12 +64,12 @@ public class VpnSessionManager
             OnStateChanged?.Invoke("Failed");
             if (!_userDisconnected)
             {
-                _ = AutoRetryAsync(ip);
+                _ = AutoRetryAsync(profile);
             }
         }
     }
 
-    private async Task AutoRetryAsync(string ip)
+    private async Task AutoRetryAsync(VpnProfile profile)
     {
         _retryCts = new CancellationTokenSource();
         var token = _retryCts.Token;
@@ -90,7 +86,7 @@ public class VpnSessionManager
             if (token.IsCancellationRequested) break;
 
             _retryCount++;
-            await ConnectInternalAsync(ip);
+            await ConnectInternalAsync(profile);
             if (_xrayController.IsRunning()) break;
         }
     }

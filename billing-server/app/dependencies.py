@@ -124,6 +124,11 @@ async def get_refresh_repo(session: AsyncSession = Depends(get_db)) -> RefreshTo
     return RefreshTokenRepository(session)
 
 
+async def get_device_repo(session: AsyncSession = Depends(get_db)) -> DeviceRepository:
+    """Dependency provider yielding DeviceRepository tied to the request session."""
+    return DeviceRepository(session)
+
+
 async def get_auth_service(
     account_repo: AccountRepository = Depends(get_account_repo),
 ) -> AuthenticationService:
@@ -133,9 +138,10 @@ async def get_auth_service(
 
 async def get_refresh_service(
     refresh_repo: RefreshTokenRepository = Depends(get_refresh_repo),
+    device_repo: DeviceRepository = Depends(get_device_repo),
 ) -> RefreshTokenService:
     """Dependency provider yielding RefreshTokenService."""
-    return RefreshTokenService(refresh_repo)
+    return RefreshTokenService(refresh_repo, device_repo)
 
 
 async def get_device_repo(session: AsyncSession = Depends(get_db)) -> DeviceRepository:
@@ -146,9 +152,10 @@ async def get_device_repo(session: AsyncSession = Depends(get_db)) -> DeviceRepo
 async def get_device_service(
     device_repo: DeviceRepository = Depends(get_device_repo),
     account_repo: AccountRepository = Depends(get_account_repo),
+    refresh_service: RefreshTokenService = Depends(get_refresh_service),
 ) -> DeviceService:
     """Dependency provider yielding DeviceService."""
-    return DeviceService(device_repo, account_repo)
+    return DeviceService(device_repo, account_repo, refresh_service)
 
 
 async def get_signal_repo(

@@ -74,6 +74,7 @@ from app.services import (
 from app.services.exceptions import (
     DeviceLimitExceededError,
     DeviceOwnershipError,
+    DeviceRevokedError,
     DeviceServiceError,
     InactiveDeviceError,
     RefreshTokenExpiredError,
@@ -411,6 +412,16 @@ async def refresh(
             device_guid=getattr(exc, "device_guid", None),
             http_request=http_request,
         )
+        if isinstance(exc, DeviceRevokedError):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"code": "DEVICE_REVOKED", "message": str(exc)},
+            )
+        if isinstance(exc, RefreshTokenReplayError):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"code": "REPLAY_DETECTED", "message": str(exc)},
+            )
         raise
 
     account = await auth_service.get_active_account_by_uuid(rotated.account_id)

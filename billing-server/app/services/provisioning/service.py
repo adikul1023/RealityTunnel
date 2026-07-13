@@ -24,6 +24,13 @@ from app.services.exceptions import (
     ProvisioningTimeoutError,
 )
 from app.services.provisioning.provider import ProvisioningProvider, ProvisionedUserDTO
+from pydantic import BaseModel
+
+class VpnIdentity(BaseModel):
+    uuid: str
+    username: str
+    provider: str
+    synced_at: datetime | None
 
 logger = logging.getLogger(__name__)
 
@@ -188,6 +195,7 @@ class ProvisioningService:
                     provisioning_state=ProvisioningState.ACTIVE,
                     last_sync_at=now,
                     last_error=None,
+                    vpn_uuid=user_dto.uuid,
                 )
                 self.session.add(profile)
             else:
@@ -195,6 +203,8 @@ class ProvisioningService:
                 profile.provisioning_state = ProvisioningState.ACTIVE
                 profile.last_sync_at = now
                 profile.last_error = None
+                if user_dto.uuid:
+                    profile.vpn_uuid = user_dto.uuid
 
             account.marzban_username = user_dto.remote_user_id
             if commit:
@@ -412,6 +422,9 @@ class ProvisioningService:
                 profile.provisioning_state = ProvisioningState.SUSPENDED
             elif user_dto.status.lower() == "active":
                 profile.provisioning_state = ProvisioningState.ACTIVE
+                
+            if user_dto.uuid:
+                profile.vpn_uuid = user_dto.uuid
 
             await self.session.commit()
             await self.session.refresh(profile)
@@ -485,6 +498,9 @@ class ProvisioningService:
                 profile.provisioning_state = ProvisioningState.SUSPENDED
             elif user_dto.status.lower() == "active":
                 profile.provisioning_state = ProvisioningState.ACTIVE
+                
+            if user_dto.uuid:
+                profile.vpn_uuid = user_dto.uuid
 
             await self.session.commit()
             await self.session.refresh(profile)
@@ -495,4 +511,55 @@ class ProvisioningService:
         except Exception as exc:
             await self.session.rollback()
             raise self._translate_exception(exc, "rotate_user_credentials") from exc
+
+    async def get_vpn_identity(self, account_id: uuid.UUID, *, commit: bool = True) -> VpnIdentity:
+        """
+        Retrieve the cached VPN identity. If the UUID is missing (legacy user), 
+        lazily synchronize from the provisioning provider, extract the UUID, 
+        and save it to the cache.
+        """
+        try:
+            profile = await self.provisioning_repo.get_by_account_id(account_id, for_update=True)
+            if not profile:
+                raise EntityNotFoundError(f"Provisioning profile for account {account_id} not found.")
+                
+            if not profile.vpn_uuid:
+                try:
+                    user_dto = await self.provider.get_user(profile.remote_user_id)
+                except Exception as exc:
+                    raise ProvisioningSynchronizationError(
+                        f"Failed to fetch remote user '{profile.remote_user_id}': {str(exc)}"
+                    ) from exc
+
+                if not user_dto:
+                    raise ProvisioningSynchronizationError(
+                        f"Remote user '{profile.remote_user_id}' not found in provisioning provider."
+                    )
+                    
+                if not user_dto.uuid:
+                    raise ProvisioningSynchronizationError(
+                        f"Remote user '{profile.remote_user_id}' does not have a UUID (VLESS id missing)."
+                    )
+                    
+                profile.vpn_uuid = user_dto.uuid
+                profile.last_sync_at = datetime.now(timezone.utc)
+                if commit:
+                    await self.session.commit()
+                    await self.session.refresh(profile)
+                else:
+                    await self.session.flush()
+
+            return VpnIdentity(
+                uuid=profile.vpn_uuid,
+                username=profile.remote_user_id,
+                provider="marzban",
+                synced_at=profile.last_sync_at
+            )
+
+        except (EntityNotFoundError, DatabaseOperationError, ProvisioningServiceError):
+            raise
+        except Exception as exc:
+            if commit:
+                await self.session.rollback()
+            raise self._translate_exception(exc, "get_vpn_identity") from exc
 

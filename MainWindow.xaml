@@ -8,12 +8,12 @@
         <MicaBackdrop Kind="BaseAlt" />
     </Window.SystemBackdrop>
 
-    <Grid>
+    <Grid x:Name="RootGrid">
         <!-- Drag handle: top bar -->
-        <Grid x:Name="TitleBar" Height="32" VerticalAlignment="Top"
-              Background="Transparent" PointerPressed="TitleBar_PointerPressed">
+        <Grid x:Name="TitleBar" Height="40" VerticalAlignment="Top"
+              Background="Transparent" PointerPressed="TitleBar_PointerPressed" Canvas.ZIndex="100">
             <TextBlock Text="Stealthy" VerticalAlignment="Center"
-                       Margin="12,0" FontSize="11" Opacity="0.5"
+                       Margin="16,0" FontSize="12" Opacity="0.5"
                        Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
             <!-- Minimise to tray -->
             <Button x:Name="MinimiseButton" Content="⊟" HorizontalAlignment="Right"
@@ -22,9 +22,11 @@
                     Click="MinimiseButton_Click" />
         </Grid>
 
-        <!-- Main content area for Panels -->
-        <Grid x:Name="RootPanelHost" Margin="12,40,12,12">
-            
+        <Grid x:Name="RootPanelHost" Margin="24,56,24,24">
+            <!-- Global InfoBar for errors -->
+            <InfoBar x:Name="GlobalErrorBanner" IsOpen="False" Severity="Error" 
+                     VerticalAlignment="Top" Margin="0,0,0,16" Canvas.ZIndex="50" />
+
             <!-- SPLASH PANEL -->
             <Grid x:Name="SplashPanel" Visibility="Visible">
                 <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="16">
@@ -34,117 +36,154 @@
             </Grid>
 
             <!-- LOGIN PANEL -->
-            <StackPanel x:Name="LoginPanel" Visibility="Collapsed" Orientation="Vertical" Spacing="12" VerticalAlignment="Center">
-                <TextBlock Text="Welcome to Stealthy" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+            <StackPanel x:Name="LoginPanel" Visibility="Collapsed" Orientation="Vertical" Spacing="16" VerticalAlignment="Center" MaxWidth="400">
+                <TextBlock Text="Welcome to Stealthy" FontSize="24" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                <PasswordBox x:Name="CredentialBox" PlaceholderText="Stealthy Credential (e.g. ST-...:hash)" FontSize="14" Background="#18FFFFFF" BorderBrush="#30FFFFFF" CornerRadius="8" Padding="12" />
+                <CheckBox x:Name="RememberDeviceCheckBox" Content="Remember this device" IsChecked="True" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <Button x:Name="LoginActionBtn" Content="Log In" HorizontalAlignment="Stretch" CornerRadius="8" Background="{ThemeResource AccentFillColorDefaultBrush}" Foreground="White" BorderBrush="Transparent" Padding="0,12" FontSize="14" FontWeight="SemiBold" Click="LoginActionBtn_Click" />
                 
-                <TextBox x:Name="AccountIdBox" PlaceholderText="Account ID" FontSize="13" Background="#18FFFFFF" BorderBrush="#30FFFFFF" CornerRadius="8" />
-                <PasswordBox x:Name="MasterTokenBox" PlaceholderText="Master Token" FontSize="13" Background="#18FFFFFF" BorderBrush="#30FFFFFF" CornerRadius="8" />
-                
-                <CheckBox x:Name="RememberDeviceCheckBox" Content="Remember this device" IsChecked="True" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                
-                <Button x:Name="LoginActionBtn" Content="Log In" HorizontalAlignment="Stretch" CornerRadius="8" Background="#CC0078D4" Foreground="White" BorderBrush="Transparent" Padding="0,10" Click="LoginActionBtn_Click" />
+                <StackPanel x:Name="TwoFaPanel" Visibility="Collapsed" Spacing="16">
+                    <TextBlock Text="Two-Factor Authentication Required" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                    <TextBox x:Name="TotpBox" PlaceholderText="6-digit code" FontSize="14" Background="#18FFFFFF" BorderBrush="#30FFFFFF" CornerRadius="8" Padding="12" />
+                    <Button x:Name="Verify2FaBtn" Content="Verify" HorizontalAlignment="Stretch" CornerRadius="8" Background="{ThemeResource AccentFillColorDefaultBrush}" Foreground="White" BorderBrush="Transparent" Padding="0,12" FontSize="14" FontWeight="SemiBold" Click="Verify2FaBtn_Click" />
+                </StackPanel>
             </StackPanel>
 
-            <!-- PROFILE PANEL -->
-            <StackPanel x:Name="ProfilePanel" Visibility="Collapsed" Orientation="Vertical" Spacing="16" VerticalAlignment="Center">
-                <TextBlock Text="Profile" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+            <!-- DASHBOARD PANEL (Adaptive) -->
+            <Grid x:Name="DashboardPanel" Visibility="Collapsed">
+                <VisualStateManager.VisualStateGroups>
+                    <VisualStateGroup x:Name="AdaptiveStates">
+                        <VisualState x:Name="LargeLayout">
+                            <VisualState.StateTriggers>
+                                <AdaptiveTrigger MinWindowWidth="800" />
+                            </VisualState.StateTriggers>
+                            <VisualState.Setters>
+                                <Setter Target="DashboardRightColumn.Width" Value="*" />
+                                <Setter Target="DashboardBottomRow.Height" Value="0" />
+                                <Setter Target="AccountCard.(Grid.Row)" Value="0" />
+                                <Setter Target="AccountCard.(Grid.Column)" Value="1" />
+                                <Setter Target="AccountCard.Margin" Value="24,0,0,0" />
+                            </VisualState.Setters>
+                        </VisualState>
+                        <VisualState x:Name="SmallLayout">
+                            <VisualState.StateTriggers>
+                                <AdaptiveTrigger MinWindowWidth="0" />
+                            </VisualState.StateTriggers>
+                            <VisualState.Setters>
+                                <Setter Target="DashboardRightColumn.Width" Value="0" />
+                                <Setter Target="DashboardBottomRow.Height" Value="Auto" />
+                                <Setter Target="AccountCard.(Grid.Row)" Value="1" />
+                                <Setter Target="AccountCard.(Grid.Column)" Value="0" />
+                                <Setter Target="AccountCard.Margin" Value="0,24,0,0" />
+                            </VisualState.Setters>
+                        </VisualState>
+                    </VisualStateGroup>
+                </VisualStateManager.VisualStateGroups>
                 
-                <Border Background="#18FFFFFF" BorderBrush="#30FFFFFF" BorderThickness="1" CornerRadius="8" Padding="12">
-                    <StackPanel Spacing="8">
-                        <TextBlock x:Name="ProfilePlanText" Text="Plan: Basic" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
-                        <TextBlock x:Name="ProfileDevicesText" Text="Devices: 1 / 5" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                <Grid x:Name="DashboardLayoutGrid">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition x:Name="DashboardLeftColumn" Width="*" />
+                        <ColumnDefinition x:Name="DashboardRightColumn" Width="0" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition x:Name="DashboardTopRow" Height="Auto" />
+                        <RowDefinition x:Name="DashboardBottomRow" Height="Auto" />
+                    </Grid.RowDefinitions>
+                    
+                    <!-- LEFT/TOP: VPN Controls -->
+                    <StackPanel Grid.Row="0" Grid.Column="0" Spacing="24" VerticalAlignment="Center">
+                        <Grid HorizontalAlignment="Center">
+                            <Ellipse x:Name="StatusOrb" Width="96" Height="96" Fill="#33FFFFFF" />
+                            <Ellipse x:Name="StatusOrbGlow" Width="72" Height="72" Fill="#44808080" />
+                            <TextBlock x:Name="StatusIcon" Text="●" FontSize="42" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#80808080" />
+                        </Grid>
+                        
+                        <StackPanel Spacing="4">
+                            <TextBlock x:Name="StatusLabel" Text="Disconnected" HorizontalAlignment="Center" FontSize="18" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                            <TextBlock x:Name="TimerLabel" Text="00:00:00" HorizontalAlignment="Center" FontSize="14" Opacity="0.55" Foreground="{ThemeResource TextFillColorPrimaryBrush}" Visibility="Collapsed" />
+                        </StackPanel>
+                        
+                        <Grid>
+                            <Button x:Name="ConnectButton" Content="Connect" HorizontalAlignment="Stretch" MaxWidth="300" Click="ConnectButton_Click" CornerRadius="8" FontWeight="SemiBold" FontSize="16" Background="{ThemeResource AccentFillColorDefaultBrush}" Foreground="White" BorderBrush="Transparent" Padding="0,16" />
+                            <Button x:Name="DisconnectButton" Content="Disconnect" HorizontalAlignment="Stretch" MaxWidth="300" Click="DisconnectButton_Click" IsEnabled="False" CornerRadius="8" FontWeight="SemiBold" FontSize="16" Background="#22FFFFFF" Foreground="{ThemeResource TextFillColorPrimaryBrush}" BorderBrush="#30FFFFFF" Padding="0,16" Visibility="Collapsed" />
+                        </Grid>
+                        
+                        <StackPanel HorizontalAlignment="Center" Spacing="4">
+                            <TextBlock Text="LOCATION / EXIT IP" FontSize="11" Opacity="0.5" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                            <TextBlock x:Name="ExitIpLabel" Text="—" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                            <TextBlock x:Name="RetryLabel" Text="" FontSize="12" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                        </StackPanel>
                     </StackPanel>
-                </Border>
+                    
+                    <!-- RIGHT/BOTTOM: Account Card -->
+                    <Border x:Name="AccountCard" Grid.Row="1" Grid.Column="0" Background="#18FFFFFF" BorderBrush="#30FFFFFF" BorderThickness="1" CornerRadius="12" Padding="20" VerticalAlignment="Center">
+                        <StackPanel Spacing="16">
+                            <Grid>
+                                <TextBlock Text="Account Information" FontSize="16" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+                                <Button Content="⚙" HorizontalAlignment="Right" Background="Transparent" BorderBrush="Transparent" FontSize="18" Margin="0,-4,0,0" Click="GoToSettings_Click" ToolTipService.ToolTip="Settings" />
+                            </Grid>
+                            
+                            <StackPanel Spacing="12">
+                                <Grid>
+                                    <TextBlock Text="Plan" FontSize="14" Opacity="0.7" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                                    <TextBlock x:Name="ProfilePlanText" Text="Unknown" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Right" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                                </Grid>
+                                <Grid>
+                                    <TextBlock Text="Devices" FontSize="14" Opacity="0.7" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                                    <TextBlock x:Name="ProfileDevicesText" Text="0 / 0" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Right" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                                </Grid>
+                                <Grid>
+                                    <TextBlock Text="Two-Factor (2FA)" FontSize="14" Opacity="0.7" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                                    <TextBlock x:Name="Profile2FaText" Text="Unknown" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Right" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                                </Grid>
+                                <Grid>
+                                    <TextBlock Text="API Connectivity" FontSize="14" Opacity="0.7" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                                    <TextBlock x:Name="ProfileApiConnectivityText" Text="Checking..." FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Right" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                                </Grid>
+                            </StackPanel>
+                            <Button Content="Manage Account" HorizontalAlignment="Stretch" CornerRadius="8" Background="#11FFFFFF" Foreground="{ThemeResource TextFillColorPrimaryBrush}" BorderBrush="#20FFFFFF" Padding="0,10" Click="ManageDevices_Click" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Grid>
+
+            <!-- SETTINGS PANEL -->
+            <StackPanel x:Name="SettingsPanel" Visibility="Collapsed" Orientation="Vertical" Spacing="16" VerticalAlignment="Center" MaxWidth="500">
+                <TextBlock Text="Settings" FontSize="24" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
                 
-                <Button Content="Manage Devices" HorizontalAlignment="Stretch" CornerRadius="8" Background="#22FFFFFF" Foreground="{ThemeResource TextFillColorPrimaryBrush}" BorderBrush="#30FFFFFF" Padding="0,10" Click="ManageDevices_Click" />
-                <Button Content="Log Out" HorizontalAlignment="Stretch" CornerRadius="8" Background="#44FF0000" Foreground="White" BorderBrush="Transparent" Padding="0,10" Click="Logout_Click" />
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Appearance" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                    <ComboBox x:Name="ThemeComboBox" HorizontalAlignment="Stretch" SelectionChanged="ThemeComboBox_SelectionChanged">
+                        <ComboBoxItem Content="System Default" Tag="System" />
+                        <ComboBoxItem Content="Dark" Tag="Dark" />
+                        <ComboBoxItem Content="Light" Tag="Light" />
+                    </ComboBox>
+                </StackPanel>
                 
-                <Button Content="Back" HorizontalAlignment="Center" Background="Transparent" BorderBrush="Transparent" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Click="BackToMain_Click" />
+                <Expander Header="Advanced Diagnostics" HorizontalAlignment="Stretch">
+                    <StackPanel Spacing="8" Padding="12">
+                        <TextBlock x:Name="DebugVersionText" Text="Version: " FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        <TextBlock x:Name="DebugBackendText" Text="Backend: " FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        <TextBlock x:Name="DebugGitCommitText" Text="Git Commit: Local Build" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        <TextBlock x:Name="DebugApiReachabilityText" Text="API: Checking..." FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        <TextBlock x:Name="DebugJwtExpiryText" Text="JWT expires in: " FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                    </StackPanel>
+                </Expander>
+                
+                <Button Content="Log Out" HorizontalAlignment="Stretch" CornerRadius="8" Background="#44FF0000" Foreground="White" BorderBrush="Transparent" Padding="0,12" FontSize="14" FontWeight="SemiBold" Click="Logout_Click" Margin="0,16,0,0"/>
+                <Button Content="Back to Dashboard" HorizontalAlignment="Center" Background="Transparent" BorderBrush="Transparent" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Click="BackToMain_Click" />
             </StackPanel>
 
             <!-- SAVE MASTER TOKEN PANEL -->
             <StackPanel x:Name="SaveMasterTokenPanel" Visibility="Collapsed" Orientation="Vertical" Spacing="16" VerticalAlignment="Center">
                 <TextBlock Text="Save Your Master Token" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
                 <TextBlock Text="This token is generated once and will never be shown again. Save it securely." TextWrapping="Wrap" FontSize="13" HorizontalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextAlignment="Center"/>
-                
                 <Border Background="#18FFFFFF" BorderBrush="#30FFFFFF" BorderThickness="1" CornerRadius="8" Padding="12">
                     <TextBlock x:Name="SaveMasterTokenText" Text="xoxb-..." FontSize="14" FontWeight="Bold" Foreground="{ThemeResource TextFillColorPrimaryBrush}" TextWrapping="Wrap"/>
                 </Border>
-                
-                <Button Content="I have saved it" HorizontalAlignment="Stretch" CornerRadius="8" Background="#CC0078D4" Foreground="White" BorderBrush="Transparent" Padding="0,10" Click="SaveMasterTokenDone_Click" />
+                <Button Content="I have saved it" HorizontalAlignment="Stretch" CornerRadius="8" Background="{ThemeResource AccentFillColorDefaultBrush}" Foreground="White" BorderBrush="Transparent" Padding="0,10" Click="SaveMasterTokenDone_Click" />
             </StackPanel>
 
-            <!-- MAIN VPN PANEL -->
-            <StackPanel x:Name="MainVpnPanel" Visibility="Collapsed" Orientation="Vertical" Spacing="10">
-                <Grid>
-                    <TextBlock x:Name="AutoUpdateBanner" Text="Update available!" FontSize="11" Foreground="#0078D4" HorizontalAlignment="Center" Visibility="Collapsed" />
-                    <Button Content="👤" HorizontalAlignment="Right" Background="Transparent" BorderBrush="Transparent" FontSize="16" Margin="0,-4,0,0" Click="GoToProfile_Click" />
-                </Grid>
-
-            <!-- Status orb + label -->
-            <Grid HorizontalAlignment="Center">
-                <Ellipse x:Name="StatusOrb" Width="64" Height="64"
-                         Fill="#33FFFFFF" />
-                <Ellipse x:Name="StatusOrbGlow" Width="48" Height="48"
-                         Fill="#44808080" />
-                <TextBlock x:Name="StatusIcon" Text="●" FontSize="28"
-                           HorizontalAlignment="Center" VerticalAlignment="Center"
-                           Foreground="#80808080" />
-            </Grid>
-
-            <TextBlock x:Name="StatusLabel" Text="Disconnected"
-                       HorizontalAlignment="Center" FontSize="13" FontWeight="SemiBold"
-                       Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
-
-            <TextBlock x:Name="TimerLabel" Text="" HorizontalAlignment="Center"
-                       FontSize="11" Opacity="0.55"
-                       Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
-
-            <!-- Divider -->
-            <Rectangle Height="1" Fill="#22FFFFFF" Margin="0,2" />
-
-            <!-- Server IP -->
-            <TextBlock Text="SERVER IP" FontSize="10" Opacity="0.5" Margin="0,2,0,0"
-                       Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
-            <TextBox x:Name="ServerIpTextBox"
-                     PlaceholderText="e.g. 1.2.3.4"
-                     FontSize="13"
-                     Background="#18FFFFFF"
-                     BorderBrush="#30FFFFFF"
-                     CornerRadius="8" />
-
-            <!-- Connect / Disconnect -->
-            <Button x:Name="ConnectButton" Content="Connect"
-                    HorizontalAlignment="Stretch" Click="ConnectButton_Click"
-                    CornerRadius="8" FontWeight="SemiBold" FontSize="13"
-                    Background="#CC0078D4" Foreground="White"
-                    BorderBrush="Transparent" Padding="0,10" />
-
-            <Button x:Name="DisconnectButton" Content="Disconnect"
-                    HorizontalAlignment="Stretch" Click="DisconnectButton_Click"
-                    IsEnabled="False" CornerRadius="8" FontSize="13"
-                    Background="#22FFFFFF" Foreground="{ThemeResource TextFillColorPrimaryBrush}"
-                    BorderBrush="#30FFFFFF" Padding="0,10" />
-
-            <!-- Dashboard stats -->
-            <Rectangle Height="1" Fill="#22FFFFFF" Margin="0,2" />
-
-            <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto">
-                <TextBlock Grid.Column="0" Grid.Row="0" Text="EXIT IP"
-                           FontSize="9" Opacity="0.45" Margin="0,0,0,2"
-                           Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
-                <TextBlock Grid.Column="1" Grid.Row="0" Text="STATUS"
-                           FontSize="9" Opacity="0.45" Margin="8,0,0,2"
-                           Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
-                <TextBlock x:Name="ExitIpLabel" Grid.Column="0" Grid.Row="1"
-                           Text="—" FontSize="11" FontWeight="SemiBold"
-                           Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
-                <TextBlock x:Name="RetryLabel" Grid.Column="1" Grid.Row="1"
-                           Text="—" FontSize="11" Margin="8,0,0,0"
-                           Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
-            </Grid>
-
-            </StackPanel>
         </Grid>
     </Grid>
 </Window>

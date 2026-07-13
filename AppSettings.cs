@@ -6,8 +6,11 @@ namespace RealityTunnel;
 
 public class AppSettings
 {
-    public string ServerIp { get; set; } = "";
-
+    public int WindowWidth { get; set; } = 1050;
+    public int WindowHeight { get; set; } = 720;
+    public int? WindowX { get; set; }
+    public int? WindowY { get; set; }
+    public string Theme { get; set; } = "System";
     private static string FilePath =>
         Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

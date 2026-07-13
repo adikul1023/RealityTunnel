@@ -9,7 +9,6 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
-    <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <EnableMsixTooling>true</EnableMsixTooling>
     <WindowsPackageType>None</WindowsPackageType>
@@ -17,6 +16,7 @@
     <ApplicationIcon>app.ico</ApplicationIcon>
     <Version>1.0.0-rc1</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <DefineConstants>DISABLE_XAML_GENERATED_MAIN</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

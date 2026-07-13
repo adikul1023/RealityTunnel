@@ -26,13 +26,8 @@ public partial class App : Application
         services.AddSingleton<SecureStorageService>();
         services.AddSingleton<TokenService>();
         services.AddSingleton<LicenseService>();
-        // Setup API Base URL based on environment
-#if DEBUG
-        string apiBaseUrl = "https://staging-api.stealthy.co.in";
-#else
-        string apiBaseUrl = "https://api.stealthy.co.in";
-#endif
-
+        // Setup API Base URL based on environment or configuration
+        string apiBaseUrl = Environment.GetEnvironmentVariable("STEALTHY_API_URL") ?? "https://api.stealthy.co.in";
         services.AddTransient<ResilientHttpClientHandler>(sp => new ResilientHttpClientHandler(new HttpClientHandler()));
 
         services.AddHttpClient<OracleApiClient>(client =>
@@ -64,6 +59,25 @@ public partial class App : Application
         if (!string.IsNullOrWhiteSpace(args.Arguments) && args.Arguments.Contains("exchange_token="))
         {
             _ = mainWindow.HandleActivationUriAsync(args.Arguments);
+        }
+    }
+
+    public void BringToForeground(Microsoft.Windows.AppLifecycle.AppActivationArguments args)
+    {
+        if (m_window is MainWindow window)
+        {
+            window.DispatcherQueue.TryEnqueue(() =>
+            {
+                window.ShowFromTray();
+                
+                // If it's a protocol activation, we handle it
+                if (args.Kind == Microsoft.Windows.AppLifecycle.ExtendedActivationKind.Launch)
+                {
+                    var launchArgs = args.Data as Microsoft.Windows.AppLifecycle.AppActivationArguments; // or cast to appropriate
+                    // For now, if we need to parse arguments from redirection, we would do it here
+                    // e.g. window.HandleActivationUriAsync(...)
+                }
+            });
         }
     }
 

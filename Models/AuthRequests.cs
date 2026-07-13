@@ -12,6 +12,10 @@ public class LoginRequest
 
     [JsonPropertyName("device_guid")]
     public string DeviceGuid { get; set; } = "";
+
+    [JsonPropertyName("two_fa_code")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? TwoFaCode { get; set; }
 }
 
 public class RefreshRequest
