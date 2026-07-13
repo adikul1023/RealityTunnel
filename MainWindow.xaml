@@ -141,7 +141,15 @@
                                     <TextBlock x:Name="ProfileApiConnectivityText" Text="Checking..." FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Right" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                                 </Grid>
                             </StackPanel>
-                            <Button Content="Manage Account" HorizontalAlignment="Stretch" CornerRadius="8" Background="#11FFFFFF" Foreground="{ThemeResource TextFillColorPrimaryBrush}" BorderBrush="#20FFFFFF" Padding="0,10" Click="ManageDevices_Click" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0" Content="Manage Account" HorizontalAlignment="Stretch" CornerRadius="8" Background="#11FFFFFF" Foreground="{ThemeResource TextFillColorPrimaryBrush}" BorderBrush="#20FFFFFF" Padding="0,10" Click="ManageDevices_Click" />
+                                <Button Grid.Column="2" Content="Sign Out" HorizontalAlignment="Stretch" CornerRadius="8" Background="#22FF4444" Foreground="#FFFF8888" BorderBrush="#33FF4444" Padding="0,10" Click="Logout_Click" ToolTipService.ToolTip="Sign out of this account on this device" />
+                            </Grid>
                         </StackPanel>
                     </Border>
                 </Grid>
