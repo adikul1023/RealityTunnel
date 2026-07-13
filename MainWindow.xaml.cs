@@ -16,7 +16,7 @@ using RealityTunnel.Services;
 
 namespace RealityTunnel;
 
-public enum NavigationState { Splash, Login, Main, Profile, FirstTimeMasterToken }
+public enum NavigationState { Splash, Login, Main, Settings, FirstTimeMasterToken }
 
 public sealed partial class MainWindow : Window
 {
@@ -65,18 +65,10 @@ public sealed partial class MainWindow : Window
         _oracleClient = oracleClient;
         _tray = new TrayIcon(this);
 
-        // Compact floating window — no title bar chrome, always on top
         var appWin = AppWindow;
-        appWin.Resize(new SizeInt32(260, 420));
-        if (appWin.Presenter is OverlappedPresenter p)
-        {
-            p.IsResizable    = false;
-            p.IsMaximizable  = false;
-            p.IsAlwaysOnTop  = true;
-        }
+        appWin.Resize(new SizeInt32(_settings.WindowWidth, _settings.WindowHeight));
         ExtendsContentIntoTitleBar = true;
 
-        // Set taskbar / title-bar icon
         string? exeDir = System.IO.Path.GetDirectoryName(Environment.ProcessPath);
         string iconPath = System.IO.Path.Combine(exeDir ?? AppContext.BaseDirectory, "app.ico");
         if (System.IO.File.Exists(iconPath))
@@ -88,60 +80,58 @@ public sealed partial class MainWindow : Window
         _sessionManager.OnConnectedChanged += SessionManager_OnConnectedChanged;
         _sessionManager.OnRetryUpdate += SessionManager_OnRetryUpdate;
 
-        ServerIpTextBox.Text = _settings.ServerIp;
         this.Closed += OnClosed;
+        this.SizeChanged += MainWindow_SizeChanged;
 
-        _ = RunStartupSequenceAsync();
+        ApplyTheme();
+
+        RunStartupSequence();
     }
 
     private static readonly Version MinimumSupportedVersion = new(1, 0, 0);
 
-    private async Task RunStartupSequenceAsync()
+    private void RunStartupSequence()
     {
-        _logger.Log(LogLevel.INFO, "STARTUP", "Starting explicit 6-step client initialization sequence");
+        _logger.Log(LogLevel.INFO, "STARTUP", "Starting client initialization sequence");
         SetNavigationState(NavigationState.Splash);
 
-        // 1. Load cached credentials
-        // 2. Load cached VPN profile
         var profile = _configProvider.GetCachedProfile();
 
-        // 3. Validate offline license
+        var tokens = _tokenService.CurrentTokens;
+        _logger.Log(LogLevel.INFO, "STARTUP_DEBUG", $"Tokens Object Present: {tokens != null}");
+        if (tokens != null)
+        {
+            _logger.Log(LogLevel.INFO, "STARTUP_DEBUG", $"Access Token Present: {!string.IsNullOrEmpty(tokens.AccessToken)} (Value: {tokens.AccessToken?.Substring(0, Math.Min(5, tokens.AccessToken?.Length ?? 0))}...)");
+            _logger.Log(LogLevel.INFO, "STARTUP_DEBUG", $"Refresh Token Present: {!string.IsNullOrEmpty(tokens.RefreshToken)}");
+            _logger.Log(LogLevel.INFO, "STARTUP_DEBUG", $"Parsed Expiry (Raw): {tokens.ExpiresAt:O}");
+            _logger.Log(LogLevel.INFO, "STARTUP_DEBUG", $"Calculated Expiry threshold (+72h): {tokens.ExpiresAt.AddHours(72):O}");
+            _logger.Log(LogLevel.INFO, "STARTUP_DEBUG", $"Current UTC Time: {DateTimeOffset.UtcNow:O}");
+        }
+
         if (!_authService.IsAuthenticated)
         {
             _logger.Log(LogLevel.INFO, "AUTH", "No valid authentication state found -> Login");
+            _logger.Log(LogLevel.INFO, "STARTUP_DEBUG", "Decision: Session Invalid (IsAuthenticated is false).");
             SetNavigationState(NavigationState.Login);
             return;
         }
 
-        var tokens = _tokenService.CurrentTokens;
         if (tokens != null && DateTimeOffset.UtcNow > tokens.ExpiresAt.AddHours(72))
         {
             _logger.Log(LogLevel.WARN, "AUTH", "Offline grace period (72 hours) expired -> Login");
+            _logger.Log(LogLevel.INFO, "STARTUP_DEBUG", "Decision: Session Invalid (Grace period expired). Calling ClearTokens() (which clears session/files).");
             _tokenService.ClearTokens();
             SetNavigationState(NavigationState.Login);
             return;
         }
-        // 4 & 5. Refresh JWT and Profile asynchronously without blocking UI
+        
+        _logger.Log(LogLevel.INFO, "STARTUP_DEBUG", "Decision: Session Valid. Proceeding to main navigation.");
         _ = RefreshJwtSafelyAsync();
         _ = RefreshProfileSafelyAsync();
 
-        // 6. Navigate with auto-recovery for missing cached profile
-        if (profile == null)
-        {
-            _logger.Log(LogLevel.WARN, "CONFIG", "Cached profile missing -> attempting network recovery");
-            profile = await _configProvider.GetVpnProfileAsync();
-        }
-
-        if (profile != null)
-        {
-            _logger.Log(LogLevel.INFO, "NAV", "Authenticated and profile available -> Main");
-            SetNavigationState(NavigationState.Main);
-            ServerIpTextBox.Text = profile.ServerIp;
-        }
-        else
-        {
-            SetNavigationState(NavigationState.Login);
-        }
+        _logger.Log(LogLevel.INFO, "NAV", "Authenticated -> Main");
+        SetNavigationState(NavigationState.Main);
+        _ = UpdateDashboardAsync();
     }
 
     private async Task RefreshJwtSafelyAsync()
@@ -198,17 +188,15 @@ public sealed partial class MainWindow : Window
                     _tokenService.UpdateTokensInMemoryOnly(result.Tokens);
                 }
 
-                // Version compatibility check after online authentication
                 var currentVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version ?? new Version(1, 0, 0);
                 if (currentVersion < MinimumSupportedVersion)
                 {
                     _logger.Log(LogLevel.ERROR, "AUTH", "Client version below MinimumSupportedVersion -> Blocked");
                     SetNavigationState(NavigationState.Login);
-                    await ShowError("Your client version is outdated. Please update to continue.");
+                    ShowError("Your client version is outdated. Please update to continue.");
                     return;
                 }
 
-                // Never display Master Token — proceed to authenticated experience
                 SetNavigationState(NavigationState.Main);
             }
             else
@@ -216,7 +204,7 @@ public sealed partial class MainWindow : Window
                 _logger.Log(LogLevel.ERROR, "AUTH", $"Exchange token redemption failed: {result.ErrorMessage}");
                 _tokenService.ClearTokens();
                 SetNavigationState(NavigationState.Login);
-                await ShowError("Authentication link invalid or expired. Please log in manually.");
+                ShowError("Authentication link invalid or expired. Please log in manually.");
             }
         }
         catch (Exception ex)
@@ -232,18 +220,19 @@ public sealed partial class MainWindow : Window
 
     private void SetNavigationState(NavigationState state)
     {
+        GlobalErrorBanner.IsOpen = false;
         SplashPanel.Visibility = Visibility.Collapsed;
         LoginPanel.Visibility = Visibility.Collapsed;
-        MainVpnPanel.Visibility = Visibility.Collapsed;
-        ProfilePanel.Visibility = Visibility.Collapsed;
+        DashboardPanel.Visibility = Visibility.Collapsed;
+        SettingsPanel.Visibility = Visibility.Collapsed;
         SaveMasterTokenPanel.Visibility = Visibility.Collapsed;
 
         switch (state)
         {
             case NavigationState.Splash: SplashPanel.Visibility = Visibility.Visible; break;
             case NavigationState.Login: LoginPanel.Visibility = Visibility.Visible; break;
-            case NavigationState.Main: MainVpnPanel.Visibility = Visibility.Visible; break;
-            case NavigationState.Profile: ProfilePanel.Visibility = Visibility.Visible; break;
+            case NavigationState.Main: DashboardPanel.Visibility = Visibility.Visible; break;
+            case NavigationState.Settings: SettingsPanel.Visibility = Visibility.Visible; break;
             case NavigationState.FirstTimeMasterToken: SaveMasterTokenPanel.Visibility = Visibility.Visible; break;
         }
     }
@@ -251,6 +240,7 @@ public sealed partial class MainWindow : Window
     private void SaveMasterTokenDone_Click(object sender, RoutedEventArgs e)
     {
         SetNavigationState(NavigationState.Main);
+        _ = UpdateDashboardAsync();
     }
 
     private void SessionManager_OnStateChanged(string stateLabel)
@@ -276,19 +266,22 @@ public sealed partial class MainWindow : Window
                 _connectedAt = DateTime.Now;
                 _timer.Start();
                 _tray.SetConnected(true);
+                TimerLabel.Visibility = Visibility.Visible;
                 _ = FetchExitIpAsync();
             }
             else
             {
                 _timer.Stop();
+                TimerLabel.Visibility = Visibility.Collapsed;
                 ExitIpLabel.Text = "\u2014";
                 RetryLabel.Text  = "\u2014";
                 _tray.SetConnected(false);
             }
 
+            ConnectButton.Visibility = connected ? Visibility.Collapsed : Visibility.Visible;
+            DisconnectButton.Visibility = connected ? Visibility.Visible : Visibility.Collapsed;
             ConnectButton.IsEnabled = !connected;
             DisconnectButton.IsEnabled = connected;
-            ServerIpTextBox.IsEnabled = !connected;
         });
     }
 
@@ -299,151 +292,26 @@ public sealed partial class MainWindow : Window
 
     private async void LoginActionBtn_Click(object sender, RoutedEventArgs e)
     {
-        string accountId = AccountIdBox.Text.Trim();
-        string masterToken = MasterTokenBox.Password.Trim();
+        string credential = CredentialBox.Password.Trim();
 
-        if (string.IsNullOrEmpty(accountId) || string.IsNullOrEmpty(masterToken))
+        if (string.IsNullOrEmpty(credential))
         {
-            await ShowError("Please enter both Account ID and Master Token.");
+            ShowError("Please enter your Stealthy Credential.");
             return;
         }
 
         LoginActionBtn.IsEnabled = false;
+        GlobalErrorBanner.IsOpen = false;
         _logger.Log(LogLevel.INFO, "AUTH", "Manual login attempt initiated");
         try
         {
-            var result = await _authService.LoginAsync(accountId, masterToken);
-            if (result.Status == LoginStatus.Success && result.Tokens != null)
-            {
-                if (RememberDeviceCheckBox.IsChecked != true)
-                {
-                    _tokenService.UpdateTokensInMemoryOnly(result.Tokens);
-                }
-
-                var currentVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version ?? new Version(1, 0, 0);
-                if (currentVersion < MinimumSupportedVersion)
-                {
-                    _logger.Log(LogLevel.ERROR, "AUTH", "Client version below MinimumSupportedVersion -> Blocked");
-                    await ShowError("Your client version is outdated. Please download the latest update.");
-                    return;
-                }
-
-                var profile = await _configProvider.GetVpnProfileAsync();
-                if (profile != null)
-                {
-                    _logger.Log(LogLevel.INFO, "NAV", "Login success -> Main");
-                    ServerIpTextBox.Text = profile.ServerIp;
-                    SetNavigationState(NavigationState.Main);
-                }
-                else
-                {
-                    await ShowError("Failed to fetch VPN configuration.");
-                }
-            }
-            else if (result.Status == LoginStatus.SubscriptionExpired)
-            {
-                _logger.Log(LogLevel.WARN, "AUTH", "Subscription expired");
-                var dialog = new ContentDialog
-                {
-                    Title = "Subscription Expired",
-                    Content = "Your VPN subscription has expired. Please renew to continue using the service.",
-                    PrimaryButtonText = "Renew Subscription",
-                    CloseButtonText = "Cancel",
-                    XamlRoot = Content.XamlRoot
-                };
-                if (await dialog.ShowAsync() == ContentDialogResult.Primary)
-                {
-                    _ = Windows.System.Launcher.LaunchUriAsync(new Uri("https://stealthy.co.in/account/billing"));
-                }
-            }
-            else if (result.Status == LoginStatus.MandatoryUpdate)
-            {
-                _logger.Log(LogLevel.ERROR, "AUTH", "Mandatory update required");
-                var dialog = new ContentDialog
-                {
-                    Title = "Mandatory Update Required",
-                    Content = "A critical security update is required to connect.",
-                    PrimaryButtonText = "Download Update",
-                    CloseButtonText = "Close",
-                    XamlRoot = Content.XamlRoot
-                };
-                if (await dialog.ShowAsync() == ContentDialogResult.Primary)
-                {
-                    _ = Windows.System.Launcher.LaunchUriAsync(new Uri("https://stealthy.co.in/download"));
-                }
-            }
-            else if (result.Status == LoginStatus.MaintenanceMode)
-            {
-                _logger.Log(LogLevel.WARN, "AUTH", "Service in maintenance mode");
-                string detail = result.RetryAfterSeconds.HasValue 
-                    ? $"The service is undergoing scheduled maintenance. Please try again in {result.RetryAfterSeconds} seconds."
-                    : "The service is undergoing scheduled maintenance. Please try again later.";
-                await ShowError(detail);
-            }
-            else if (result.Status == LoginStatus.Requires2FA)
-            {
-                TextBox totpBox = new TextBox { PlaceholderText = "6-digit code" };
-                var dialog = new ContentDialog
-                {
-                    Title = "Two-Factor Authentication",
-                    Content = totpBox,
-                    PrimaryButtonText = "Verify",
-                    CloseButtonText = "Cancel",
-                    XamlRoot = Content.XamlRoot
-                };
-
-                if (await dialog.ShowAsync() == ContentDialogResult.Primary)
-                {
-                    bool verified = await _authService.Verify2FaAsync(result.TemporaryLoginToken ?? "", totpBox.Text);
-                    if (verified)
-                    {
-                        var profile = await _configProvider.GetVpnProfileAsync();
-                        if (profile != null)
-                        {
-                            ServerIpTextBox.Text = profile.ServerIp;
-                            SetNavigationState(NavigationState.Main);
-                        }
-                    }
-                    else
-                    {
-                        await ShowError("Invalid 2FA code.");
-                    }
-                }
-            }
-            else if (result.Status == LoginStatus.DeviceLimitExceeded)
-            {
-                var details = result.DeviceLimitDetails;
-                string msg = details != null 
-                    ? $"You have reached your device limit ({details.CurrentDevices} / {details.MaxDevices}). Please remove a device to continue."
-                    : "You have reached your device limit. Please remove a device to continue.";
-                var dialog = new ContentDialog
-                {
-                    Title = "Device Limit Exceeded",
-                    Content = msg,
-                    PrimaryButtonText = "Manage Devices",
-                    CloseButtonText = "Cancel",
-                    XamlRoot = Content.XamlRoot
-                };
-                if (await dialog.ShowAsync() == ContentDialogResult.Primary)
-                {
-                    _ = Windows.System.Launcher.LaunchUriAsync(new Uri(details?.ManageDevicesUrl ?? "https://stealthy.co.in/account"));
-                }
-            }
-            else if (result.Status == LoginStatus.ReplayDetected)
-            {
-                _logger.Log(LogLevel.WARN, "AUTH", "Replay detected -> Terminating session");
-                _authService.Logout();
-                await ShowError("Security Alert: A potential replay attack was detected. Your session has been terminated for your safety. Please log in again.");
-            }
-            else
-            {
-                await ShowError(result.ErrorMessage ?? "Login failed.");
-            }
+            var result = await _authService.LoginAsync(credential);
+            HandleLoginResult(result);
         }
         catch (Exception ex)
         {
             _logger.Log(LogLevel.ERROR, "AUTH", $"Connection error: {ex.Message}");
-            await ShowError("Connection error: " + ex.Message);
+            ShowError("Connection error: " + ex.Message);
         }
         finally
         {
@@ -451,14 +319,161 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void GoToProfile_Click(object sender, RoutedEventArgs e)
+    private async void Verify2FaBtn_Click(object sender, RoutedEventArgs e)
     {
-        SetNavigationState(NavigationState.Profile);
+        string credential = CredentialBox.Password.Trim();
+        string totp = TotpBox.Text.Trim();
+
+        if (string.IsNullOrEmpty(totp))
+        {
+            ShowError("Please enter your 2FA code.");
+            return;
+        }
+
+        Verify2FaBtn.IsEnabled = false;
+        GlobalErrorBanner.IsOpen = false;
+        try
+        {
+            var result = await _authService.LoginAsync(credential, totp);
+            HandleLoginResult(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.Log(LogLevel.ERROR, "AUTH", $"2FA error: {ex.Message}");
+            ShowError("Connection error: " + ex.Message);
+        }
+        finally
+        {
+            Verify2FaBtn.IsEnabled = true;
+        }
+    }
+
+    private void HandleLoginResult(LoginResult result)
+    {
+        if (result.Status == LoginStatus.Success && result.Tokens != null)
+        {
+            if (RememberDeviceCheckBox.IsChecked != true)
+            {
+                _tokenService.UpdateTokensInMemoryOnly(result.Tokens);
+            }
+            
+            var currentVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version ?? new Version(1, 0, 0);
+            if (currentVersion < MinimumSupportedVersion)
+            {
+                _logger.Log(LogLevel.ERROR, "AUTH", "Client version below MinimumSupportedVersion -> Blocked");
+                ShowError("Your client version is outdated. Please download the latest update.");
+                return;
+            }
+
+            _logger.Log(LogLevel.INFO, "NAV", "Login success -> Main");
+            TwoFaPanel.Visibility = Visibility.Collapsed;
+            SetNavigationState(NavigationState.Main);
+            _ = UpdateDashboardAsync();
+        }
+        else if (result.Status == LoginStatus.SubscriptionExpired)
+        {
+            _logger.Log(LogLevel.WARN, "AUTH", "Subscription expired");
+            ShowError("Your VPN subscription has expired. Please renew to continue using the service.");
+            _ = Windows.System.Launcher.LaunchUriAsync(new Uri("https://stealthy.co.in/account/billing"));
+        }
+        else if (result.Status == LoginStatus.MandatoryUpdate)
+        {
+            _logger.Log(LogLevel.ERROR, "AUTH", "Mandatory update required");
+            ShowError("A critical security update is required to connect.");
+            _ = Windows.System.Launcher.LaunchUriAsync(new Uri("https://stealthy.co.in/download"));
+        }
+        else if (result.Status == LoginStatus.MaintenanceMode)
+        {
+            _logger.Log(LogLevel.WARN, "AUTH", "Service in maintenance mode");
+            string detail = result.RetryAfterSeconds.HasValue 
+                ? $"The service is undergoing scheduled maintenance. Please try again in {result.RetryAfterSeconds} seconds."
+                : "The service is undergoing scheduled maintenance. Please try again later.";
+            ShowError(detail);
+        }
+        else if (result.Status == LoginStatus.Requires2FA)
+        {
+            TwoFaPanel.Visibility = Visibility.Visible;
+            LoginActionBtn.Visibility = Visibility.Collapsed;
+        }
+        else if (result.Status == LoginStatus.DeviceLimitExceeded)
+        {
+            var details = result.DeviceLimitDetails;
+            string msg = details != null 
+                ? $"You have reached your device limit ({details.CurrentDevices} / {details.MaxDevices}). Please remove a device to continue."
+                : "You have reached your device limit. Please remove a device to continue.";
+            ShowError(msg);
+            _ = Windows.System.Launcher.LaunchUriAsync(new Uri(details?.ManageDevicesUrl ?? "https://stealthy.co.in/account"));
+        }
+        else if (result.Status == LoginStatus.ReplayDetected)
+        {
+            _logger.Log(LogLevel.WARN, "AUTH", "Replay detected -> Terminating session");
+            _authService.Logout();
+            ShowError("Security Alert: A potential replay attack was detected. Your session has been terminated.");
+        }
+        else
+        {
+            ShowError(result.ErrorMessage ?? "Login failed.");
+        }
+    }
+
+    private void GoToSettings_Click(object sender, RoutedEventArgs e)
+    {
+        SetNavigationState(NavigationState.Settings);
     }
 
     private void BackToMain_Click(object sender, RoutedEventArgs e)
     {
         SetNavigationState(NavigationState.Main);
+    }
+
+    private async Task UpdateDashboardAsync()
+    {
+        var token = await _authService.GetValidAccessTokenAsync();
+        if (string.IsNullOrEmpty(token))
+        {
+            DispatcherQueue.TryEnqueue(() => {
+                ProfileApiConnectivityText.Text = "Offline (No Token)";
+                DebugApiReachabilityText.Text = "API Reachability: Offline";
+            });
+            return;
+        }
+        
+        try
+        {
+            var me = await _oracleClient.FetchClientMeAsync(token);
+            if (me != null)
+            {
+                DispatcherQueue.TryEnqueue(() => {
+                    ProfilePlanText.Text = me.Plan;
+                    ProfileDevicesText.Text = $"{me.DeviceCount}";
+                    Profile2FaText.Text = me.TwoFactorEnabled ? "Enabled" : "Disabled";
+                    ProfileApiConnectivityText.Text = "Online";
+                    
+                    DebugApiReachabilityText.Text = "API Reachability: \u2713 Online";
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            DispatcherQueue.TryEnqueue(() => {
+                ProfileApiConnectivityText.Text = "Offline / Error";
+                DebugApiReachabilityText.Text = $"API Reachability: Error ({ex.Message})";
+            });
+        }
+
+        DispatcherQueue.TryEnqueue(() => {
+            var t = _tokenService.CurrentTokens;
+            if (t != null)
+            {
+                var jwtExpiry = t.ExpiresAt - DateTimeOffset.UtcNow;
+                DebugJwtExpiryText.Text = $"JWT expires in: {(int)jwtExpiry.TotalMinutes} min";
+            }
+            
+            string apiBaseUrl = Environment.GetEnvironmentVariable("STEALTHY_API_URL") ?? "https://api.stealthy.co.in";
+            DebugBackendText.Text = $"Backend: {apiBaseUrl}";
+            DebugVersionText.Text = $"Version: {System.Reflection.Assembly.GetExecutingAssembly().GetName().Version}";
+            DebugGitCommitText.Text = "Git Commit: Local Build";
+        });
     }
 
     private void ManageDevices_Click(object sender, RoutedEventArgs e)
@@ -469,20 +484,18 @@ public sealed partial class MainWindow : Window
     private void Logout_Click(object sender, RoutedEventArgs e)
     {
         _sessionManager.StopSession();
-        _authService.Logout();
+        _tokenService.ClearTokens();
+        CredentialBox.Password = "";
+        TotpBox.Text = "";
+        TwoFaPanel.Visibility = Visibility.Collapsed;
+        LoginActionBtn.Visibility = Visibility.Visible;
         SetNavigationState(NavigationState.Login);
     }
 
     private async void ConnectButton_Click(object sender, RoutedEventArgs e)
     {
-        string ip = ServerIpTextBox.Text.Trim();
-        if (string.IsNullOrWhiteSpace(ip)) { await ShowError("Enter a server IP."); return; }
-
-        _settings.ServerIp = ip;
-        _settings.Save();
-        
         ExitIpLabel.Text = "\u2014";
-        await _sessionManager.StartSessionAsync(ip);
+        await _sessionManager.StartSessionAsync();
     }
 
     private void DisconnectButton_Click(object sender, RoutedEventArgs e) => Disconnect();
@@ -494,7 +507,46 @@ public sealed partial class MainWindow : Window
         _sessionManager.StopSession();
     }
 
-    // ── UI helpers ───────────────────────────────────────────────────────────
+    private void ApplyTheme()
+    {
+        if (_settings.Theme == "Dark")
+            RootGrid.RequestedTheme = ElementTheme.Dark;
+        else if (_settings.Theme == "Light")
+            RootGrid.RequestedTheme = ElementTheme.Light;
+        else
+            RootGrid.RequestedTheme = ElementTheme.Default;
+
+        foreach (ComboBoxItem item in ThemeComboBox.Items)
+        {
+            if (item.Tag?.ToString() == _settings.Theme)
+            {
+                ThemeComboBox.SelectedItem = item;
+                break;
+            }
+        }
+    }
+
+    private void ThemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ThemeComboBox.SelectedItem is ComboBoxItem item)
+        {
+            string theme = item.Tag?.ToString() ?? "System";
+            _settings.Theme = theme;
+            _settings.Save();
+            ApplyTheme();
+        }
+    }
+
+    private void MainWindow_SizeChanged(object sender, WindowSizeChangedEventArgs args)
+    {
+        // Enforce 900x650 minimum
+        if (args.Size.Width < 900 || args.Size.Height < 650)
+        {
+            AppWindow.Resize(new SizeInt32(
+                Math.Max(900, (int)args.Size.Width), 
+                Math.Max(650, (int)args.Size.Height)));
+        }
+    }
 
     private void SetState(string label, Color orb, string timer)
     {
@@ -532,6 +584,11 @@ public sealed partial class MainWindow : Window
 
     private void OnClosed(object sender, WindowEventArgs args)
     {
+        // Save window bounds before minimizing/closing
+        _settings.WindowWidth = AppWindow.Size.Width;
+        _settings.WindowHeight = AppWindow.Size.Height;
+        _settings.Save();
+
         args.Handled = true;
         AppWindow.Hide();
         _tray.ShowBalloon("Stealthy running in tray");
@@ -541,12 +598,6 @@ public sealed partial class MainWindow : Window
     {
         AppWindow.Show();
         AppWindow.SetPresenter(AppWindowPresenterKind.Overlapped);
-        if (AppWindow.Presenter is OverlappedPresenter p)
-        {
-            p.IsResizable   = false;
-            p.IsMaximizable = false;
-            p.IsAlwaysOnTop = true;
-        }
     }
 
     internal void ExitApp()
@@ -556,14 +607,9 @@ public sealed partial class MainWindow : Window
         Application.Current.Exit();
     }
 
-    private async Task ShowError(string msg)
+    private void ShowError(string msg)
     {
-        var dlg = new ContentDialog
-        {
-            Title = "Error", Content = msg, CloseButtonText = "OK",
-            XamlRoot = Content.XamlRoot
-        };
-        await dlg.ShowAsync();
+        GlobalErrorBanner.Message = msg;
+        GlobalErrorBanner.IsOpen = true;
     }
 }
-

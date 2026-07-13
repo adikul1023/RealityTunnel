@@ -19,54 +19,14 @@ public class SecureStorageService
         }
     }
 
-    public void SaveMasterToken(string token)
+    public void SaveAccountId(string accountId)
     {
-        byte[] tokenBytes = Encoding.UTF8.GetBytes(token);
-        try
-        {
-            byte[] protectedBytes = ProtectedData.Protect(tokenBytes, null, DataProtectionScope.CurrentUser);
-            File.WriteAllBytes(Path.Combine(_storageDir, "master.dat"), protectedBytes);
-        }
-        finally
-        {
-            Array.Clear(tokenBytes, 0, tokenBytes.Length);
-        }
+        SaveObject("account_id.dat", accountId);
     }
 
-    /// <summary>
-    /// Reads and decrypts the master token. The caller is responsible for clearing the returned char array!
-    /// </summary>
-    public char[]? GetMasterToken()
+    public string? GetAccountId()
     {
-        string path = Path.Combine(_storageDir, "master.dat");
-        if (!File.Exists(path)) return null;
-
-        byte[] protectedBytes = File.ReadAllBytes(path);
-        byte[]? decryptedBytes = null;
-        try
-        {
-            decryptedBytes = ProtectedData.Unprotect(protectedBytes, null, DataProtectionScope.CurrentUser);
-            char[] tokenChars = Encoding.UTF8.GetChars(decryptedBytes);
-            return tokenChars;
-        }
-        catch
-        {
-            try
-            {
-                string corruptPath = path + ".corrupt";
-                if (File.Exists(corruptPath)) File.Delete(corruptPath);
-                File.Move(path, corruptPath);
-            }
-            catch { }
-            return null;
-        }
-        finally
-        {
-            if (decryptedBytes != null)
-            {
-                Array.Clear(decryptedBytes, 0, decryptedBytes.Length);
-            }
-        }
+        return GetObject<string>("account_id.dat");
     }
 
     public void SaveJwtTokens(JwtTokens tokens)
@@ -194,13 +154,18 @@ public class SecureStorageService
         return defaultName;
     }
 
-    public void ClearAll()
+    public void ClearSession()
     {
         if (Directory.Exists(_storageDir))
         {
-            foreach (var file in Directory.GetFiles(_storageDir))
+            var filesToDelete = new[] { "tokens.dat", "trusted_time.dat", "license.dat", "vpn_profile.dat" };
+            foreach (var filename in filesToDelete)
             {
-                File.Delete(file);
+                string path = Path.Combine(_storageDir, filename);
+                if (File.Exists(path))
+                {
+                    try { File.Delete(path); } catch { }
+                }
             }
         }
     }

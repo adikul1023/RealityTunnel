@@ -21,63 +21,59 @@ public class AuthenticationService
         _licenseService = licenseService;
     }
 
-    public bool IsAuthenticated =>
-        _tokenService.GetCurrentState() == SessionState.Authenticated || 
-        _tokenService.GetCurrentState() == SessionState.Offline;
+    public bool IsAuthenticated => _tokenService.CurrentTokens != null;
 
     public string GetOrCreateDeviceGuid()
     {
         return _secureStorage.GetDeviceGuid();
     }
 
-    public async Task<LoginResult> LoginAsync(string accountId, string masterToken)
+    public async Task<LoginResult> LoginAsync(string stealthyCredential, string? totpCode = null)
     {
-        _secureStorage.SaveMasterToken(masterToken);
+        if (string.IsNullOrWhiteSpace(stealthyCredential))
+        {
+            return new LoginResult { Status = LoginStatus.Error, ErrorMessage = "Credential cannot be empty." };
+        }
+
+        var parts = stealthyCredential.Split(':', 2);
+        if (parts.Length != 2)
+        {
+            return new LoginResult { Status = LoginStatus.Error, ErrorMessage = "Invalid credential format. Expected AccountID:MasterToken." };
+        }
+
+        string accountId = parts[0].Trim();
+        string masterToken = parts[1].Trim();
         
         var deviceId = _secureStorage.GetDeviceGuid();
         var osVersion = Environment.OSVersion.Version.ToString();
         var clientVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0";
         var device = new DeviceRegistration(deviceId, Environment.MachineName, "windows", clientVersion, osVersion);
-        var result = await _apiClient.LoginAsync(accountId, masterToken, device);
+        var result = await _apiClient.LoginAsync(accountId, masterToken, device, totpCode);
 
         if (result.Status == LoginStatus.Success && result.Tokens != null)
         {
             _tokenService.UpdateTokens(result.Tokens);
             _secureStorage.SaveLastTrustedTimestamp(DateTimeOffset.UtcNow);
-            
-            // Fetch license immediately upon success
-            var license = await _apiClient.FetchLicenseAsync(result.Tokens.AccessToken);
-            if (license != null)
+            _secureStorage.SaveAccountId(accountId);
+            // Fetch config immediately upon success
+            string deviceGuid = _secureStorage.GetDeviceGuid();
+            var config = await _apiClient.FetchClientConfigAsync(result.Tokens.AccessToken, deviceGuid);
+            if (config != null)
             {
+                var license = new LicenseBlob(config.LicenseBlob.Payload, config.LicenseBlob.Signature);
                 _licenseService.UpdateLicenseBlob(license);
+                _secureStorage.SaveVpnProfile(config.VpnProfile);
             }
         }
 
         return result;
     }
 
-    public async Task<bool> Verify2FaAsync(string tempToken, string totpCode)
-    {
-        var tokens = await _apiClient.Verify2FaAsync(tempToken, totpCode);
-        if (tokens != null)
-        {
-            _tokenService.UpdateTokens(tokens);
-            _secureStorage.SaveLastTrustedTimestamp(DateTimeOffset.UtcNow);
-            
-            var license = await _apiClient.FetchLicenseAsync(tokens.AccessToken);
-            if (license != null)
-            {
-                _licenseService.UpdateLicenseBlob(license);
-            }
-            return true;
-        }
-        return false;
-    }
-
     public void Logout()
     {
         _tokenService.ClearTokens();
-        _secureStorage.ClearAll();
+        // ClearTokens() internally calls _storage.ClearSession() which clears all session
+        // files while deliberately preserving device_guid.dat
     }
 
     public async Task RefreshTokenIfNeededAsync()

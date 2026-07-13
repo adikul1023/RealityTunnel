@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Menu, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { StealthyLogo } from '@/components/ui/logo'
@@ -20,6 +20,7 @@ const authLinks = [
 ]
 
 import { api } from '@/lib/api'
+import { isAuthenticated } from '@/lib/api'
 import { useRouter } from 'next/navigation'
 
 export function Nav({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
@@ -27,12 +28,25 @@ export function Nav({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
 
+  // Hydrate auth state from localStorage on mount, and subscribe to
+  // stealthy-auth-change events (dispatched by api.setSession / api.clearSession)
+  // so the navbar stays consistent during client-side navigation across all pages,
+  // including public pages that don't receive isLoggedIn from the server.
+  const [loggedIn, setLoggedIn] = useState(isLoggedIn)
+  useEffect(() => {
+    setLoggedIn(isAuthenticated())
+    const onAuthChange = () => setLoggedIn(isAuthenticated())
+    window.addEventListener('stealthy-auth-change', onAuthChange)
+    return () => window.removeEventListener('stealthy-auth-change', onAuthChange)
+  }, [])
+
   async function handleSignOut() {
     await api.logout()
     router.push('/login')
   }
 
-  const links = isLoggedIn ? [...publicLinks, ...authLinks] : publicLinks
+  const links = loggedIn ? [...publicLinks, ...authLinks] : publicLinks
+
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/80 backdrop-blur-md" suppressHydrationWarning>
@@ -64,7 +78,7 @@ export function Nav({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
 
           {/* Auth buttons */}
           <div className="hidden md:flex items-center gap-2">
-            {isLoggedIn ? (
+            {loggedIn ? (
               <button
                 type="button"
                 onClick={handleSignOut}
@@ -119,7 +133,7 @@ export function Nav({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
               </Link>
             ))}
             <div className="pt-2 flex flex-col gap-1">
-              {isLoggedIn ? (
+              {loggedIn ? (
                 <button
                   type="button"
                   onClick={() => { setOpen(false); handleSignOut(); }}

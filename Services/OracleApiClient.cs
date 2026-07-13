@@ -2,6 +2,7 @@ using System;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
+using System.Text.Json.Serialization;
 using RealityTunnel.Models;
 
 namespace RealityTunnel.Services;
@@ -10,28 +11,52 @@ public class OracleApiClient
 {
     private readonly HttpClient _httpClient;
 
+    private class TokenResponseDto
+    {
+        [JsonPropertyName("access_token")]
+        public string AccessToken { get; set; } = string.Empty;
+
+        [JsonPropertyName("refresh_token")]
+        public string RefreshToken { get; set; } = string.Empty;
+
+        [JsonPropertyName("expires_in")]
+        public int ExpiresIn { get; set; }
+    }
+
     public OracleApiClient(HttpClient httpClient)
     {
         _httpClient = httpClient;
     }
 
-    public async Task<LoginResult> LoginAsync(string accountId, string masterToken, DeviceRegistration device)
+    public async Task<LoginResult> LoginAsync(string accountId, string masterToken, DeviceRegistration device, string? totpCode = null)
     {
         var request = new LoginRequest
         {
             AccountId = accountId, 
             MasterToken = masterToken,
-            DeviceGuid = device.DeviceGuid
+            DeviceGuid = device.DeviceGuid,
+            TwoFaCode = totpCode
         };
         
         var response = await _httpClient.PostAsJsonAsync("/api/auth/login", request);
         
         if (response.IsSuccessStatusCode)
         {
+            var dto = await response.Content.ReadFromJsonAsync<TokenResponseDto>();
+            JwtTokens? tokens = null;
+            if (dto != null)
+            {
+                tokens = new JwtTokens(
+                    dto.AccessToken,
+                    dto.RefreshToken,
+                    DateTimeOffset.UtcNow.AddSeconds(dto.ExpiresIn)
+                );
+            }
+            
             return new LoginResult
             {
                 Status = LoginStatus.Success,
-                Tokens = await response.Content.ReadFromJsonAsync<JwtTokens>()
+                Tokens = tokens
             };
         }
         
@@ -43,20 +68,19 @@ public class OracleApiClient
         if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
             var errorBody = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
-            if (errorBody?.Error == "requires_2fa")
+            if (errorBody?.Requires2Fa == true)
             {
                 return new LoginResult 
                 { 
-                    Status = LoginStatus.Requires2FA,
-                    TemporaryLoginToken = errorBody.TemporaryLoginToken
+                    Status = LoginStatus.Requires2FA 
                 };
             }
         }
         
-        if (response.StatusCode == System.Net.HttpStatusCode.Conflict || response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
         {
             var errorBody = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
-            if (errorBody?.Error == "device_limit_exceeded")
+            if (errorBody?.CurrentDevices != null)
             {
                 return new LoginResult 
                 { 
@@ -74,21 +98,7 @@ public class OracleApiClient
         return new LoginResult { Status = LoginStatus.Error, ErrorMessage = response.ReasonPhrase };
     }
 
-    public async Task<JwtTokens?> Verify2FaAsync(string tempToken, string totpCode)
-    {
-        var request = new Verify2FaRequest
-        {
-            TemporaryLoginToken = tempToken,
-            TotpCode = totpCode
-        };
-        
-        var response = await _httpClient.PostAsJsonAsync("/api/auth/verify-2fa", request);
-        if (response.IsSuccessStatusCode)
-        {
-            return await response.Content.ReadFromJsonAsync<JwtTokens>();
-        }
-        return null;
-    }
+
 
     public async Task<ExchangeResult> ExchangeTokenAsync(string exchangeToken, string deviceGuid)
     {
@@ -126,7 +136,16 @@ public class OracleApiClient
         
         if (response.IsSuccessStatusCode)
         {
-            return await response.Content.ReadFromJsonAsync<JwtTokens>();
+            var dto = await response.Content.ReadFromJsonAsync<TokenResponseDto>();
+            if (dto != null)
+            {
+                return new JwtTokens(
+                    dto.AccessToken,
+                    dto.RefreshToken,
+                    DateTimeOffset.UtcNow.AddSeconds(dto.ExpiresIn)
+                );
+            }
+            return null;
         }
         
         if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
@@ -137,24 +156,17 @@ public class OracleApiClient
         return null;
     }
 
-    public async Task<LicenseBlob?> FetchLicenseAsync(string accessToken)
+    public async Task<ClientConfigResponse?> FetchClientConfigAsync(string accessToken, string deviceGuid)
     {
         _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
-        var response = await _httpClient.GetAsync("/api/client/license");
+        
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/client/config");
+        request.Headers.Add("X-Device-ID", deviceGuid);
+        
+        var response = await _httpClient.SendAsync(request);
         if (response.IsSuccessStatusCode)
         {
-            return await response.Content.ReadFromJsonAsync<LicenseBlob>();
-        }
-        return null;
-    }
-    
-    public async Task<VpnProfile?> FetchVpnProfileAsync(string accessToken)
-    {
-        _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
-        var response = await _httpClient.GetAsync("/api/client/profile");
-        if (response.IsSuccessStatusCode)
-        {
-            return await response.Content.ReadFromJsonAsync<VpnProfile>();
+            return await response.Content.ReadFromJsonAsync<ClientConfigResponse>();
         }
         return null;
     }

@@ -46,7 +46,7 @@ public class TokenService
     public void ClearTokens()
     {
         _currentTokens = null;
-        _storage.ClearAll(); // For now, clearing all on token clear
+        _storage.ClearSession();
     }
 
     // Handles the replay detection flow outlined in the architecture
