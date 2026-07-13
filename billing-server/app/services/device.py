@@ -252,7 +252,25 @@ class DeviceService:
             logger.error("Repository error renaming device")
             raise DeviceServiceError("Database error renaming device") from exc
 
-    async def deactivate_device(
+    async def remove_device(
+        self, account_id: uuid.UUID, device_guid: str
+    ) -> None:
+        """
+        Hard remove device. Delete from database and revoke tokens.
+        Must verify ownership.
+        """
+        device = await self._get_and_verify_ownership(account_id, device_guid, for_update=True)
+
+        if self.refresh_service:
+            await self.refresh_service.revoke_all_for_device(account_id, device_guid, "DEVICE_REMOVED")
+
+        try:
+            await self.device_repo.delete(device)
+        except RepositoryError as exc:
+            logger.error("Repository error removing device")
+            raise DeviceServiceError("Database error removing device") from exc
+
+    async def suspend_device(
         self, account_id: uuid.UUID, device_guid: str
     ) -> Device:
         """
@@ -263,18 +281,18 @@ class DeviceService:
         device = await self._get_and_verify_ownership(account_id, device_guid, for_update=True)
 
         if not device.is_active:
-            logger.info("Attempted deactivation on already deactivated device")
+            logger.info("Attempted suspension on already deactivated device")
             raise InactiveDeviceError("Device is already deactivated")
 
         device.is_active = False
         try:
             updated = await self.device_repo.update(device)
             if self.refresh_service:
-                await self.refresh_service.revoke_all_for_device(account_id, device_guid)
+                await self.refresh_service.revoke_all_for_device(account_id, device_guid, "ACCOUNT_DISABLED")
             return self._normalize_device_timestamps(updated)
         except RepositoryError as exc:
-            logger.error("Repository error deactivating device")
-            raise DeviceServiceError("Database error deactivating device") from exc
+            logger.error("Repository error suspending device")
+            raise DeviceServiceError("Database error suspending device") from exc
 
     async def reactivate_device(
         self, account_id: uuid.UUID, device_guid: str

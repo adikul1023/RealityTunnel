@@ -218,6 +218,57 @@ async def rename_device(
 
 @router.delete(
     "/{device_guid}",
+    summary="Hard-remove a registered client device",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {"description": "Authentication failed or token invalid"},
+        404: {"description": "Device not found or owned by another account"},
+        500: {"description": "Unexpected service or database error"},
+    },
+)
+async def remove_device(
+    device_guid: str,
+    http_request: Request,
+    current_account: Account = Depends(get_current_account),
+    device_service: DeviceService = Depends(get_device_service),
+    signal_service: ConnectionSignalService = Depends(get_signal_service),
+) -> SuccessResponse:
+    """Hard-delete a device and revoke its tokens."""
+    try:
+        await device_service.remove_device(current_account.id, device_guid)
+    except Exception:
+        logger.info("Remove device failed")
+        await safe_record_signal(
+            signal_service,
+            account_id=current_account.id,
+            event_type=ConnectionEventType.DEVICE_DEACTIVATE,  # Reuse event type for now
+            success=False,
+            device_guid=device_guid,
+            http_request=http_request,
+        )
+        raise
+
+    logger.info("Remove device succeeded")
+    await safe_record_signal(
+        signal_service,
+        account_id=current_account.id,
+        event_type=ConnectionEventType.DEVICE_DEACTIVATE,
+        success=True,
+        device_guid=device_guid,
+        http_request=http_request,
+    )
+    await audit_service.record_event(
+        event_type="device_remove",
+        actor_id=str(current_account.id),
+        target_id=device_guid,
+        details={"action": "remove_device"},
+    )
+    return SuccessResponse(success=True, message="Device removed successfully")
+
+
+@router.post(
+    "/{device_guid}/suspend",
     summary="Soft-deactivate a registered client device",
     response_model=SuccessResponse,
     status_code=status.HTTP_200_OK,
@@ -227,7 +278,7 @@ async def rename_device(
         500: {"description": "Unexpected service or database error"},
     },
 )
-async def deactivate_device(
+async def suspend_device(
     device_guid: str,
     http_request: Request,
     current_account: Account = Depends(get_current_account),
@@ -236,9 +287,9 @@ async def deactivate_device(
 ) -> SuccessResponse:
     """Soft-delete a device by setting is_active to False. Operation is idempotent."""
     try:
-        await device_service.deactivate_device(current_account.id, device_guid)
+        await device_service.suspend_device(current_account.id, device_guid)
     except InactiveDeviceError:
-        logger.info("Deactivate device succeeded (already inactive)")
+        logger.info("Suspend device succeeded (already inactive)")
         await safe_record_signal(
             signal_service,
             account_id=current_account.id,
@@ -248,14 +299,14 @@ async def deactivate_device(
             http_request=http_request,
         )
         await audit_service.record_event(
-            event_type="device_deactivate",
+            event_type="device_suspend",
             actor_id=str(current_account.id),
             target_id=device_guid,
-            details={"action": "deactivate_device", "status": "already_inactive"},
+            details={"action": "suspend_device", "status": "already_inactive"},
         )
-        return SuccessResponse(success=True, message="Device deactivated successfully")
+        return SuccessResponse(success=True, message="Device suspended successfully")
     except Exception:
-        logger.info("Deactivate device failed")
+        logger.info("Suspend device failed")
         await safe_record_signal(
             signal_service,
             account_id=current_account.id,
@@ -266,7 +317,7 @@ async def deactivate_device(
         )
         raise
 
-    logger.info("Deactivate device succeeded")
+    logger.info("Suspend device succeeded")
     await safe_record_signal(
         signal_service,
         account_id=current_account.id,
@@ -276,12 +327,12 @@ async def deactivate_device(
         http_request=http_request,
     )
     await audit_service.record_event(
-        event_type="device_deactivate",
+        event_type="device_suspend",
         actor_id=str(current_account.id),
         target_id=device_guid,
-        details={"action": "deactivate_device"},
+        details={"action": "suspend_device"},
     )
-    return SuccessResponse(success=True, message="Device deactivated successfully")
+    return SuccessResponse(success=True, message="Device suspended successfully")
 
 
 @router.post(
