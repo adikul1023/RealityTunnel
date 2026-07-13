@@ -9,10 +9,13 @@ namespace RealityTunnel.Services;
 public class SecureStorageService
 {
     private readonly string _storageDir;
-    
-    public SecureStorageService()
+    private readonly ClientLogger _logger;
+
+    public SecureStorageService(ClientLogger logger)
     {
+        _logger = logger;
         _storageDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OverREALITY", "Secure");
+        _logger.Log(LogLevel.INFO, "DEVICE_DEBUG", $"Storage path: {_storageDir}");
         if (!Directory.Exists(_storageDir))
         {
             Directory.CreateDirectory(_storageDir);
@@ -48,12 +51,12 @@ public class SecureStorageService
     {
         return GetObject<LicenseBlob>("license.dat");
     }
-    
+
     public void SaveVpnProfile(VpnProfile profile)
     {
         SaveObject("vpn_profile.dat", profile);
     }
-    
+
     public VpnProfile? GetVpnProfile()
     {
         return GetObject<VpnProfile>("vpn_profile.dat");
@@ -105,26 +108,54 @@ public class SecureStorageService
     public string GetDeviceGuid()
     {
         string path = Path.Combine(_storageDir, "device_guid.dat");
-        if (File.Exists(path))
+        bool fileExisted = File.Exists(path);
+        _logger.Log(LogLevel.INFO, "DEVICE_DEBUG", $"device_guid.dat exists: {fileExisted} (path: {path})");
+
+        if (fileExisted)
         {
             try
             {
                 byte[] protectedBytes = File.ReadAllBytes(path);
                 byte[] decryptedBytes = ProtectedData.Unprotect(protectedBytes, null, DataProtectionScope.CurrentUser);
-                return Encoding.UTF8.GetString(decryptedBytes);
+                string loadedGuid = Encoding.UTF8.GetString(decryptedBytes);
+                _logger.Log(LogLevel.INFO, "DEVICE_DEBUG", $"Loaded GUID from disk: {loadedGuid}");
+                return loadedGuid;
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // DPAPI decryption failed — file may have been written by a different user or
+                // Windows account. Rename so the next call can write a clean one.
+                _logger.Log(LogLevel.WARN, "DEVICE_DEBUG",
+                    $"DPAPI Unprotect failed for device_guid.dat: {ex.GetType().Name}: {ex.Message}. Renaming to .corrupt.");
+                try
+                {
+                    string corruptPath = path + ".corrupt";
+                    if (File.Exists(corruptPath)) File.Delete(corruptPath);
+                    File.Move(path, corruptPath);
+                }
+                catch (Exception renameEx)
+                {
+                    _logger.Log(LogLevel.ERROR, "DEVICE_DEBUG",
+                        $"Failed to rename corrupt device_guid.dat: {renameEx.Message}");
+                }
+            }
         }
 
         string newGuid = Guid.NewGuid().ToString();
+        _logger.Log(LogLevel.INFO, "DEVICE_DEBUG", $"Generated new GUID: {newGuid}");
         try
         {
             byte[] bytes = Encoding.UTF8.GetBytes(newGuid);
             byte[] protectedBytes = ProtectedData.Protect(bytes, null, DataProtectionScope.CurrentUser);
             File.WriteAllBytes(path, protectedBytes);
+            _logger.Log(LogLevel.INFO, "DEVICE_DEBUG", $"Saved new GUID to disk successfully.");
         }
-        catch { }
-        
+        catch (Exception ex)
+        {
+            _logger.Log(LogLevel.ERROR, "DEVICE_DEBUG",
+                $"FAILED to save new GUID to disk: {ex.GetType().Name}: {ex.Message}. GUID will not persist across restarts.");
+        }
+
         return newGuid;
     }
 
@@ -150,7 +181,7 @@ public class SecureStorageService
             File.WriteAllBytes(path, protectedBytes);
         }
         catch { }
-        
+
         return defaultName;
     }
 
@@ -158,6 +189,9 @@ public class SecureStorageService
     {
         if (Directory.Exists(_storageDir))
         {
+            // Explicitly only delete session-scoped files.
+            // device_guid.dat and device_name.dat are intentionally excluded —
+            // device identity must survive logout and restart.
             var filesToDelete = new[] { "tokens.dat", "trusted_time.dat", "license.dat", "vpn_profile.dat" };
             foreach (var filename in filesToDelete)
             {

@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { CheckCircle2, Zap } from 'lucide-react'
 import { Nav } from '@/components/nav'
 import { Footer } from '@/components/footer'
+import { PlanCta } from '@/components/plan-cta'
 
 const features = [
   { label: 'Encrypted private network access', basic: true, standard: true, quarterly: true },
@@ -69,12 +70,7 @@ export default function PlansPage() {
                 </li>
               </ul>
 
-              <Link
-                href="/register"
-                className="block text-center rounded-md border border-border px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-muted transition-colors"
-              >
-                Get started
-              </Link>
+              <PlanCta planId="basic" />
             </div>
 
             {/* Standard Monthly */}
@@ -101,12 +97,7 @@ export default function PlansPage() {
                 </li>
               </ul>
 
-              <Link
-                href="/register"
-                className="block text-center rounded-md border border-border px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-muted transition-colors"
-              >
-                Get started
-              </Link>
+              <PlanCta planId="standard" />
             </div>
 
             {/* Quarterly */}
@@ -138,12 +129,7 @@ export default function PlansPage() {
                 </li>
               </ul>
 
-              <Link
-                href="/register"
-                className="block text-center rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
-              >
-                Get started
-              </Link>
+              <PlanCta planId="quarterly" variant="primary" />
             </div>
           </div>
 
