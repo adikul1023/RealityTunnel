@@ -49,6 +49,15 @@ PRO: Final[SubscriptionPlan] = SubscriptionPlan(
     price_minor_units=49900,  # 499 INR
 )
 
+STANDARD: Final[SubscriptionPlan] = SubscriptionPlan(
+    plan_id="standard",
+    display_name="Standard Plan",
+    max_devices=2,
+    max_concurrent_ips=2,
+    data_quota_bytes=50 * 1024**3,  # 50 GB
+    price_minor_units=19900,  # 199 INR
+)
+
 FAMILY: Final[SubscriptionPlan] = SubscriptionPlan(
     plan_id="family",
     display_name="Family Plan",
@@ -62,6 +71,7 @@ FAMILY: Final[SubscriptionPlan] = SubscriptionPlan(
 # Registry dictionary mapping plan_id (lowercase) to SubscriptionPlan instance
 PLANS_REGISTRY: Final[dict[str, SubscriptionPlan]] = {
     FREE.plan_id: FREE,
+    STANDARD.plan_id: STANDARD,
     PRO.plan_id: PRO,
     FAMILY.plan_id: FAMILY,
 }

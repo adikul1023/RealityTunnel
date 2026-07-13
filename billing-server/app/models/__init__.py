@@ -5,7 +5,7 @@ from app.models.base import SubscriptionStatus, SubscriptionLifecycleStatus, Tim
 from app.models.account import Account
 from app.models.device import Device
 from app.models.refresh_token import RefreshToken
-from app.models.subscription_plan import SubscriptionPlan, FREE, PRO, FAMILY, PLANS_REGISTRY
+from app.models.subscription_plan import SubscriptionPlan, FREE, STANDARD, PRO, FAMILY, PLANS_REGISTRY
 from app.models.connection_signal import ConnectionSignal, ConnectionEventType
 from app.models.admin_user import AdminUser
 from app.models.subscription import Subscription
@@ -25,6 +25,7 @@ __all__ = [
     "RefreshToken",
     "SubscriptionPlan",
     "FREE",
+    "STANDARD",
     "PRO",
     "FAMILY",
     "PLANS_REGISTRY",
