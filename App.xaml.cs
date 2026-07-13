@@ -39,6 +39,7 @@ public partial class App : Application
 
         services.AddSingleton<AuthenticationService>();
         services.AddSingleton<ConfigurationProvider>();
+        services.AddSingleton<DeviceHeartbeatService>();
         
         // Register legacy controllers that the VpnSessionManager needs
         services.AddSingleton<XrayController>();

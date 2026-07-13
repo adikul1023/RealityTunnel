@@ -41,3 +41,12 @@ class SuccessResponse(BaseModel):
     """Generic success confirmation for device operations."""
     success: bool = Field(default=True, description="Indicates operation completed successfully")
     message: str | None = Field(default=None, description="Optional informational message")
+
+
+class DeviceStatusResponse(BaseModel):
+    """Real-time presence and status heartbeat response for a client device."""
+    active: bool = Field(..., description="Whether device is registered and active under the current account")
+    reason: str | None = Field(default=None, description="Revocation reason when active is false")
+    server_time: datetime = Field(..., description="Current server UTC timestamp")
+    heartbeat_interval: int = Field(default=60, description="Recommended heartbeat check interval in seconds")
+

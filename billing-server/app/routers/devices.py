@@ -20,7 +20,8 @@ from __future__ import annotations
 
 import logging
 import uuid
-from fastapi import APIRouter, Depends, Request, status
+from datetime import datetime, timezone
+from fastapi import APIRouter, Depends, Header, Request, status
 
 from app.dependencies import get_current_account, get_device_service, get_signal_service
 from app.models.account import Account
@@ -32,6 +33,7 @@ from app.security_hardening.audit import audit_service
 from app.routers.device_models import (
     DeviceListResponse,
     DeviceResponse,
+    DeviceStatusResponse,
     RegisterDeviceRequest,
     RenameDeviceRequest,
     SuccessResponse,
@@ -142,6 +144,45 @@ async def list_devices(
     logger.info("List devices succeeded")
     return DeviceListResponse(
         devices=[DeviceResponse.model_validate(d) for d in devices]
+    )
+
+
+@router.get(
+    "/status",
+    summary="Check real-time device presence and active status",
+    response_model=DeviceStatusResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {"description": "Authentication failed or token invalid"},
+        500: {"description": "Unexpected service or database error"},
+    },
+)
+async def check_device_status(
+    current_account: Account = Depends(get_current_account),
+    device_service: DeviceService = Depends(get_device_service),
+    x_device_guid: str | None = Header(default=None, alias="X-Device-Guid"),
+    device_guid: str | None = None,
+) -> DeviceStatusResponse:
+    """
+    Lightweight heartbeat endpoint reporting device active status.
+    Scopes device check strictly to current authenticated account.
+    Returns 200 OK with active=false when device is removed or inactive.
+    """
+    guid = x_device_guid or device_guid
+    now = datetime.now(timezone.utc)
+    if not guid:
+        return DeviceStatusResponse(
+            active=False,
+            reason="DEVICE_REMOVED",
+            server_time=now,
+            heartbeat_interval=60,
+        )
+    active, reason = await device_service.get_device_status(current_account.id, guid)
+    return DeviceStatusResponse(
+        active=active,
+        reason=reason,
+        server_time=now,
+        heartbeat_interval=60,
     )
 
 

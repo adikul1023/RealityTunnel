@@ -97,6 +97,27 @@ class DeviceService:
 
         return self._normalize_device_timestamps(device)
 
+    async def get_device_status(
+        self, account_id: uuid.UUID, device_guid: str
+    ) -> tuple[bool, str | None]:
+        """
+        Lightweight heartbeat check verifying if a device is registered and active
+        under the authenticated account. Does not throw exceptions on missing or inactive devices.
+        """
+        try:
+            device = await self.device_repo.get_by_guid(device_guid)
+        except Exception as exc:
+            logger.error("Repository error querying device in get_device_status")
+            return False, "DEVICE_REMOVED"
+
+        if device is None or device.account_id != account_id:
+            return False, "DEVICE_REMOVED"
+
+        if not device.is_active:
+            return False, "DEVICE_REMOVED"
+
+        return True, None
+
     async def register_device(
         self,
         account_id: uuid.UUID,

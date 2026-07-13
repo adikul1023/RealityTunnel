@@ -200,4 +200,18 @@ public class OracleApiClient
         }
         return null;
     }
+
+    public async Task<DeviceStatusResponse?> CheckDeviceStatusAsync(string accessToken, string deviceGuid, System.Threading.CancellationToken cancellationToken = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/devices/status");
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+        request.Headers.Add("X-Device-Guid", deviceGuid);
+
+        var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (response.IsSuccessStatusCode)
+        {
+            return await response.Content.ReadFromJsonAsync<DeviceStatusResponse>(cancellationToken: cancellationToken);
+        }
+        return null;
+    }
 }

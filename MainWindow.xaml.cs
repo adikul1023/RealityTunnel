@@ -39,6 +39,7 @@ public sealed partial class MainWindow : Window
     private readonly LicenseService _licenseService;
     private readonly ClientLogger _logger;
     private readonly OracleApiClient _oracleClient;
+    private readonly DeviceHeartbeatService _heartbeatService;
 
     private DateTime _connectedAt;
 
@@ -53,7 +54,8 @@ public sealed partial class MainWindow : Window
         TokenService tokenService,
         LicenseService licenseService,
         ClientLogger logger,
-        OracleApiClient oracleClient)
+        OracleApiClient oracleClient,
+        DeviceHeartbeatService heartbeatService)
     {
         InitializeComponent();
         _sessionManager = sessionManager;
@@ -63,6 +65,7 @@ public sealed partial class MainWindow : Window
         _licenseService = licenseService;
         _logger = logger;
         _oracleClient = oracleClient;
+        _heartbeatService = heartbeatService;
         _tray = new TrayIcon(this);
 
         var appWin = AppWindow;
@@ -90,7 +93,7 @@ public sealed partial class MainWindow : Window
 
     private static readonly Version MinimumSupportedVersion = new(1, 0, 0);
 
-    private void RunStartupSequence()
+    private async void RunStartupSequence()
     {
         _logger.Log(LogLevel.INFO, "STARTUP", "Starting client initialization sequence");
         SetNavigationState(NavigationState.Splash);
@@ -124,6 +127,16 @@ public sealed partial class MainWindow : Window
             SetNavigationState(NavigationState.Login);
             return;
         }
+
+        bool active = await _heartbeatService.CheckImmediateAsync();
+        if (!active)
+        {
+            _logger.Log(LogLevel.WARN, "AUTH", "Device presence check failed on startup (device removed) -> Login");
+            _tokenService.ClearTokens();
+            SetNavigationState(NavigationState.Login);
+            ShowError("This device has been removed from your account.");
+            return;
+        }
         
         _logger.Log(LogLevel.INFO, "STARTUP_DEBUG", "Decision: Session Valid. Proceeding to main navigation.");
         _ = RefreshJwtSafelyAsync();
@@ -132,6 +145,22 @@ public sealed partial class MainWindow : Window
         _logger.Log(LogLevel.INFO, "NAV", "Authenticated -> Main");
         SetNavigationState(NavigationState.Main);
         _ = UpdateDashboardAsync();
+        StartDeviceHeartbeat();
+    }
+
+    private void StartDeviceHeartbeat()
+    {
+        _heartbeatService.Start(() =>
+        {
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                _logger.Log(LogLevel.WARN, "NAV", "Device presence heartbeat revoked -> Logout");
+                _sessionManager.StopSession();
+                _tokenService.ClearTokens();
+                SetNavigationState(NavigationState.Login);
+                ShowError("This device has been removed from your account.");
+            });
+        });
     }
 
     private async Task RefreshJwtSafelyAsync()
@@ -369,6 +398,7 @@ public sealed partial class MainWindow : Window
             TwoFaPanel.Visibility = Visibility.Collapsed;
             SetNavigationState(NavigationState.Main);
             _ = UpdateDashboardAsync();
+            StartDeviceHeartbeat();
         }
         else if (result.Status == LoginStatus.SubscriptionExpired)
         {
@@ -483,6 +513,7 @@ public sealed partial class MainWindow : Window
 
     private void Logout_Click(object sender, RoutedEventArgs e)
     {
+        _heartbeatService.Stop();
         _sessionManager.StopSession();
         _tokenService.ClearTokens();
         CredentialBox.Password = "";
@@ -602,6 +633,7 @@ public sealed partial class MainWindow : Window
 
     internal void ExitApp()
     {
+        _heartbeatService.Stop();
         _sessionManager.StopSession();
         _tray.Dispose();
         Application.Current.Exit();
