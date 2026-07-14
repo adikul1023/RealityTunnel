@@ -45,6 +45,9 @@ services:
       # Override host to point at the compose service name
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
+      ENVIRONMENT: development
+    ports:
+      - "8080:8080"
     depends_on:
       postgres:
         condition: service_healthy

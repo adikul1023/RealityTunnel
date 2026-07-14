@@ -59,8 +59,9 @@ public class VpnSessionManager
             _retryCount = 0;
             OnRetryUpdate?.Invoke("OK");
         }
-        catch
+        catch (Exception ex)
         {
+            try { System.IO.File.AppendAllText(System.IO.Path.Combine(XrayController.GetAppDirectory(), "runtime_trace.log"), $"\n[ConnectInternalAsync ERROR]\n{ex}\n"); } catch { }
             OnStateChanged?.Invoke("Failed");
             if (!_userDisconnected)
             {

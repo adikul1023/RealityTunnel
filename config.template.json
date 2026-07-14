@@ -11,8 +11,8 @@
       "interface_name": "singbox_tun",
       "address": ["10.0.85.2/24"],
       "mtu": 9000,
-      "auto_route": false,
-      "strict_route": false,
+      "auto_route": true,
+      "strict_route": true,
       "stack": "mixed",
       "sniff": true
     }
@@ -24,7 +24,7 @@
       "server": "{{SERVER_HOST}}",
       "server_port": {{SERVER_PORT}},
       "uuid": "{{VPN_UUID}}",
-      "flow": "xtls-rprx-vision",
+      "flow": "",
       "packet_encoding": "",
       "tls": {
         "enabled": true,

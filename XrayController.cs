@@ -67,6 +67,34 @@ public class XrayController
             orphan.Dispose();
         }
 
+        string wintunPath = Path.Combine(appDir, "wintun.dll");
+        string hash = "(not found)", version = "(not found)";
+        if (File.Exists(corePath))
+        {
+            using var sha256 = System.Security.Cryptography.SHA256.Create();
+            using var stream = File.OpenRead(corePath);
+            hash = BitConverter.ToString(sha256.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
+            version = FileVersionInfo.GetVersionInfo(corePath).FileVersion ?? "(none)";
+        }
+        string traceLog = Path.Combine(appDir, "runtime_trace.log");
+        File.AppendAllText(traceLog, "\n=== Launching sing-box ===\n");
+        File.AppendAllText(traceLog, $"Full path to sing-box.exe: {corePath}\nSHA256 hash: {hash}\nFile version: {version}\n");
+        File.AppendAllText(traceLog, $"Working directory: {appDir}\nCurrent directory: {Environment.CurrentDirectory}\nConfig.json path: {configPath}\n");
+        File.AppendAllText(traceLog, $"File.Exists(sing-box.exe): {File.Exists(corePath)}\n");
+        File.AppendAllText(traceLog, $"File.Exists(config.json): {File.Exists(configPath)}\n");
+        File.AppendAllText(traceLog, $"File.Exists(wintun.dll): {File.Exists(wintunPath)}\n");
+        
+        try
+        {
+            var whoami = Process.Start(new ProcessStartInfo { FileName = "whoami", Arguments = "/groups", RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true });
+            if (whoami != null)
+            {
+                string whoamiOut = whoami.StandardOutput.ReadToEnd();
+                whoami.WaitForExit();
+                File.AppendAllText(traceLog, $"\n--- whoami /groups ---\n{whoamiOut}\n----------------------\n");
+            }
+        } catch { }
+
         _process = Process.Start(new ProcessStartInfo
         {
             FileName         = corePath,
@@ -78,14 +106,21 @@ public class XrayController
             RedirectStandardError  = true
         }) ?? throw new InvalidOperationException("Failed to launch sing-box.");
 
+        string stdOut = "", stdErr = "";
+        _process.OutputDataReceived += (s, e) => { if (e.Data != null) stdOut += e.Data + "\n"; };
+        _process.ErrorDataReceived += (s, e) => { if (e.Data != null) stdErr += e.Data + "\n"; };
+        _process.BeginOutputReadLine();
+        _process.BeginErrorReadLine();
+
         Thread.Sleep(4000);
 
         if (_process.HasExited)
         {
+            File.AppendAllText(traceLog, $"Process exited immediately! Code: {_process.ExitCode}\nSTDOUT:\n{stdOut}\nSTDERR:\n{stdErr}\n");
             _process.Dispose();
             _process = null;
             string log = File.Exists(logPath) ? File.ReadAllText(logPath).Trim() : "(no log)";
-            throw new InvalidOperationException($"sing-box exited immediately.\n\nLog:\n{log}");
+            throw new InvalidOperationException($"sing-box exited immediately.\n\nStderr:\n{stdErr}\n\nLog:\n{log}");
         }
 
         try   { SetupRoutes(_serverIp); }
