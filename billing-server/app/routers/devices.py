@@ -30,6 +30,7 @@ from app.rate_limit import require_rate_limit
 from app.services import DeviceService, ConnectionSignalService
 from app.services.exceptions import InactiveDeviceError
 from app.security_hardening.audit import audit_service
+from app.observability.logging import extract_client_info
 from app.routers.device_models import (
     DeviceListResponse,
     DeviceResponse,
@@ -158,6 +159,7 @@ async def list_devices(
     },
 )
 async def check_device_status(
+    http_request: Request,
     current_account: Account = Depends(get_current_account),
     device_service: DeviceService = Depends(get_device_service),
     x_device_guid: str | None = Header(default=None, alias="X-Device-Guid"),
@@ -176,13 +178,25 @@ async def check_device_status(
             reason="DEVICE_REMOVED",
             server_time=now,
             heartbeat_interval=60,
+            heartbeat_jitter=10,
         )
     active, reason = await device_service.get_device_status(current_account.id, guid)
+    logger.info(
+        "Heartbeat check",
+        extra={
+            "account_id": current_account.account_id,
+            "device_guid": guid,
+            "action": "HEARTBEAT",
+            "status": "ACTIVE" if active else "REMOVED",
+            **extract_client_info(http_request),
+        },
+    )
     return DeviceStatusResponse(
         active=active,
         reason=reason,
         server_time=now,
         heartbeat_interval=60,
+        heartbeat_jitter=10,
     )
 
 

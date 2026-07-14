@@ -32,6 +32,7 @@ import {
   DeviceDto,
   BillingPaymentDto,
   ApiError,
+  getOrCreateDeviceGuid,
 } from '@/lib/api'
 import TwoFactorPanel from '@/components/ui/TwoFactorPanel'
 
@@ -167,6 +168,11 @@ function DevicesTab({
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [removing, setRemoving] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [currentDeviceGuid, setCurrentDeviceGuid] = useState('')
+
+  useEffect(() => {
+    setCurrentDeviceGuid(getOrCreateDeviceGuid())
+  }, [])
 
   const planName = profile?.plan || 'Free'
   const planLimit = getPlanLimit(planName)
@@ -227,28 +233,38 @@ function DevicesTab({
               <p className="text-sm text-muted-foreground">No devices connected.</p>
             </div>
           ) : (
-            devices.map((device) => (
-              <div key={device.device_guid} className="flex items-center gap-4 px-5 py-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
-                  <PlatformIcon platform={device.friendly_name || 'windows'} />
+            devices.map((device) => {
+              const isCurrent = device.device_guid === currentDeviceGuid
+              return (
+                <div key={device.device_guid} className="flex items-center gap-4 px-5 py-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
+                    <PlatformIcon platform={device.friendly_name || 'windows'} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium text-foreground truncate">
+                        {device.friendly_name || (isCurrent ? 'This Device' : device.device_guid)}
+                      </p>
+                      {isCurrent && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary border border-primary/20">
+                          ✓ Current Device
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Last active {formatRelative(device.last_seen_at)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setConfirmId(device.device_guid)}
+                    className="flex-shrink-0 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-destructive/10 hover:border-destructive/30 hover:text-destructive transition-colors"
+                    aria-label={`Remove device`}
+                  >
+                    {isCurrent ? 'Remove (This Device)' : 'Remove'}
+                  </button>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-foreground truncate">
-                    {device.friendly_name || device.device_guid}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Last active {formatRelative(device.last_seen_at)}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setConfirmId(device.device_guid)}
-                  className="flex-shrink-0 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-destructive/10 hover:border-destructive/30 hover:text-destructive transition-colors"
-                  aria-label={`Remove device`}
-                >
-                  Remove
-                </button>
-              </div>
-            ))
+              )
+            })
           )}
         </div>
       </div>
@@ -281,9 +297,16 @@ function DevicesTab({
             <div className="rounded-lg border border-border bg-muted px-4 py-3 mb-5 flex items-center gap-3">
               <PlatformIcon platform={deviceToRemove.friendly_name || 'windows'} />
               <div>
-                <p className="text-sm font-medium text-foreground">
-                  {deviceToRemove.friendly_name || deviceToRemove.device_guid}
-                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-medium text-foreground">
+                    {deviceToRemove.friendly_name || deviceToRemove.device_guid}
+                  </p>
+                  {deviceToRemove.device_guid === currentDeviceGuid && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                      ✓ Current Device
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
             <div className="flex gap-2">
@@ -317,8 +340,8 @@ function BillingTab({ transactions }: { transactions: BillingPaymentDto[] }) {
     : []
 
   const totalPaid = list
-    .filter((t) => (t?.status || '').toLowerCase() === 'paid')
-    .reduce((s, t) => s + (t?.amount || 0), 0)
+    .filter((t: any) => (t?.status || '').toLowerCase() === 'paid')
+    .reduce((s: number, t: any) => s + (t?.amount || 0), 0)
 
   return (
     <div className="space-y-5">
@@ -349,7 +372,7 @@ function BillingTab({ transactions }: { transactions: BillingPaymentDto[] }) {
                   </td>
                 </tr>
               ) : (
-                list.map((tx, idx) => (
+                list.map((tx: any, idx: number) => (
                   <tr key={tx.id || (tx as any).payment_id || idx} className="hover:bg-muted/20 transition-colors">
                     <td className="px-6 py-3 text-muted-foreground whitespace-nowrap">{formatDate(tx.created_at)}</td>
                     <td className="px-6 py-3 text-foreground">{tx.description || 'Subscription Payment'}</td>

@@ -96,6 +96,14 @@ class StructuredJsonFormatter(logging.Formatter):
         if record.exc_info and not exc_type:
             exc_type = "Exception"
 
+        account_id = getattr(record, "account_id", None)
+        device_guid = getattr(record, "device_guid", None)
+        action = getattr(record, "action", None)
+        client_version = getattr(record, "client_version", None)
+        os_name = getattr(record, "os", None)
+        ip_addr = getattr(record, "ip", None)
+        user_agent = getattr(record, "user_agent", None)
+
         log_record = {
             "timestamp": timestamp_str,
             "level": record.levelname,
@@ -109,8 +117,48 @@ class StructuredJsonFormatter(logging.Formatter):
             "status": status,
             "exception_type": exc_type,
             "message": message,
+            "account_id": str(account_id) if account_id else None,
+            "device_guid": device_guid,
+            "action": action,
+            "client_version": client_version,
+            "os": os_name,
+            "ip": ip_addr,
+            "user_agent": user_agent,
         }
 
         # Format as JSON and apply mandatory zero-secret redaction
         raw_json = json.dumps(log_record, ensure_ascii=False)
         return redact_string(raw_json)
+
+
+def extract_client_info(request: Any | None) -> dict[str, Any]:
+    """Extract client telemetry attributes from an HTTP Request for logging."""
+    if not request:
+        return {}
+    headers = getattr(request, "headers", {})
+    ua = headers.get("user-agent", "")
+    ip = headers.get("x-forwarded-for", "").split(",")[0].strip()
+    client = getattr(request, "client", None)
+    if not ip and client:
+        ip = getattr(client, "host", None)
+    client_version = headers.get("x-client-version")
+    if not client_version and "/" in ua:
+        parts = ua.split("/")
+        if len(parts) >= 2 and parts[0].strip() in ("RealityTunnel", "OverREALITY"):
+            client_version = parts[1].split()[0]
+    os_name = headers.get("x-client-os")
+    if not os_name:
+        if "Windows" in ua:
+            os_name = "Windows"
+        elif "Android" in ua:
+            os_name = "Android"
+        elif "Linux" in ua:
+            os_name = "Linux"
+        elif "Mac OS" in ua or "Darwin" in ua:
+            os_name = "macOS"
+    return {
+        "client_version": client_version,
+        "os": os_name,
+        "ip": ip,
+        "user_agent": ua,
+    }

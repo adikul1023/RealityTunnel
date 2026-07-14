@@ -16,4 +16,7 @@ public sealed class DeviceStatusResponse
 
     [JsonPropertyName("heartbeat_interval")]
     public int HeartbeatInterval { get; init; } = 60;
+
+    [JsonPropertyName("heartbeat_jitter")]
+    public int HeartbeatJitter { get; init; } = 10;
 }

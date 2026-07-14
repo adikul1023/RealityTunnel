@@ -49,4 +49,5 @@ class DeviceStatusResponse(BaseModel):
     reason: str | None = Field(default=None, description="Revocation reason when active is false")
     server_time: datetime = Field(..., description="Current server UTC timestamp")
     heartbeat_interval: int = Field(default=60, description="Recommended heartbeat check interval in seconds")
+    heartbeat_jitter: int = Field(default=10, description="Random jitter in seconds to apply to heartbeat interval")
 

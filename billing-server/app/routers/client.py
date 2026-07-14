@@ -66,7 +66,7 @@ async def get_client_config(
     if not x_device_id:
         raise HTTPException(status_code=400, detail="Missing X-Device-ID header")
     
-    device_res = await db.execute(select(Device).where(Device.device_id == x_device_id, Device.account_id == current_account.id))
+    device_res = await db.execute(select(Device).where(Device.device_guid == x_device_id, Device.account_id == current_account.id))
     if not device_res.scalar_one_or_none():
         raise HTTPException(status_code=401, detail="Device not registered")
         

@@ -121,12 +121,13 @@ public sealed class DeviceHeartbeatService : IDisposable
     private async Task HeartbeatLoopAsync(CancellationToken ct)
     {
         int baseIntervalSeconds = 60;
+        int jitterRangeSeconds = 10;
 
         while (!ct.IsCancellationRequested && _isRunning)
         {
-            // Calculate jitter: baseInterval ± 10 seconds (Change #2)
-            int jitter = _rand.Next(-10, 11);
-            int intervalSeconds = Math.Max(15, baseIntervalSeconds + jitter);
+            // Calculate jitter: baseInterval ± jitterRangeSeconds
+            int jitter = jitterRangeSeconds > 0 ? _rand.Next(-jitterRangeSeconds, jitterRangeSeconds + 1) : 0;
+            int intervalSeconds = Math.Max(10, baseIntervalSeconds + jitter);
 
             using var timer = new PeriodicTimer(TimeSpan.FromSeconds(intervalSeconds));
             try
@@ -149,10 +150,13 @@ public sealed class DeviceHeartbeatService : IDisposable
 
                         if (status != null)
                         {
-                            // Update baseInterval if server provided a different heartbeat_interval (Change #3)
                             if (status.HeartbeatInterval > 0)
                             {
                                 baseIntervalSeconds = status.HeartbeatInterval;
+                            }
+                            if (status.HeartbeatJitter >= 0)
+                            {
+                                jitterRangeSeconds = status.HeartbeatJitter;
                             }
 
                             if (status.Active)

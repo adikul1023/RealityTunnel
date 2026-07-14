@@ -43,6 +43,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
+from app.observability.logging import extract_client_info
 from app.database import get_db
 from app.models import ExchangeToken
 from app.models.base import SubscriptionStatus
@@ -359,7 +360,16 @@ async def login(
         device_guid=request.device_guid,
     )
 
-    logger.info("Login succeeded")
+    logger.info(
+        "Login succeeded",
+        extra={
+            "account_id": result.account.account_id,
+            "device_guid": request.device_guid,
+            "action": "LOGIN",
+            "status": "SUCCESS",
+            **extract_client_info(http_request),
+        },
+    )
     await safe_record_signal(
         signal_service,
         account_id=result.account.id,
@@ -431,7 +441,16 @@ async def refresh(
         device_guid=rotated.device_guid,
     )
 
-    logger.info("Refresh succeeded")
+    logger.info(
+        "Refresh succeeded",
+        extra={
+            "account_id": account.account_id,
+            "device_guid": rotated.device_guid,
+            "action": "REFRESH",
+            "status": "SUCCESS",
+            **extract_client_info(http_request),
+        },
+    )
     await safe_record_signal(
         signal_service,
         account_id=rotated.account_id,
