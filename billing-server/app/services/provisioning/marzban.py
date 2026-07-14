@@ -174,8 +174,11 @@ class MarzbanProvisioningProvider(ProvisioningProvider):
         """Parse raw JSON payload into a clean ProvisionedUserDTO without logging sensitive links."""
         uuid = None
         proxies = data.get("proxies", {})
-        if isinstance(proxies, dict) and "vless" in proxies:
-            uuid = proxies["vless"].get("id")
+        if isinstance(proxies, dict):
+            if "VLESS TCP REALITY" in proxies:
+                uuid = proxies["VLESS TCP REALITY"].get("id")
+            elif "vless" in proxies:
+                uuid = proxies["vless"].get("id")
 
         return ProvisionedUserDTO(
             remote_user_id=str(data.get("username", fallback_username)),
@@ -198,7 +201,8 @@ class MarzbanProvisioningProvider(ProvisioningProvider):
         payload: dict[str, Any] = {
             "username": username, 
             "status": "active",
-            "proxies": {"vless": {}}
+            "proxies": {"vless": {}},
+            "inbounds": {"vless": ["VLESS TCP REALITY"]}
         }
         if data_limit is not None:
             payload["data_limit"] = data_limit
@@ -225,7 +229,10 @@ class MarzbanProvisioningProvider(ProvisioningProvider):
     ) -> ProvisionedUserDTO:
         """Update existing user in Marzban."""
         path = settings.marzban_update_user_path.format(username=username)
-        payload: dict[str, Any] = {"proxies": {"vless": {}}}
+        payload: dict[str, Any] = {
+            "proxies": {"vless": {}},
+            "inbounds": {"vless": ["VLESS TCP REALITY"]}
+        }
         if data_limit is not None:
             payload["data_limit"] = data_limit
         if expire_at is not None:

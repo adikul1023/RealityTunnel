@@ -136,10 +136,10 @@ services:
       TRUST_PROXY: "true"
       TRUSTED_PROXY_IPS: "${DOCKER_INTERNAL_SUBNET:-172.28.0.0/16}"
       # Provide explicit paths to the mounted read-only keys for the production environment
-      JWT_PRIVATE_KEY_PATH: "/app/dev_keys/jwt_ed25519.pem"
-      JWT_PUBLIC_KEY_PATH: "/app/dev_keys/jwt_ed25519.pub"
-      ADMIN_JWT_PRIVATE_KEY_PATH: "/app/dev_keys/jwt_ed25519.pem"
-      ADMIN_JWT_PUBLIC_KEY_PATH: "/app/dev_keys/jwt_ed25519.pub"
+      JWT_PRIVATE_KEY_PATH: "/app/dev_keys/ed25519_private.pem"
+      JWT_PUBLIC_KEY_PATH: "/app/dev_keys/ed25519_public.pem"
+      ADMIN_JWT_PRIVATE_KEY_PATH: "/app/dev_keys/admin/admin_ed25519_private.pem"
+      ADMIN_JWT_PUBLIC_KEY_PATH: "/app/dev_keys/admin/admin_ed25519_public.pem"
     volumes:
       - backup_data_prod:/app/backups
       - brain_data_prod:/app/brain
