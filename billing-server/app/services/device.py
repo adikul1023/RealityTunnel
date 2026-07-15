@@ -293,7 +293,7 @@ class DeviceService:
             logger.error("Repository error removing device")
             raise DeviceServiceError("Database error removing device") from exc
 
-    async def suspend_device(
+    async def deactivate_device(
         self, account_id: uuid.UUID, device_guid: str
     ) -> Device:
         """
@@ -316,6 +316,8 @@ class DeviceService:
         except RepositoryError as exc:
             logger.error("Repository error suspending device")
             raise DeviceServiceError("Database error suspending device") from exc
+
+    suspend_device = deactivate_device
 
     async def reactivate_device(
         self, account_id: uuid.UUID, device_guid: str

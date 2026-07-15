@@ -7,6 +7,7 @@ from app.models import RefreshToken
 from app.services.refresh_tokens import RefreshTokenService
 from app.services.exceptions import RefreshTokenReplayError, RefreshTokenServiceError, RefreshTokenRevokedError
 from app.repositories.refresh_token_repository import RefreshTokenRepository
+from app.repositories.device_repository import DeviceRepository
 from app.config import settings
 
 @pytest.mark.asyncio
@@ -20,7 +21,8 @@ async def test_concurrent_refresh_token_rotation_service_layer(db_session: Async
     # 1. Setup account and initial token using the standard test session
     account = await account_factory()
     repo = RefreshTokenRepository(db_session)
-    refresh_svc = RefreshTokenService(repo)
+    device_repo = DeviceRepository(db_session)
+    refresh_svc = RefreshTokenService(repo, device_repo)
     
     token_result = await refresh_svc.issue_refresh_token(
         account_id=account.id,
@@ -36,7 +38,7 @@ async def test_concurrent_refresh_token_rotation_service_layer(db_session: Async
     
     async def rotate_with_new_session():
         async with async_session_maker() as session:
-            svc = RefreshTokenService(RefreshTokenRepository(session))
+            svc = RefreshTokenService(RefreshTokenRepository(session), DeviceRepository(session))
             try:
                 return await svc.rotate_refresh_token(token_result.token)
             except Exception as exc:

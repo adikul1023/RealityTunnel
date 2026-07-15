@@ -190,7 +190,7 @@ async def test_missing_jwt(async_client: AsyncClient):
     """8. GET /api/devices without Authorization header returns 401."""
     resp = await async_client.get("/api/devices")
     assert resp.status_code == 401
-    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+    assert resp.json() == {"detail": "Missing Authorization header"}
 
 
 # ── 9. Invalid JWT ───────────────────────────────────────────────────────────
@@ -199,7 +199,7 @@ async def test_invalid_jwt(async_client: AsyncClient):
     """9. GET /api/devices with malformed or invalid JWT returns 401."""
     resp = await async_client.get("/api/devices", headers={"Authorization": "Bearer not-a-valid-token"})
     assert resp.status_code == 401
-    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+    assert resp.json() == {"detail": "Invalid access token"}
 
 
 # ── 10. Expired JWT ──────────────────────────────────────────────────────────
@@ -209,22 +209,25 @@ async def test_expired_jwt(async_client: AsyncClient, account_factory):
     _, acc = await get_auth_headers(async_client, account_factory, "RT-EXP-JWT")
     jwt_service = get_jwt_service()
 
-    # Craft an expired token directly using jwt_service keys
+    # Craft an expired token directly using jwt_service keys with all required claims
+    now = int(datetime.now(timezone.utc).timestamp())
     expired_payload = {
         "sub": str(acc.id),
-        "account_id": acc.account_id,
-        "device_guid": "dev-exp",
+        "account": str(acc.account_id),
+        "device": "dev-exp",
         "iss": "realitytunnel-auth",
         "aud": "realitytunnel-client",
-        "iat": int((datetime.now(timezone.utc) - timedelta(hours=2)).timestamp()),
-        "exp": int((datetime.now(timezone.utc) - timedelta(hours=1)).timestamp()),
+        "iat": now - 7200,
+        "nbf": now - 7200,
+        "exp": now - 3600,
+        "jti": "jti-expired-test",
     }
     import jwt
     expired_token = jwt.encode(expired_payload, jwt_service.private_key, algorithm="EdDSA")
 
     resp = await async_client.get("/api/devices", headers={"Authorization": f"Bearer {expired_token}"})
     assert resp.status_code == 401
-    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+    assert resp.json() == {"detail": "Access token has expired"}
 
 
 # ── 11. Tampered JWT ─────────────────────────────────────────────────────────
@@ -237,7 +240,7 @@ async def test_tampered_jwt(async_client: AsyncClient, account_factory):
 
     resp = await async_client.get("/api/devices", headers={"Authorization": f"Bearer {tampered_token}"})
     assert resp.status_code == 401
-    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+    assert resp.json() == {"detail": "Invalid access token signature"}
 
 
 # ── 12. Deleted Account ──────────────────────────────────────────────────────
@@ -250,7 +253,7 @@ async def test_deleted_account(async_client: AsyncClient, account_factory, db_se
 
     resp = await async_client.get("/api/devices", headers=headers)
     assert resp.status_code == 401
-    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+    assert resp.json() == {"detail": "Authentication failed or account invalid"}
 
 
 # ── 13. Suspended Account ────────────────────────────────────────────────────
@@ -263,7 +266,7 @@ async def test_suspended_account(async_client: AsyncClient, account_factory, db_
 
     resp = await async_client.get("/api/devices", headers=headers)
     assert resp.status_code == 401
-    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+    assert resp.json() == {"detail": "Account inactive: Account suspended"}
 
 
 # ── 14. Pending Account ──────────────────────────────────────────────────────
@@ -281,7 +284,7 @@ async def test_pending_account(async_client: AsyncClient, account_factory, db_se
 
     resp = await async_client.get("/api/devices", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 401
-    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+    assert resp.json() == {"detail": "Account inactive: Account pending"}
 
 
 # ── 15. Expired Subscription ─────────────────────────────────────────────────
@@ -294,7 +297,7 @@ async def test_expired_subscription(async_client: AsyncClient, account_factory, 
 
     resp = await async_client.get("/api/devices", headers=headers)
     assert resp.status_code == 401
-    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+    assert resp.json() == {"detail": "Account inactive: Subscription timestamp expired"}
 
 
 # ── 16. Verify DELETE Remains Idempotent (3x Calls) ──────────────────────────

@@ -24,6 +24,7 @@ class ProvisionedUserDTO:
     expire_at: int | None = None
     uuid: str | None = None
     links: list[str] = field(default_factory=list)
+    last_ip: str | None = None
 
 
 class ProvisioningProvider(ABC):

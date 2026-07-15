@@ -18,12 +18,13 @@ from app.models.account import Account
 from app.repositories import (
     AccountRepository,
     DeviceRepository,
-    RefreshTokenRepository,
     ConnectionSignalRepository,
-    AdminUserRepository,
 )
 from app.config import settings
 from app.security.jwt_service import JWTService
+from app.repositories.refresh_token_repository import RefreshTokenRepository
+from app.repositories.admin_user_repository import AdminUserRepository
+from app.repositories.subscription_repository import SubscriptionRepository
 from app.security.admin_password import AdminPasswordService
 from app.security.admin_jwt import AdminJWTService
 from app.services import (
@@ -164,6 +165,28 @@ async def get_signal_repo(
 ) -> ConnectionSignalRepository:
     """Dependency provider yielding ConnectionSignalRepository tied to request session."""
     return ConnectionSignalRepository(session)
+
+
+async def get_subscription_repo(
+    session: AsyncSession = Depends(get_db),
+) -> SubscriptionRepository:
+    """Dependency provider yielding SubscriptionRepository tied to request session."""
+    return SubscriptionRepository(session)
+
+
+async def get_provisioning_service(
+    session: AsyncSession = Depends(get_db),
+    account_repo: AccountRepository = Depends(get_account_repo),
+) -> ProvisioningService:
+    from app.repositories.provisioning_repository import ProvisioningRepository
+    from app.services.provisioning.provider import MarzbanProvisioningProvider
+    from app.services.provisioning.service import ProvisioningService
+    
+    prov_repo = ProvisioningRepository(session)
+    provider = MarzbanProvisioningProvider()
+    return ProvisioningService(prov_repo, account_repo, provider)
+
+
 
 
 async def get_signal_service(
@@ -361,9 +384,16 @@ async def get_current_admin_optional(
 async def get_admin_account_service(
     account_repo: AccountRepository = Depends(get_account_repo),
     refresh_repo: RefreshTokenRepository = Depends(get_refresh_repo),
+    subscription_repo: SubscriptionRepository = Depends(get_subscription_repo),
+    provisioning_service: ProvisioningService = Depends(get_provisioning_service),
 ) -> AdminAccountService:
     """Dependency provider yielding AdminAccountService for administrative account management."""
-    return AdminAccountService(account_repo, refresh_repo)
+    return AdminAccountService(
+        account_repo=account_repo,
+        refresh_repo=refresh_repo,
+        subscription_repo=subscription_repo,
+        provisioning_service=provisioning_service,
+    )
 
 
 async def require_super_admin(

@@ -1,6 +1,7 @@
 import subprocess
 import json
 import pytest
+from app.config import settings
 
 def get_published_ports(container_name: str) -> dict:
     try:

@@ -54,6 +54,14 @@ class OperationsService:
     - Keyset cursor pagination for audit logs with source categorization
     - Version & build info aggregation
     """
+    _cached_status: InfrastructureStatusDTO | None = None
+    _last_status_probe_time: float = 0.0
+    _status_lock: asyncio.Lock = asyncio.Lock()
+
+    @classmethod
+    def reset_status_cache(cls) -> None:
+        cls._cached_status = None
+        cls._last_status_probe_time = 0.0
 
     def __init__(
         self,
@@ -72,9 +80,6 @@ class OperationsService:
         self.sub_repo = SubscriptionRepository(session)
         self.prov_repo = ProvisioningRepository(session)
         self.health_repo = SystemHealthRepository(session)
-        self._cached_status: InfrastructureStatusDTO | None = None
-        self._last_status_probe_time: float = 0.0
-        self._status_lock = asyncio.Lock()
 
     # ── Infrastructure Status Probes ────────────────────────────────────────
 
@@ -160,13 +165,13 @@ class OperationsService:
         Each component check is strictly bounded by a 1.5s timeout.
         """
         now_perf = time.perf_counter()
-        if self._cached_status and (now_perf - self._last_status_probe_time) < 5.0:
-            return self._cached_status
+        if OperationsService._cached_status and (now_perf - OperationsService._last_status_probe_time) < 5.0:
+            return OperationsService._cached_status
 
-        async with self._status_lock:
+        async with OperationsService._status_lock:
             now_perf = time.perf_counter()
-            if self._cached_status and (now_perf - self._last_status_probe_time) < 5.0:
-                return self._cached_status
+            if OperationsService._cached_status and (now_perf - OperationsService._last_status_probe_time) < 5.0:
+                return OperationsService._cached_status
 
             now = datetime.now(timezone.utc)
             billing_api = ComponentStatusDTO(status="healthy", reason=None, message="Billing API operational", latency_ms=0, last_checked=now)
@@ -216,8 +221,8 @@ class OperationsService:
                 caddy=caddy,
                 edges=edges,
             )
-            self._cached_status = status_dto
-            self._last_status_probe_time = time.perf_counter()
+            OperationsService._cached_status = status_dto
+            OperationsService._last_status_probe_time = time.perf_counter()
             return status_dto
 
     # ── Unified Account Details ─────────────────────────────────────────────

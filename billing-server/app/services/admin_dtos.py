@@ -114,3 +114,14 @@ class ExtendSubscriptionRequest(BaseModel):
         le=3650,
         description="Number of days to extend the subscription from its current expiry (or now)",
     )
+
+
+class AdminGrantSubscriptionRequest(BaseModel):
+    """Request payload for POST /api/admin/accounts/{account_id}/grant-subscription."""
+    plan_id: str = Field(description="Subscription plan identifier (e.g. standard, pro)")
+    duration_days: int = Field(ge=1, le=3650, description="Duration in days")
+    data_quota_gb: Optional[int] = Field(default=None, description="Override data quota in GB")
+    device_limit: Optional[int] = Field(default=None, description="Override device limit")
+    payment_method: Optional[str] = Field(default=None, description="Payment method used (e.g. manual_qr)")
+    payment_reference: Optional[str] = Field(default=None, description="Payment reference/UTR")
+    notes: Optional[str] = Field(default=None, description="Operator notes")

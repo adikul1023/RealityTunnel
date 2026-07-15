@@ -679,7 +679,7 @@ async def test_get_me_missing_authorization_header(async_client: AsyncClient):
     """Missing Authorization header returns 401."""
     resp = await async_client.get("/api/auth/me")
     assert resp.status_code == 401
-    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+    assert resp.json() == {"detail": "Missing Authorization header"}
 
 
 @pytest.mark.asyncio
@@ -689,7 +689,7 @@ async def test_get_me_malformed_authorization_header(async_client: AsyncClient):
         "/api/auth/me", headers={"Authorization": "Bearer token1 token2"}
     )
     assert resp.status_code == 401
-    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+    assert resp.json() == {"detail": "Invalid Authorization header format. Expected Bearer token"}
 
 
 @pytest.mark.asyncio
@@ -699,7 +699,7 @@ async def test_get_me_wrong_bearer_format(async_client: AsyncClient):
         "/api/auth/me", headers={"Authorization": "Basic sometoken"}
     )
     assert resp.status_code == 401
-    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+    assert resp.json() == {"detail": "Invalid Authorization header format. Expected Bearer token"}
 
 
 @pytest.mark.asyncio
@@ -709,7 +709,7 @@ async def test_get_me_empty_token(async_client: AsyncClient):
         "/api/auth/me", headers={"Authorization": "Bearer   "}
     )
     assert resp.status_code == 401
-    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+    assert resp.json() == {"detail": "Invalid Authorization header format. Expected Bearer token"}
 
 
 @pytest.mark.asyncio
@@ -735,7 +735,7 @@ async def test_get_me_expired_jwt(async_client: AsyncClient, account_factory):
         "/api/auth/me", headers={"Authorization": f"Bearer {token}"}
     )
     assert resp.status_code == 401
-    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+    assert resp.json() == {"detail": "Access token has expired"}
 
 
 @pytest.mark.asyncio
@@ -761,7 +761,7 @@ async def test_get_me_tampered_jwt(async_client: AsyncClient, account_factory):
         "/api/auth/me", headers={"Authorization": f"Bearer {tampered}"}
     )
     assert resp.status_code == 401
-    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+    assert resp.json() == {"detail": "Invalid access token signature"}
 
 
 @pytest.mark.asyncio
@@ -841,7 +841,7 @@ async def test_get_me_deleted_account(
         "/api/auth/me", headers={"Authorization": f"Bearer {access_token}"}
     )
     assert resp.status_code == 401
-    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+    assert resp.json() == {"detail": "Authentication failed or account invalid"}
 
 
 @pytest.mark.asyncio
@@ -871,7 +871,7 @@ async def test_get_me_suspended_account(
         "/api/auth/me", headers={"Authorization": f"Bearer {access_token}"}
     )
     assert resp.status_code == 401
-    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+    assert "Account inactive" in resp.json()["detail"]
 
 
 @pytest.mark.asyncio
@@ -901,7 +901,7 @@ async def test_get_me_expired_subscription(
         "/api/auth/me", headers={"Authorization": f"Bearer {access_token}"}
     )
     assert resp.status_code == 401
-    assert resp.json() == {"detail": "Authentication failed or token invalid"}
+    assert "Account inactive" in resp.json()["detail"]
 
 
 # ── Phase 1.3.8: Regression Tests for Audit FINDING-01 ───────────────────────

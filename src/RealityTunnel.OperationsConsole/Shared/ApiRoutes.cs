@@ -23,6 +23,7 @@ namespace RealityTunnel.OperationsConsole.Shared
             public static string SuspendAccount(string accountId) => $"/api/admin/accounts/{accountId}/suspend";
             public static string ActivateAccount(string accountId) => $"/api/admin/accounts/{accountId}/activate";
             public static string ExtendSubscription(string accountId) => $"/api/admin/accounts/{accountId}/extend-subscription";
+            public static string GrantSubscription(string accountId) => $"/api/admin/accounts/{accountId}/grant-subscription";
             public static string GetDevices(string accountId) => $"/api/admin/accounts/{accountId}/devices";
             public static string LogoutAllSessions(string accountId) => $"/api/admin/accounts/{accountId}/logout-all";
             public static string GetSignals(string accountId) => $"/api/admin/accounts/{accountId}/signals";

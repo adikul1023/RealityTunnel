@@ -96,8 +96,44 @@
             </Grid>
         </Border>
 
+        <!-- Beta Onboarding / Manual Grant -->
+        <Border Grid.Row="1" Background="#1E1B4B" BorderBrush="#4338CA" BorderThickness="1" CornerRadius="10" Padding="16,12" Margin="0,0,0,20"
+                Visibility="{Binding IsSuperAdmin, Converter={StaticResource BoolToVis}}"
+                VerticalAlignment="Top">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Margin" Value="0,70,0,20" />
+                </Style>
+            </Border.Style>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <ui:SymbolIcon Symbol="Gift24" FontSize="20" Foreground="#818CF8" Margin="0,0,8,0"/>
+                    <TextBlock Text="Beta Onboarding (Grant):" FontWeight="Bold" Foreground="#C7D2FE" VerticalAlignment="Center" Margin="0,0,16,0"/>
+
+                    <TextBlock Text="Plan:" Foreground="#D1D5DB" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <ComboBox SelectedValue="{Binding GrantPlanId}" SelectedValuePath="Content" Width="90" Height="34" Margin="0,0,12,0">
+                        <ComboBoxItem Content="standard"/>
+                        <ComboBoxItem Content="pro"/>
+                        <ComboBoxItem Content="free"/>
+                    </ComboBox>
+
+                    <TextBlock Text="Days:" Foreground="#D1D5DB" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <ui:TextBox Text="{Binding GrantDurationDays}" Width="60" Height="34" Margin="0,0,12,0"/>
+                    
+                    <TextBlock Text="UTR / Ref:" Foreground="#D1D5DB" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <ui:TextBox Text="{Binding GrantPaymentReference}" Width="120" Height="34" PlaceholderText="e.g. UPI-123" Margin="0,0,16,0"/>
+
+                    <ui:Button Content="Grant Subscription" Appearance="Primary" Command="{Binding GrantSubscriptionCommand}" Height="34"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
         <!-- Multi-Section Layout -->
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="2" Margin="0,150,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="420" />
                 <ColumnDefinition Width="20" />

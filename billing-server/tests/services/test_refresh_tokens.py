@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import DatabaseOperationError
 from app.models import RefreshToken
-from app.repositories import RefreshTokenRepository
+from app.repositories import RefreshTokenRepository, DeviceRepository
 from app.security import hash_refresh_token
 from app.services import (
     RefreshTokenService,
@@ -27,7 +27,8 @@ from app.services import (
 @pytest.fixture
 def rtr_service(db_session: AsyncSession) -> RefreshTokenService:
     repo = RefreshTokenRepository(db_session)
-    return RefreshTokenService(repo)
+    device_repo = DeviceRepository(db_session)
+    return RefreshTokenService(repo, device_repo)
 
 
 @pytest.mark.asyncio

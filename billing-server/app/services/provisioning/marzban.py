@@ -188,6 +188,7 @@ class MarzbanProvisioningProvider(ProvisioningProvider):
             expire_at=data.get("expire"),
             uuid=uuid,
             links=data.get("links", []),
+            last_ip=data.get("last_ip") or data.get("online_at_ip") or data.get("ip"),
         )
 
     async def create_user(

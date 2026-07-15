@@ -38,7 +38,7 @@ async def test_logout_revokes_token(db_session: AsyncSession, async_client: Asyn
         json={"refresh_token": refresh_token},
     )
     assert refresh_resp.status_code == 401
-    assert "Authentication failed or token invalid" in refresh_resp.text
+    assert refresh_resp.json()["detail"]["code"] == "REPLAY_DETECTED"
 
 
 @pytest.mark.asyncio

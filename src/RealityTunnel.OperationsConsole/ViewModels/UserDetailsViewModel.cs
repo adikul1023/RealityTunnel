@@ -56,6 +56,15 @@ namespace RealityTunnel.OperationsConsole.ViewModels
         [ObservableProperty]
         private int extendDaysInput = 30;
 
+        [ObservableProperty]
+        private string grantPlanId = "standard";
+
+        [ObservableProperty]
+        private int grantDurationDays = 30;
+
+        [ObservableProperty]
+        private string grantPaymentReference = "";
+
         public UserDetailsViewModel(
             IAdminApiService apiService,
             INavigationService navigationService,
@@ -209,6 +218,42 @@ namespace RealityTunnel.OperationsConsole.ViewModels
                 {
                     Account.SubscriptionExpiresAt = res.Data.SubscriptionExpiresAt;
                     await _dialogService.ShowInfoAsync("Success", $"Subscription extended by {ExtendDaysInput} days.");
+                }
+            }
+            finally { IsBusy = false; }
+        }
+
+        [RelayCommand]
+        private async Task GrantSubscriptionAsync()
+        {
+            if (Account == null || !IsSuperAdmin) return;
+            bool confirm = await _dialogService.ShowConfirmationAsync("Confirm Grant",
+                $"Are you sure you want to atomically provision the '{GrantPlanId}' plan for {GrantDurationDays} days?");
+            if (!confirm) return;
+
+            IsBusy = true;
+            try
+            {
+                var req = new AdminGrantSubscriptionRequest
+                {
+                    PlanId = GrantPlanId,
+                    DurationDays = GrantDurationDays,
+                    PaymentMethod = "manual_qr",
+                    PaymentReference = string.IsNullOrWhiteSpace(GrantPaymentReference) ? null : GrantPaymentReference,
+                    Notes = "Beta manual onboarding"
+                };
+
+                var res = await _apiService.PostAsync<AdminAccountResponse, AdminGrantSubscriptionRequest>(
+                    ApiRoutes.Admin.GrantSubscription(Account.Id), req);
+
+                if (res.IsSuccess && res.Data != null)
+                {
+                    Account.Status = res.Data.Status;
+                    Account.PlanId = res.Data.PlanId;
+                    Account.SubscriptionExpiresAt = res.Data.SubscriptionExpiresAt;
+                    await _dialogService.ShowInfoAsync("Success", "Beta subscription successfully granted and provisioned.");
+                    // Reload to get updated Provisioning and Subscription data
+                    await LoadDetailsAsync(Account);
                 }
             }
             finally { IsBusy = false; }

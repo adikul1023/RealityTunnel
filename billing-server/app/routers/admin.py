@@ -37,6 +37,7 @@ from app.routers.admin_dtos import (
     AdminSignalListResponse,
     AdminSignalResponse,
     ExtendSubscriptionRequest,
+    AdminGrantSubscriptionRequest,
 )
 from app.services.admin_account import AdminAccountService
 from app.services.connection_signal import ConnectionSignalService
@@ -262,6 +263,48 @@ async def extend_subscription(
             actor_id=str(current_admin.id),
             target_id=account_id,
             details={"action": "extend_subscription", "account_id": account_id, "days": body.days, "new_status": account.status.value},
+        )
+    except AdminAccountNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
+    except AdminServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return _build_account_dto(account)
+
+
+@router.post(
+    "/accounts/{account_id}/grant-subscription",
+    summary="Atomically grant a beta subscription (super-admin only)",
+    response_model=AdminAccountResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"description": "Invalid duration or plan"},
+        401: {"description": "Admin authentication required"},
+        403: {"description": "Super-admin privilege required"},
+        404: {"description": "Account not found"},
+    },
+)
+async def grant_subscription(
+    account_id: str,
+    body: AdminGrantSubscriptionRequest,
+    current_admin: AdminUser = Depends(require_super_admin),
+    admin_account_service: AdminAccountService = Depends(get_admin_account_service),
+) -> AdminAccountResponse:
+    """
+    Atomically grant a subscription to an account.
+    Updates the account status and expiry, creates/updates the subscription record,
+    pushes changes to Marzban, and securely logs the transaction.
+    """
+    try:
+        account = await admin_account_service.grant_subscription(
+            account_id_str=account_id,
+            plan_id=body.plan_id,
+            duration_days=body.duration_days,
+            data_quota_gb=body.data_quota_gb,
+            device_limit=body.device_limit,
+            payment_method=body.payment_method,
+            payment_reference=body.payment_reference,
+            notes=body.notes,
+            admin_id=current_admin.id,
         )
     except AdminAccountNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")

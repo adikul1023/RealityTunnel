@@ -20,9 +20,14 @@ from datetime import datetime, timedelta, timezone
 
 from app.exceptions import RepositoryError
 from app.models.account import Account
-from app.models.base import SubscriptionStatus
+from app.models.base import SubscriptionStatus, SubscriptionLifecycleStatus
+from app.models.subscription import Subscription
+from app.models.subscription_plan import PLANS_REGISTRY
 from app.repositories.account_repository import AccountRepository
 from app.repositories.refresh_token_repository import RefreshTokenRepository
+from app.repositories.subscription_repository import SubscriptionRepository
+from app.services.provisioning.service import ProvisioningService, ProvisioningState
+from app.security_hardening.audit import audit_service
 from app.services.exceptions import (
     AdminAccountNotFoundError,
     AdminServiceError,
@@ -42,9 +47,13 @@ class AdminAccountService:
         self,
         account_repo: AccountRepository,
         refresh_repo: RefreshTokenRepository,
+        subscription_repo: SubscriptionRepository | None = None,
+        provisioning_service: ProvisioningService | None = None,
     ) -> None:
         self.account_repo = account_repo
         self.refresh_repo = refresh_repo
+        self.subscription_repo = subscription_repo
+        self.provisioning_service = provisioning_service
 
     # ── Private helpers ─────────────────────────────────────────────────────
 
@@ -162,6 +171,134 @@ class AdminAccountService:
             raise AdminServiceError("Database error extending subscription") from exc
 
         logger.info("Administrative subscription extension completed.")
+        return account
+
+    async def grant_subscription(
+        self,
+        account_id_str: str,
+        plan_id: str,
+        duration_days: int,
+        data_quota_gb: int | None = None,
+        device_limit: int | None = None,
+        payment_method: str | None = None,
+        payment_reference: str | None = None,
+        notes: str | None = None,
+        admin_id: uuid.UUID | None = None,
+    ) -> Account:
+        """
+        Atomic operator-driven beta onboarding grant.
+        Updates account, creates/updates subscription, provisions Marzban, records audit trail.
+        """
+        if not self.subscription_repo or not self.provisioning_service:
+            raise AdminServiceError("Service misconfigured: Missing subscription/provisioning dependencies.")
+
+        clean_plan_id = plan_id.strip().lower()
+        plan = PLANS_REGISTRY.get(clean_plan_id)
+        if not plan:
+            raise AdminServiceError(f"Unknown subscription plan ID: '{clean_plan_id}'")
+
+        if duration_days < 1 or duration_days > 3650:
+            raise AdminServiceError("Duration days must be between 1 and 3650")
+
+        # Determine limits
+        data_limit = (data_quota_gb * 1024**3) if data_quota_gb and data_quota_gb > 0 else plan.data_quota_bytes
+
+        # 1. Lock Account
+        account = await self._get_by_account_id(account_id_str, for_update=True)
+        now = datetime.now(timezone.utc)
+        new_expiry = now + timedelta(days=duration_days)
+        expire_ts = int(new_expiry.timestamp())
+
+        try:
+            # 2. Update Account (Uncommitted)
+            account = await self.account_repo.update(
+                account,
+                plan_id=plan.plan_id,
+                status=SubscriptionStatus.ACTIVE,
+                subscription_expires_at=new_expiry,
+                commit=False,
+            )
+
+            # 3. Create or update Subscription (Uncommitted)
+            active_sub = await self.subscription_repo.get_active_for_account(account.id, now, for_update=True)
+            if active_sub:
+                await self.subscription_repo.update(
+                    active_sub,
+                    plan_id=plan.plan_id,
+                    status=SubscriptionLifecycleStatus.ACTIVE,
+                    expires_at=new_expiry,
+                    commit=False,
+                )
+            else:
+                await self.subscription_repo.create(
+                    account_id=account.id,
+                    plan_id=plan.plan_id,
+                    status=SubscriptionLifecycleStatus.ACTIVE,
+                    starts_at=now,
+                    expires_at=new_expiry,
+                    commit=False,
+                )
+
+            # 4. Sync Marzban Provisioning (Uncommitted flush)
+            profile = await self.provisioning_service.provisioning_repo.get_by_account_id(account.id, for_update=True)
+            if profile:
+                try:
+                    await self.provisioning_service.provider.update_user(
+                        profile.remote_user_id,
+                        data_limit=data_limit,
+                        expire_at=expire_ts,
+                        status="active"
+                    )
+                except Exception as exc:
+                    logger.error("Failed to update Marzban user %s: %s", profile.remote_user_id, exc)
+                    raise AdminServiceError("Marzban provisioning update failed") from exc
+
+                profile.provisioning_state = ProvisioningState.ACTIVE
+                profile.last_sync_at = now
+                profile.last_error = None
+                await self.provisioning_service.session.flush()
+                
+                if self.provisioning_service.credential_service:
+                    await self.provisioning_service.credential_service.generate(account.id)
+            else:
+                await self.provisioning_service.provision_subscription(
+                    account.id,
+                    plan.plan_id,
+                    expire_at=new_expiry,
+                    data_limit=data_limit,
+                    commit=False
+                )
+
+            # 5. Record Audit Event
+            await audit_service.record_event(
+                event_type="subscription_change",
+                actor_id=str(admin_id) if admin_id else "SYSTEM",
+                target_id=str(account.id),
+                details={
+                    "action": "grant_subscription",
+                    "account_id_str": account.account_id,
+                    "plan_id": plan.plan_id,
+                    "duration_days": duration_days,
+                    "data_quota_gb": data_quota_gb,
+                    "device_limit": device_limit,
+                    "payment_method": payment_method,
+                    "payment_reference": payment_reference,
+                    "notes": notes,
+                },
+            )
+
+            # 6. Commit atomic transaction
+            await self.account_repo.session.commit()
+            await self.account_repo.session.refresh(account)
+
+        except Exception as exc:
+            await self.account_repo.session.rollback()
+            logger.error("Failed to grant subscription for account %s: %s", account_id_str, exc)
+            if isinstance(exc, AdminServiceError):
+                raise
+            raise AdminServiceError("Database or provisioning error during subscription grant") from exc
+
+        logger.info("Administrative subscription grant completed for %s.", account_id_str)
         return account
 
     # ── Session management ───────────────────────────────────────────────────
