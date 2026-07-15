@@ -88,10 +88,10 @@
                                 <TextBlock Text="Subscriptions" FontSize="14" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
-                        <Button Style="{StaticResource NavButtonStyle}" Command="{Binding NavigateCommand}" CommandParameter="Payments" Margin="0,0,0,6">
+                        <Button Style="{StaticResource NavButtonStyle}" Command="{Binding NavigateCommand}" CommandParameter="Billing" Margin="0,0,0,6">
                             <StackPanel Orientation="Horizontal">
                                 <ui:SymbolIcon Symbol="Money24" FontSize="20" Margin="0,0,12,0" Foreground="#FBBF24"/>
-                                <TextBlock Text="Payments" FontSize="14" VerticalAlignment="Center"/>
+                                <TextBlock Text="Billing" FontSize="14" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
                         <Button Style="{StaticResource NavButtonStyle}" Command="{Binding NavigateCommand}" CommandParameter="Infrastructure" Margin="0,0,0,6">

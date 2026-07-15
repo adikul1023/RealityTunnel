@@ -11,6 +11,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -145,8 +146,33 @@
             </Border>
         </Grid>
 
+        <!-- KPI Cards Row 3: Provision Queue & Diagnostics -->
+        <Grid Grid.Row="3" Margin="0,0,0,20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Card 9: Provision Queue -->
+            <Border Grid.Column="0" Grid.ColumnSpan="3" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="12" Padding="20">
+                <Grid>
+                    <StackPanel>
+                        <TextBlock Text="PROVISION QUEUE" FontSize="11" FontWeight="Bold" Foreground="#9CA3AF" Margin="0,0,0,8"/>
+                        <TextBlock Text="{Binding ProvisionQueuePending, StringFormat='{}{0} pending'}" FontSize="28" FontWeight="Bold" Foreground="#FBBF24" />
+                        <TextBlock Text="Failed or pending Marzban edge tunnel synchronizations" FontSize="11" Foreground="#6B7280" Margin="0,4,0,0"/>
+                    </StackPanel>
+                    <ui:SymbolIcon Symbol="ClockAlarm24" FontSize="32" Foreground="#B45309" HorizontalAlignment="Right" VerticalAlignment="Top"/>
+                </Grid>
+            </Border>
+        </Grid>
+
         <!-- Spinner overlay -->
-        <Grid Grid.Row="0" Grid.RowSpan="4" Background="#80000000" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}">
+        <Grid Grid.Row="0" Grid.RowSpan="5" Background="#80000000" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}">
             <ui:ProgressRing IsIndeterminate="True" Width="60" Height="60" HorizontalAlignment="Center" VerticalAlignment="Center"/>
         </Grid>
     </Grid>

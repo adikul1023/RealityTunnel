@@ -39,6 +39,15 @@ namespace RealityTunnel.OperationsConsole.ViewModels
         private bool isSuperAdmin;
 
         [ObservableProperty]
+        private bool isOracleHealthy = false;
+
+        [ObservableProperty]
+        private bool isMarzbanHealthy = false;
+
+        [ObservableProperty]
+        private bool isClientConfigHealthy = false;
+
+        [ObservableProperty]
         private bool canRemoveSingleDevice = false;
 
         [ObservableProperty]
@@ -75,6 +84,11 @@ namespace RealityTunnel.OperationsConsole.ViewModels
                     Account.Status = accRes.Data.Status;
                     Account.PlanId = accRes.Data.PlanId;
                     Account.SubscriptionExpiresAt = accRes.Data.SubscriptionExpiresAt;
+                    IsOracleHealthy = true;
+                }
+                else
+                {
+                    IsOracleHealthy = false;
                 }
 
                 // 2. Fetch registered devices
@@ -102,6 +116,17 @@ namespace RealityTunnel.OperationsConsole.ViewModels
                         p.AccountId.Equals(initialAccount.AccountId, StringComparison.OrdinalIgnoreCase) ||
                         p.AccountId.Equals(initialAccount.Id, StringComparison.OrdinalIgnoreCase));
                     Account.Provisioning = ProvisioningProfile;
+
+                    IsMarzbanHealthy = ProvisioningProfile != null && (
+                        ProvisioningProfile.ProvisionStatus.Equals("synced", StringComparison.OrdinalIgnoreCase) ||
+                        ProvisioningProfile.ProvisionStatus.Equals("active", StringComparison.OrdinalIgnoreCase));
+
+                    IsClientConfigHealthy = ProvisioningProfile != null && !string.IsNullOrEmpty(ProvisioningProfile.VpnProfileUuid);
+                }
+                else
+                {
+                    IsMarzbanHealthy = false;
+                    IsClientConfigHealthy = false;
                 }
 
                 // 5. Fetch Subscriptions to find exact data usage

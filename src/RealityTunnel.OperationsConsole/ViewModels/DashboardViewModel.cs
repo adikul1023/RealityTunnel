@@ -40,6 +40,9 @@ namespace RealityTunnel.OperationsConsole.ViewModels
         private string bandwidthMonthFormatted = "0 B";
 
         [ObservableProperty]
+        private int provisionQueuePending = 0;
+
+        [ObservableProperty]
         private string lastUpdatedFormatted = "Never";
 
         public DashboardViewModel(IAdminApiService apiService, IDialogService dialogService)
@@ -71,6 +74,13 @@ namespace RealityTunnel.OperationsConsole.ViewModels
                 else if (!result.IsUnauthorized && !result.IsForbidden)
                 {
                     await _dialogService.ShowErrorAsync("Dashboard Error", result.ErrorMessage ?? "Failed to load dashboard metrics.");
+                }
+
+                // Load Provision Queue count
+                var qRes = await _apiService.GetAsync<AdminRetryQueueDTO>(ApiRoutes.Admin.RetryQueue);
+                if (qRes.IsSuccess && qRes.Data != null)
+                {
+                    ProvisionQueuePending = qRes.Data.Total;
                 }
             }
             finally

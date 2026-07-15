@@ -35,7 +35,7 @@
             <StackPanel>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,8">
                     <ui:SymbolIcon Symbol="Info24" FontSize="20" Foreground="#60A5FA" Margin="0,0,8,0"/>
-                    <TextBlock Text="Payment Gateway Interface (Open Payment Provider / Future Integration Placeholder)" FontWeight="Bold" Foreground="#60A5FA"/>
+                    <TextBlock Text="Billing &amp; Payment Gateway Interface (Open Payment Provider / Future Integration Placeholder)" FontWeight="Bold" Foreground="#60A5FA"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Visibility="{Binding IsSuperAdmin, Converter={StaticResource BoolToVis}}">
                     <ui:SymbolIcon Symbol="Wrench24" FontSize="18" Foreground="#FBBF24" Margin="0,0,8,0"/>

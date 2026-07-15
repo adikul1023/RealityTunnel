@@ -29,14 +29,41 @@
                 <TextBlock Text="{Binding Account.AccountId}" FontSize="24" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" Margin="0,0,16,0"/>
                 
                 <!-- Status Badge -->
-                <Border Background="#1F2937" CornerRadius="6" Padding="10,4" VerticalAlignment="Center" Margin="0,0,16,0">
+                <Border Background="#1F2937" CornerRadius="6" Padding="10,4" VerticalAlignment="Center" Margin="0,0,12,0">
                     <StackPanel Orientation="Horizontal">
                         <Ellipse Width="10" Height="10" Fill="{Binding Account.Status, Converter={StaticResource StatusColor}}" Margin="0,0,6,0"/>
                         <TextBlock Text="{Binding Account.Status}" FontWeight="Bold" FontSize="13" Foreground="White"/>
                     </StackPanel>
                 </Border>
 
-                <TextBlock Text="{Binding Account.PlanId, StringFormat='Plan: {0}'}" FontSize="14" FontWeight="SemiBold" Foreground="#60A5FA" VerticalAlignment="Center" Margin="0,0,16,0"/>
+                <!-- Oracle Status Badge -->
+                <Border Background="#111827" BorderBrush="#374151" BorderThickness="1" CornerRadius="4" Padding="6,2" VerticalAlignment="Center" Margin="0,0,6,0">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Oracle " FontSize="11" Foreground="#9CA3AF"/>
+                        <TextBlock Text="✓" FontSize="11" FontWeight="Bold" Foreground="#10B981" Visibility="{Binding IsOracleHealthy, Converter={StaticResource BoolToVis}}"/>
+                        <TextBlock Text="✗" FontSize="11" FontWeight="Bold" Foreground="#EF4444" Visibility="{Binding IsOracleHealthy, Converter={StaticResource BoolToVis}, ConverterParameter=invert}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Marzban Status Badge -->
+                <Border Background="#111827" BorderBrush="#374151" BorderThickness="1" CornerRadius="4" Padding="6,2" VerticalAlignment="Center" Margin="0,0,6,0">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Marzban " FontSize="11" Foreground="#9CA3AF"/>
+                        <TextBlock Text="✓" FontSize="11" FontWeight="Bold" Foreground="#10B981" Visibility="{Binding IsMarzbanHealthy, Converter={StaticResource BoolToVis}}"/>
+                        <TextBlock Text="✗" FontSize="11" FontWeight="Bold" Foreground="#EF4444" Visibility="{Binding IsMarzbanHealthy, Converter={StaticResource BoolToVis}, ConverterParameter=invert}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Client Config Badge -->
+                <Border Background="#111827" BorderBrush="#374151" BorderThickness="1" CornerRadius="4" Padding="6,2" VerticalAlignment="Center" Margin="0,0,12,0">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Client Config " FontSize="11" Foreground="#9CA3AF"/>
+                        <TextBlock Text="✓" FontSize="11" FontWeight="Bold" Foreground="#10B981" Visibility="{Binding IsClientConfigHealthy, Converter={StaticResource BoolToVis}}"/>
+                        <TextBlock Text="✗" FontSize="11" FontWeight="Bold" Foreground="#EF4444" Visibility="{Binding IsClientConfigHealthy, Converter={StaticResource BoolToVis}, ConverterParameter=invert}"/>
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Text="{Binding Account.PlanId, StringFormat='Plan: {0}'}" FontSize="14" FontWeight="SemiBold" Foreground="#60A5FA" VerticalAlignment="Center" Margin="0,0,12,0"/>
                 <TextBlock Text="{Binding Account.FormattedExpiry, StringFormat='Expires: {0}'}" FontSize="14" Foreground="#D1D5DB" VerticalAlignment="Center"/>
             </StackPanel>
         </Grid>
@@ -87,7 +114,7 @@
                         </StackPanel>
 
                         <!-- Profile fields -->
-                        <Grid Margin="0,0,0,8">
+                        <Grid Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="140" />
                                 <ColumnDefinition Width="*" />
@@ -95,54 +122,59 @@
                             <TextBlock Grid.Column="0" Text="Marzban Username:" Foreground="#9CA3AF" FontSize="12"/>
                             <TextBlock Grid.Column="1" Text="{Binding ProvisioningProfile.MarzbanUsername, TargetNullValue='N/A'}" FontWeight="SemiBold" Foreground="White"/>
                         </Grid>
-                        <Grid Margin="0,0,0,8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="140" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="VPN Profile UUID:" Foreground="#9CA3AF" FontSize="12"/>
-                            <TextBlock Grid.Column="1" Text="{Binding ProvisioningProfile.VpnProfileUuid, TargetNullValue='Not Provisioned'}" Foreground="#60A5FA" FontSize="11" TextWrapping="Wrap"/>
-                        </Grid>
-                        <Grid Margin="0,0,0,8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="140" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Protocol Inbound:" Foreground="#9CA3AF" FontSize="12"/>
-                            <TextBlock Grid.Column="1" Text="{Binding ProvisioningProfile.Inbound, TargetNullValue='VLESS TCP REALITY'}" Foreground="#D1D5DB"/>
-                        </Grid>
-                        <Grid Margin="0,0,0,8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="140" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="SNI / Edge Domain:" Foreground="#9CA3AF" FontSize="12"/>
-                            <TextBlock Grid.Column="1" Text="{Binding ProvisioningProfile.Sni, TargetNullValue='dl.google.com'}" Foreground="#34D399"/>
-                        </Grid>
-                        <Grid Margin="0,0,0,8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="140" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Server Port / Protocol:" Foreground="#9CA3AF" FontSize="12"/>
-                            <TextBlock Grid.Column="1" Text="443 / VLESS_REALITY" Foreground="#D1D5DB"/>
-                        </Grid>
-                        <Grid Margin="0,0,0,8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="140" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="REALITY Short ID:" Foreground="#9CA3AF" FontSize="12"/>
-                            <TextBlock Grid.Column="1" Text='"" (Empty per production baseline)' Foreground="#D1D5DB"/>
-                        </Grid>
-                        <Grid Margin="0,0,0,16">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="140" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Provision Status:" Foreground="#9CA3AF" FontSize="12"/>
-                            <TextBlock Grid.Column="1" Text="{Binding ProvisioningProfile.ProvisionStatus, TargetNullValue='synced'}" FontWeight="Bold" Foreground="#10B981"/>
-                        </Grid>
+
+                        <Expander Header="Advanced Networking Fields (Troubleshooting)" Margin="0,0,0,16" Foreground="#9CA3AF" FontSize="12">
+                            <StackPanel Margin="0,8,0,0">
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="140" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="VPN Profile UUID:" Foreground="#9CA3AF" FontSize="12"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding ProvisioningProfile.VpnProfileUuid, TargetNullValue='Not Provisioned'}" Foreground="#60A5FA" FontSize="11" TextWrapping="Wrap"/>
+                                </Grid>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="140" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Protocol Inbound:" Foreground="#9CA3AF" FontSize="12"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding ProvisioningProfile.Inbound, TargetNullValue='VLESS TCP REALITY'}" Foreground="#D1D5DB"/>
+                                </Grid>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="140" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="SNI / Edge Domain:" Foreground="#9CA3AF" FontSize="12"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding ProvisioningProfile.Sni, TargetNullValue='dl.google.com'}" Foreground="#34D399"/>
+                                </Grid>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="140" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Server Port / Protocol:" Foreground="#9CA3AF" FontSize="12"/>
+                                    <TextBlock Grid.Column="1" Text="443 / VLESS_REALITY" Foreground="#D1D5DB"/>
+                                </Grid>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="140" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="REALITY Short ID:" Foreground="#9CA3AF" FontSize="12"/>
+                                    <TextBlock Grid.Column="1" Text='"" (Empty per production baseline)' Foreground="#D1D5DB"/>
+                                </Grid>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="140" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Provision Status:" Foreground="#9CA3AF" FontSize="12"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding ProvisioningProfile.ProvisionStatus, TargetNullValue='synced'}" FontWeight="Bold" Foreground="#10B981"/>
+                                </Grid>
+                            </StackPanel>
+                        </Expander>
 
                         <!-- Provisioning Actions -->
                         <TextBlock Text="Remote VPN Edge Actions (Super-Admin):" FontSize="11" FontWeight="SemiBold" Foreground="#9CA3AF" Margin="0,0,0,8"/>

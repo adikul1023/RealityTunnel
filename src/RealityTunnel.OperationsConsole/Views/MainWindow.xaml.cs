@@ -41,7 +41,7 @@ namespace RealityTunnel.OperationsConsole.Views
                     "Users" => _serviceProvider.GetRequiredService<UsersView>(),
                     "UserDetails" => _serviceProvider.GetRequiredService<UserDetailsPanel>(),
                     "Subscriptions" => _serviceProvider.GetRequiredService<SubscriptionsView>(),
-                    "Payments" => _serviceProvider.GetRequiredService<PaymentsView>(),
+                    "Billing" or "Payments" => _serviceProvider.GetRequiredService<PaymentsView>(),
                     "Infrastructure" => _serviceProvider.GetRequiredService<InfrastructureView>(),
                     "Logs" => _serviceProvider.GetRequiredService<LogsView>(),
                     "Settings" => _serviceProvider.GetRequiredService<SettingsView>(),
