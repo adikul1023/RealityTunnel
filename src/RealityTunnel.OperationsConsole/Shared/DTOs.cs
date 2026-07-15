@@ -384,12 +384,6 @@ namespace RealityTunnel.OperationsConsole.Shared
         [JsonPropertyName("duration_days")]
         public int DurationDays { get; set; }
 
-        [JsonPropertyName("data_quota_gb")]
-        public int? DataQuotaGb { get; set; }
-
-        [JsonPropertyName("device_limit")]
-        public int? DeviceLimit { get; set; }
-
         [JsonPropertyName("payment_method")]
         public string? PaymentMethod { get; set; }
 
@@ -398,5 +392,23 @@ namespace RealityTunnel.OperationsConsole.Shared
 
         [JsonPropertyName("notes")]
         public string? Notes { get; set; }
+    }
+
+    public class AdminGrantSubscriptionResponse
+    {
+        [JsonPropertyName("success")]
+        public bool Success { get; set; }
+
+        [JsonPropertyName("plan")]
+        public string Plan { get; set; } = string.Empty;
+
+        [JsonPropertyName("expires_at")]
+        public DateTime? ExpiresAt { get; set; }
+
+        [JsonPropertyName("provisioning_state")]
+        public string ProvisioningState { get; set; } = string.Empty;
+
+        [JsonPropertyName("sync_status")]
+        public string SyncStatus { get; set; } = string.Empty;
     }
 }

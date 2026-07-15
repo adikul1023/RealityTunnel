@@ -120,8 +120,19 @@ class AdminGrantSubscriptionRequest(BaseModel):
     """Request payload for POST /api/admin/accounts/{account_id}/grant-subscription."""
     plan_id: str = Field(description="Subscription plan identifier (e.g. standard, pro)")
     duration_days: int = Field(ge=1, le=3650, description="Duration in days")
-    data_quota_gb: Optional[int] = Field(default=None, description="Override data quota in GB")
-    device_limit: Optional[int] = Field(default=None, description="Override device limit")
+    data_quota_gb: Optional[int] = Field(default=None, description="[DEPRECATED] Override data quota in GB")
+    device_limit: Optional[int] = Field(default=None, description="[DEPRECATED] Override device limit")
     payment_method: Optional[str] = Field(default=None, description="Payment method used (e.g. manual_qr)")
     payment_reference: Optional[str] = Field(default=None, description="Payment reference/UTR")
     notes: Optional[str] = Field(default=None, description="Operator notes")
+
+
+class AdminGrantSubscriptionResponse(BaseModel):
+    """Response payload for POST /api/admin/accounts/{account_id}/grant-subscription."""
+    success: bool = Field(description="Whether the DB grant was successful")
+    plan: str = Field(description="The granted plan ID")
+    expires_at: Optional[datetime] = Field(description="The new subscription expiry timestamp")
+    provisioning_state: str = Field(description="Current state of the VPN provisioning (e.g. PROVISIONED or NEEDS_SYNC)")
+    sync_status: str = Field(description="Status of the post-commit Marzban sync (e.g. success, queued_for_retry)")
+
+    model_config = {"from_attributes": True}

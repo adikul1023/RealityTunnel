@@ -227,8 +227,11 @@ namespace RealityTunnel.OperationsConsole.ViewModels
         private async Task GrantSubscriptionAsync()
         {
             if (Account == null || !IsSuperAdmin) return;
-            bool confirm = await _dialogService.ShowConfirmationAsync("Confirm Grant",
-                $"Are you sure you want to atomically provision the '{GrantPlanId}' plan for {GrantDurationDays} days?");
+            
+            string refStr = string.IsNullOrWhiteSpace(GrantPaymentReference) ? "None" : GrantPaymentReference;
+            string confirmationMessage = $"Grant Benefits\n\nAccount:\n{Account.AccountId}\n\nPlan:\n{GrantPlanId}\n\nDuration:\n{GrantDurationDays} days\n\nPayment Reference:\n{refStr}\n\nProceed?";
+            
+            bool confirm = await _dialogService.ShowConfirmationAsync("Confirm Grant", confirmationMessage);
             if (!confirm) return;
 
             IsBusy = true;
@@ -243,15 +246,23 @@ namespace RealityTunnel.OperationsConsole.ViewModels
                     Notes = "Beta manual onboarding"
                 };
 
-                var res = await _apiService.PostAsync<AdminAccountResponse, AdminGrantSubscriptionRequest>(
+                var res = await _apiService.PostAsync<AdminGrantSubscriptionResponse, AdminGrantSubscriptionRequest>(
                     ApiRoutes.Admin.GrantSubscription(Account.Id), req);
 
                 if (res.IsSuccess && res.Data != null)
                 {
-                    Account.Status = res.Data.Status;
-                    Account.PlanId = res.Data.PlanId;
-                    Account.SubscriptionExpiresAt = res.Data.SubscriptionExpiresAt;
-                    await _dialogService.ShowInfoAsync("Success", "Beta subscription successfully granted and provisioned.");
+                    Account.PlanId = res.Data.Plan;
+                    Account.SubscriptionExpiresAt = res.Data.ExpiresAt;
+                    
+                    if (res.Data.SyncStatus == "success" || res.Data.ProvisioningState == "ACTIVE")
+                    {
+                        await _dialogService.ShowInfoAsync("Success", "🟢 Subscription granted successfully\n🟢 VPN synchronized");
+                    }
+                    else
+                    {
+                        await _dialogService.ShowInfoAsync("Partial Success", "🟢 Subscription granted\n🟡 VPN synchronization queued (will retry automatically)");
+                    }
+                    
                     // Reload to get updated Provisioning and Subscription data
                     await LoadDetailsAsync(Account);
                 }

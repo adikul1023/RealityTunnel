@@ -38,6 +38,7 @@ from app.routers.admin_dtos import (
     AdminSignalResponse,
     ExtendSubscriptionRequest,
     AdminGrantSubscriptionRequest,
+    AdminGrantSubscriptionResponse,
 )
 from app.services.admin_account import AdminAccountService
 from app.services.connection_signal import ConnectionSignalService
@@ -274,7 +275,7 @@ async def extend_subscription(
 @router.post(
     "/accounts/{account_id}/grant-subscription",
     summary="Atomically grant a beta subscription (super-admin only)",
-    response_model=AdminAccountResponse,
+    response_model=AdminGrantSubscriptionResponse,
     status_code=status.HTTP_200_OK,
     responses={
         400: {"description": "Invalid duration or plan"},
@@ -288,14 +289,14 @@ async def grant_subscription(
     body: AdminGrantSubscriptionRequest,
     current_admin: AdminUser = Depends(require_super_admin),
     admin_account_service: AdminAccountService = Depends(get_admin_account_service),
-) -> AdminAccountResponse:
+) -> AdminGrantSubscriptionResponse:
     """
     Atomically grant a subscription to an account.
     Updates the account status and expiry, creates/updates the subscription record,
     pushes changes to Marzban, and securely logs the transaction.
     """
     try:
-        account = await admin_account_service.grant_subscription(
+        account, sync_status, prov_state = await admin_account_service.grant_subscription(
             account_id_str=account_id,
             plan_id=body.plan_id,
             duration_days=body.duration_days,
@@ -310,7 +311,14 @@ async def grant_subscription(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
     except AdminServiceError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
-    return _build_account_dto(account)
+        
+    return AdminGrantSubscriptionResponse(
+        success=True,
+        plan=body.plan_id,
+        expires_at=account.subscription_expires_at,
+        provisioning_state=prov_state,
+        sync_status=sync_status,
+    )
 
 
 # ── Device endpoint ───────────────────────────────────────────────────────────

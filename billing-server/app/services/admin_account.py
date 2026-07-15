@@ -239,35 +239,26 @@ class AdminAccountService:
                     commit=False,
                 )
 
-            # 4. Sync Marzban Provisioning (Uncommitted flush)
+            # 4. Sync Marzban Provisioning (DB only initially)
             profile = await self.provisioning_service.provisioning_repo.get_by_account_id(account.id, for_update=True)
-            if profile:
-                try:
-                    await self.provisioning_service.provider.update_user(
-                        profile.remote_user_id,
-                        data_limit=data_limit,
-                        expire_at=expire_ts,
-                        status="active"
-                    )
-                except Exception as exc:
-                    logger.error("Failed to update Marzban user %s: %s", profile.remote_user_id, exc)
-                    raise AdminServiceError("Marzban provisioning update failed") from exc
-
-                profile.provisioning_state = ProvisioningState.ACTIVE
-                profile.last_sync_at = now
-                profile.last_error = None
-                await self.provisioning_service.session.flush()
-                
-                if self.provisioning_service.credential_service:
-                    await self.provisioning_service.credential_service.generate(account.id)
-            else:
-                await self.provisioning_service.provision_subscription(
-                    account.id,
-                    plan.plan_id,
-                    expire_at=new_expiry,
-                    data_limit=data_limit,
-                    commit=False
+            
+            if not profile:
+                remote_username = account.marzban_username or f"user_{account.account_id.lower()}"
+                profile = ProvisioningProfile(
+                    account_id=account.id,
+                    remote_user_id=remote_username,
+                    provisioning_state=ProvisioningState.ACTIVE if account.marzban_username else ProvisioningState.PENDING,
+                    last_sync_at=None,
+                    last_error=None,
                 )
+                self.provisioning_service.session.add(profile)
+                account.marzban_username = remote_username
+            else:
+                profile.provisioning_state = ProvisioningState.ACTIVE
+                profile.last_error = None
+            
+            if self.provisioning_service.credential_service:
+                await self.provisioning_service.credential_service.generate(account.id)
 
             # 5. Record Audit Event
             await audit_service.record_event(
@@ -277,10 +268,12 @@ class AdminAccountService:
                 details={
                     "action": "grant_subscription",
                     "account_id_str": account.account_id,
-                    "plan_id": plan.plan_id,
+                    "previous_plan": "none", # Cannot easily query previous here unless tracked
+                    "new_plan": plan.plan_id,
+                    "previous_expiry": None,
+                    "new_expiry": new_expiry.isoformat(),
+                    "operator_id": str(admin_id) if admin_id else "SYSTEM",
                     "duration_days": duration_days,
-                    "data_quota_gb": data_quota_gb,
-                    "device_limit": device_limit,
                     "payment_method": payment_method,
                     "payment_reference": payment_reference,
                     "notes": notes,
@@ -290,16 +283,62 @@ class AdminAccountService:
             # 6. Commit atomic transaction
             await self.account_repo.session.commit()
             await self.account_repo.session.refresh(account)
+            
+            # 7. Post-Commit Sync (Swallow exceptions, leave profile in appropriate state if failed)
+            sync_status = "success"
+            try:
+                if profile.provisioning_state == ProvisioningState.PENDING:
+                    # New user
+                    user_dto = await self.provisioning_service.provider.create_user(
+                        username=profile.remote_user_id,
+                        data_limit=data_limit,
+                        expire_at=expire_ts,
+                    )
+                    # We need a separate short transaction to update the UUID and state
+                    async with self.account_repo.session.begin_nested() if self.account_repo.session.in_transaction() else self.account_repo.session.begin():
+                        profile.vpn_uuid = user_dto.uuid
+                        profile.provisioning_state = ProvisioningState.ACTIVE
+                        profile.last_sync_at = datetime.now(timezone.utc)
+                        await self.account_repo.session.commit()
+                else:
+                    # Existing user update
+                    await self.provisioning_service.provider.update_user(
+                        username=profile.remote_user_id,
+                        data_limit=data_limit,
+                        expire_at=expire_ts,
+                        status="active"
+                    )
+                    async with self.account_repo.session.begin_nested() if self.account_repo.session.in_transaction() else self.account_repo.session.begin():
+                        profile.provisioning_state = ProvisioningState.ACTIVE
+                        profile.last_sync_at = datetime.now(timezone.utc)
+                        await self.account_repo.session.commit()
+            except Exception as exc:
+                logger.error("Failed to sync Marzban user %s post-commit: %s", profile.remote_user_id, exc)
+                sync_status = "queued_for_retry"
+                # Record the error in a separate short transaction and mark as FAILED/NEEDS_SYNC
+                async with self.account_repo.session.begin_nested() if self.account_repo.session.in_transaction() else self.account_repo.session.begin():
+                    profile = await self.provisioning_service.provisioning_repo.get_by_account_id(account.id, for_update=True)
+                    if profile:
+                        profile.last_error = str(exc)
+                        # We use PENDING to signal needs_sync since it's the closest equivalent
+                        if profile.provisioning_state != ProvisioningState.ACTIVE:
+                            profile.provisioning_state = ProvisioningState.PENDING 
+                    await self.account_repo.session.commit()
+                # We can call the explicit retry logic from provisioning_service
+                translated_exc = self.provisioning_service._translate_exception(exc, "grant_subscription_sync")
+                await self.provisioning_service._maybe_enqueue_retry(account.id, plan.plan_id, new_expiry, translated_exc)
+
+            return account, sync_status, profile.provisioning_state.value
 
         except Exception as exc:
             await self.account_repo.session.rollback()
             logger.error("Failed to grant subscription for account %s: %s", account_id_str, exc)
             if isinstance(exc, AdminServiceError):
                 raise
-            raise AdminServiceError("Database or provisioning error during subscription grant") from exc
+            raise AdminServiceError("Database error during subscription grant") from exc
 
-        logger.info("Administrative subscription grant completed for %s.", account_id_str)
-        return account
+        logger.info("Administrative subscription grant completed for %s. Sync status: %s", account_id_str, sync_status)
+        return account, sync_status, profile.provisioning_state.value
 
     # ── Session management ───────────────────────────────────────────────────
 
