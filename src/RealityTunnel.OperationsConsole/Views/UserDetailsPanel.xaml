@@ -117,7 +117,23 @@
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Text="SNI / Edge Domain:" Foreground="#9CA3AF" FontSize="12"/>
-                            <TextBlock Grid.Column="1" Text="{Binding ProvisioningProfile.Sni, TargetNullValue='edge.stealthy.co.in'}" Foreground="#34D399"/>
+                            <TextBlock Grid.Column="1" Text="{Binding ProvisioningProfile.Sni, TargetNullValue='dl.google.com'}" Foreground="#34D399"/>
+                        </Grid>
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="140" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Server Port / Protocol:" Foreground="#9CA3AF" FontSize="12"/>
+                            <TextBlock Grid.Column="1" Text="443 / VLESS_REALITY" Foreground="#D1D5DB"/>
+                        </Grid>
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="140" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="REALITY Short ID:" Foreground="#9CA3AF" FontSize="12"/>
+                            <TextBlock Grid.Column="1" Text='"" (Empty per production baseline)' Foreground="#D1D5DB"/>
                         </Grid>
                         <Grid Margin="0,0,0,16">
                             <Grid.ColumnDefinitions>

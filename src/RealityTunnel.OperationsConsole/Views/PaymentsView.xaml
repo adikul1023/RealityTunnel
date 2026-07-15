@@ -30,14 +30,19 @@
             <ui:Button Content="Refresh List" Appearance="Secondary" Icon="{ui:SymbolIcon ArrowClockwise24}" Command="{Binding LoadPaymentsCommand}" HorizontalAlignment="Right" Height="36"/>
         </Grid>
 
-        <!-- Super-Admin Resolve Tool Box -->
-        <Border Grid.Row="1" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="10" Padding="16,12" Margin="0,0,0,16"
-                Visibility="{Binding IsSuperAdmin, Converter={StaticResource BoolToVis}}">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <ui:SymbolIcon Symbol="Wrench24" FontSize="20" Foreground="#FBBF24" Margin="0,0,8,0"/>
-                <TextBlock Text="Manual Resolve Reason:" FontWeight="SemiBold" Foreground="#FEF3C7" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                <ui:TextBox Text="{Binding ResolveReasonInput}" Width="320" Height="34" Margin="0,0,16,0" PlaceholderText="e.g. Manual resolution by operator"/>
-                <TextBlock Text="(Used when clicking 'Manual Resolve' below)" FontSize="11" Foreground="#9CA3AF" VerticalAlignment="Center"/>
+        <!-- Super-Admin Resolve & Gateway Placeholder Banner -->
+        <Border Grid.Row="1" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="10" Padding="16,12" Margin="0,0,0,16">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,8">
+                    <ui:SymbolIcon Symbol="Info24" FontSize="20" Foreground="#60A5FA" Margin="0,0,8,0"/>
+                    <TextBlock Text="Payment Gateway Interface (Open Payment Provider / Future Integration Placeholder)" FontWeight="Bold" Foreground="#60A5FA"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Visibility="{Binding IsSuperAdmin, Converter={StaticResource BoolToVis}}">
+                    <ui:SymbolIcon Symbol="Wrench24" FontSize="18" Foreground="#FBBF24" Margin="0,0,8,0"/>
+                    <TextBlock Text="Manual Resolve Reason:" FontWeight="SemiBold" Foreground="#FEF3C7" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <ui:TextBox Text="{Binding ResolveReasonInput}" Width="320" Height="34" Margin="0,0,16,0" PlaceholderText="e.g. Manual resolution by operator"/>
+                    <TextBlock Text="(Used when clicking 'Manual Resolve' below)" FontSize="11" Foreground="#9CA3AF" VerticalAlignment="Center"/>
+                </StackPanel>
             </StackPanel>
         </Border>
 

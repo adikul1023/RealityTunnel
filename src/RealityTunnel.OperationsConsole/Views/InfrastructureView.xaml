@@ -116,9 +116,13 @@
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal" Visibility="{Binding DataContext.IsSuperAdmin, RelativeSource={RelativeSource AncestorType=DataGrid}, Converter={StaticResource BoolToVis}}">
                                             <ui:Button Content="Retry Now" Appearance="Primary" Height="24" Padding="8,1" FontSize="11" Margin="0,0,6,0"
+                                                       IsEnabled="{Binding DataContext.CanExecuteAdvancedRecovery, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                       ToolTip="{Binding DataContext.AdvancedRecoveryTooltip, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                                        Command="{Binding DataContext.RetryItemNowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                                        CommandParameter="{Binding}"/>
                                             <ui:Button Content="Discard" Appearance="Danger" Height="24" Padding="8,1" FontSize="11"
+                                                       IsEnabled="{Binding DataContext.CanExecuteAdvancedRecovery, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                       ToolTip="{Binding DataContext.AdvancedRecoveryTooltip, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                                        Command="{Binding DataContext.DiscardRetryItemCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                                        CommandParameter="{Binding}"/>
                                         </StackPanel>
@@ -143,6 +147,8 @@
                             <TextBlock Text="Disaster Recovery &amp; Database Backups" FontSize="14" FontWeight="Bold" Foreground="White"/>
                         </StackPanel>
                         <ui:Button Content="Snapshot Now" Appearance="Primary" Icon="{ui:SymbolIcon AddCircle24}" Height="30" HorizontalAlignment="Right"
+                                   IsEnabled="{Binding CanExecuteAdvancedRecovery}"
+                                   ToolTip="{Binding AdvancedRecoveryTooltip}"
                                    Command="{Binding CreateBackupSnapshotCommand}"
                                    Visibility="{Binding IsSuperAdmin, Converter={StaticResource BoolToVis}}"/>
                     </Grid>

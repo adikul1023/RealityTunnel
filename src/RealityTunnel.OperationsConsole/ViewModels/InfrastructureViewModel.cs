@@ -39,6 +39,12 @@ namespace RealityTunnel.OperationsConsole.ViewModels
         [ObservableProperty]
         private string reloadXrayTooltip = "Backend support required (Xray reload API needed)";
 
+        [ObservableProperty]
+        private bool canExecuteAdvancedRecovery = false; // Disabled per Step 0 audit / Phase 2 verification
+
+        [ObservableProperty]
+        private string advancedRecoveryTooltip = "Backend verification / Phase 2 support required";
+
         public InfrastructureViewModel(
             IAdminApiService apiService,
             IDialogService dialogService,
