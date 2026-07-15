@@ -43,6 +43,7 @@ from app.services import (
     BillingService,
     RazorpayProvider,
     AdminBillingService,
+    OperationsService,
     TOTPService,
 )
 from app.models.admin_user import AdminUser
@@ -472,6 +473,18 @@ async def get_admin_billing_service(
 ) -> AdminBillingService:
     """Yield AdminBillingService wired to session and domain services."""
     return AdminBillingService(session, subscription_service, payment_service, provisioning_service)
+
+
+async def get_operations_service(
+    session: AsyncSession = Depends(get_db),
+    admin_account_service: AdminAccountService = Depends(get_admin_account_service),
+    admin_billing_service: AdminBillingService = Depends(get_admin_billing_service),
+    device_service: DeviceService = Depends(get_device_service),
+    marzban_provider: MarzbanProvisioningProvider = Depends(get_marzban_provider),
+) -> OperationsService:
+    """Yield OperationsService wired to database session and domain services."""
+    return OperationsService(session, admin_account_service, admin_billing_service, device_service, marzban_provider)
+
 
 
 

@@ -126,6 +126,8 @@ from app.services.admin_billing_dtos import (
     AdminComponentHealthDTO,
     AdminSystemHealthDTO,
 )
+from app.services.operations_service import OperationsService
+
 
 __all__ = [
     "ServiceError",
@@ -233,6 +235,7 @@ __all__ = [
     "TotpStatusResponse",
     "TotpVerificationRequest",
     "TotpRegenerateResponse",
+    "OperationsService",
 ]
 
 

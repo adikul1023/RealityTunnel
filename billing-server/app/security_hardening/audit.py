@@ -186,6 +186,60 @@ class AuditService:
             for e in db_events
         ]
 
+    async def list_events_cursor(
+        self,
+        cursor: str | None = None,
+        since: Any | None = None,
+        event_type: str | None = None,
+        actor_id: str | None = None,
+        target_id: str | None = None,
+        limit: int = 50,
+    ) -> tuple[list[dict[str, Any]], str | None, bool]:
+        """
+        Retrieve a cursor-paginated list of audit events.
+        """
+        from app.repositories.audit_event_repository import AuditEventRepository
+        
+        async with AsyncSessionLocal() as session:
+            repo = AuditEventRepository(session)
+            db_events, next_cursor, has_more = await repo.list_events_cursor(
+                cursor=cursor,
+                since=since,
+                event_type=event_type,
+                actor_id=actor_id,
+                target_id=target_id,
+                limit=limit,
+            )
+        
+        results = []
+        for e in db_events:
+            details = e.details if isinstance(e.details, dict) else {}
+            src = "system"
+            if "source" in details and str(details["source"]).lower() in ("billing", "marzban", "scheduler", "operator", "system"):
+                src = str(details["source"]).lower()
+            elif e.event_type in ("admin_login", "admin_action", "device_deletion"):
+                src = "operator"
+            elif e.actor_id and ("scheduler" in e.actor_id.lower() or "cron" in e.actor_id.lower()):
+                src = "scheduler"
+            elif e.event_type == "subscription_change":
+                src = "operator" if e.actor_id and ("admin" in e.actor_id.lower() or "operator" in e.actor_id.lower()) else "billing"
+            elif e.event_type == "payment_event":
+                src = "billing"
+            elif e.event_type in ("credential_regeneration", "device_registration"):
+                src = "marzban" if details.get("marzban") else "system"
+
+            results.append({
+                "event_id": e.event_id,
+                "timestamp": e.timestamp.isoformat(),
+                "event_type": e.event_type,
+                "source": src,
+                "actor_id": e.actor_id,
+                "target_id": e.target_id,
+                "details": details,
+                "ip_hash": e.ip_hash,
+            })
+        return results, next_cursor, has_more
+
     def modify_or_delete_event(self, *args: Any, **kwargs: Any) -> None:
         """
         Prohibited operation. Audit log events are immutable.

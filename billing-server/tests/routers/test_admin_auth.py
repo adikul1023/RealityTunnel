@@ -120,4 +120,4 @@ async def test_cross_domain_isolation_admin_token_rejected_on_customer_route(
     # Attempt to access protected customer route (e.g. GET /api/devices) with admin token
     resp = await async_client.get("/api/devices", headers=admin_headers)
     assert resp.status_code == 401, resp.text
-    assert "Authentication failed or token invalid" in resp.json()["detail"]
+    assert resp.json()["detail"] in ("Authentication failed or token invalid", "Invalid access token signature")

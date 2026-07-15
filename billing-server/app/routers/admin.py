@@ -21,6 +21,7 @@ from app.dependencies import (
     get_admin_account_service,
     get_current_admin,
     get_device_service,
+    get_operations_service,
     get_signal_service,
     require_super_admin,
 )
@@ -40,7 +41,16 @@ from app.routers.admin_dtos import (
 from app.services.admin_account import AdminAccountService
 from app.services.connection_signal import ConnectionSignalService
 from app.services.device import DeviceService
-from app.services.exceptions import AdminAccountNotFoundError, AdminServiceError
+from app.services.exceptions import (
+    AdminAccountNotFoundError,
+    AdminServiceError,
+    DeviceNotFoundError,
+    DeviceOwnershipError,
+    InactiveDeviceError,
+    DeviceServiceError,
+)
+from app.services.operations_dtos import DeviceRemovalResponseDTO, UnifiedAccountDetailsDTO
+from app.services.operations_service import OperationsService
 from app.security_hardening.audit import audit_service
 
 logger = logging.getLogger(__name__)
@@ -120,6 +130,33 @@ async def get_account(
     except AdminServiceError as exc:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Service error")
     return _build_account_dto(account)
+
+
+@router.get(
+    "/account/{account_id}",
+    summary="Get unified account details (account, sub, devices, prov, marzban, vpn, usage)",
+    response_model=UnifiedAccountDetailsDTO,
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {"description": "Admin authentication required"},
+        404: {"description": "Account not found"},
+    },
+)
+async def get_unified_account(
+    account_id: str,
+    current_admin: AdminUser = Depends(get_current_admin),
+    operations_service: OperationsService = Depends(get_operations_service),
+) -> UnifiedAccountDetailsDTO:
+    """
+    Retrieve unified account details across all 7 subsystems in a single request.
+    """
+    logger.info("Admin %s requesting unified details for account %s", current_admin.id, account_id)
+    try:
+        return await operations_service.get_unified_account_details(account_id)
+    except AdminAccountNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
+    except AdminServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
 
 
 @router.patch(
@@ -277,6 +314,57 @@ async def list_devices(
             for d in devices
         ]
     )
+
+
+@router.delete(
+    "/accounts/{account_id}/devices/{device_guid}",
+    summary="Delete a registered device from an account (super-admin only)",
+    response_model=DeviceRemovalResponseDTO,
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"description": "Cannot delete active device without deactivation or invalid state"},
+        401: {"description": "Admin authentication required"},
+        403: {"description": "Super-admin privilege required"},
+        404: {"description": "Account or device not found"},
+    },
+)
+async def delete_account_device(
+    account_id: str,
+    device_guid: str,
+    current_admin: AdminUser = Depends(require_super_admin),
+    admin_account_service: AdminAccountService = Depends(get_admin_account_service),
+    device_service: DeviceService = Depends(get_device_service),
+) -> DeviceRemovalResponseDTO:
+    """
+    Delete a device registration and revoke all associated refresh tokens.
+    Returns whether removal succeeded and the number of active devices remaining on the account.
+    """
+    logger.info("Admin %s removing device %s from account %s", current_admin.id, device_guid, account_id)
+    try:
+        account = await admin_account_service.get_account(account_id)
+    except AdminAccountNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
+    except AdminServiceError:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Service error")
+
+    try:
+        await device_service.remove_device(account.id, device_guid)
+        await audit_service.record_event(
+            event_type="device_deletion",
+            actor_id=str(current_admin.id),
+            target_id=account_id,
+            details={"action": "remove_device", "device_guid": device_guid, "account_id": account_id, "source": "operator"},
+        )
+    except DeviceNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
+    except (DeviceOwnershipError, InactiveDeviceError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    except DeviceServiceError:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Service error removing device")
+
+    remaining_devices = await device_service.get_devices_for_account(account.id)
+    active_remaining = len([d for d in remaining_devices if d.is_active])
+    return DeviceRemovalResponseDTO(removed=True, remaining_devices=active_remaining)
 
 
 # ── Session endpoint ──────────────────────────────────────────────────────────
