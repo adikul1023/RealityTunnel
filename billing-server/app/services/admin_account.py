@@ -23,6 +23,7 @@ from app.models.account import Account
 from app.models.base import SubscriptionStatus, SubscriptionLifecycleStatus
 from app.models.subscription import Subscription
 from app.models.subscription_plan import PLANS_REGISTRY
+from app.models.provisioning import ProvisioningProfile, ProvisioningState
 from app.repositories.account_repository import AccountRepository
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.subscription_repository import SubscriptionRepository
