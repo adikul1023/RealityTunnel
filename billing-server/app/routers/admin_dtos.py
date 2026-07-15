@@ -11,6 +11,7 @@ from app.services.admin_dtos import (
     AdminLogoutAllResponse,
     ExtendSubscriptionRequest,
     AdminGrantSubscriptionRequest,
+    AdminGrantSubscriptionResponse,
 )
 
 __all__ = [
@@ -23,4 +24,5 @@ __all__ = [
     "AdminLogoutAllResponse",
     "ExtendSubscriptionRequest",
     "AdminGrantSubscriptionRequest",
+    "AdminGrantSubscriptionResponse",
 ]
