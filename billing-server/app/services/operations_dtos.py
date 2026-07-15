@@ -21,15 +21,18 @@ from app.services.provisioning.provider import ProvisionedUserDTO
 class ComponentStatusDTO(BaseModel):
     """Detailed health status and latency probe of an individual system component."""
     status: Literal["healthy", "degraded", "offline", "not_configured"]
+    reason: str | None = None
+    message: str | None = None
     latency_ms: int | None = None
     last_checked: datetime
-    message: str | None = None
 
 
 class EdgeStatusDTO(BaseModel):
     """Health status of an individual VPN gateway edge node (future-proofed multi-edge topology)."""
     name: str
     status: Literal["healthy", "degraded", "offline", "not_configured"]
+    reason: str | None = None
+    message: str | None = None
     latency_ms: int | None = None
 
 

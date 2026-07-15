@@ -42,6 +42,7 @@ async def test_infrastructure_status_success(async_client, admin_auth_headers_fa
         assert "status" in body[comp]
         assert body[comp]["status"] in ("healthy", "degraded", "offline", "not_configured")
         assert "last_checked" in body[comp]
+        assert "reason" in body[comp]
 
 
 async def test_infrastructure_status_requires_auth(async_client):

@@ -84,13 +84,13 @@ class OperationsService:
         try:
             await asyncio.wait_for(self.session.execute(select(1)), timeout=1.5)
             latency = int((time.perf_counter() - t0) * 1000)
-            return ComponentStatusDTO(status="healthy", latency_ms=latency, last_checked=now, message="PostgreSQL reachable")
+            return ComponentStatusDTO(status="healthy", reason=None, message="PostgreSQL reachable", latency_ms=latency, last_checked=now)
         except asyncio.TimeoutError:
             latency = int((time.perf_counter() - t0) * 1000)
-            return ComponentStatusDTO(status="offline", latency_ms=latency, last_checked=now, message="Database probe timed out (>1.5s)")
+            return ComponentStatusDTO(status="offline", reason="Database probe timed out (>1.5s)", message="Database probe timed out (>1.5s)", latency_ms=latency, last_checked=now)
         except Exception as exc:
             latency = int((time.perf_counter() - t0) * 1000)
-            return ComponentStatusDTO(status="offline", latency_ms=latency, last_checked=now, message=f"Database error: {exc}")
+            return ComponentStatusDTO(status="offline", reason=f"Database error: {exc}", message=f"Database error: {exc}", latency_ms=latency, last_checked=now)
 
     async def _probe_marzban(self) -> ComponentStatusDTO:
         t0 = time.perf_counter()
@@ -103,14 +103,15 @@ class OperationsService:
             if "marzban" in monitored:
                 rec = monitored["marzban"]
                 st = "healthy" if rec.status == "ok" else ("degraded" if rec.status == "degraded" else "offline")
-                return ComponentStatusDTO(status=st, latency_ms=latency, last_checked=rec.last_checked_at or now, message=rec.message)
-            return ComponentStatusDTO(status="healthy", latency_ms=latency, last_checked=now, message="Marzban provider reachable")
+                reason_val = None if st == "healthy" else (rec.message or f"Marzban reported status: {rec.status}")
+                return ComponentStatusDTO(status=st, reason=reason_val, message=rec.message, latency_ms=latency, last_checked=rec.last_checked_at or now)
+            return ComponentStatusDTO(status="healthy", reason=None, message="Marzban provider reachable", latency_ms=latency, last_checked=now)
         except asyncio.TimeoutError:
             latency = int((time.perf_counter() - t0) * 1000)
-            return ComponentStatusDTO(status="offline", latency_ms=latency, last_checked=now, message="Marzban status check timed out (>1.5s)")
+            return ComponentStatusDTO(status="offline", reason="Marzban status check timed out (>1.5s)", message="Marzban status check timed out (>1.5s)", latency_ms=latency, last_checked=now)
         except Exception as exc:
             latency = int((time.perf_counter() - t0) * 1000)
-            return ComponentStatusDTO(status="degraded", latency_ms=latency, last_checked=now, message=f"Marzban check error: {exc}")
+            return ComponentStatusDTO(status="degraded", reason=f"Marzban check error: {exc}", message=f"Marzban check error: {exc}", latency_ms=latency, last_checked=now)
 
     async def _probe_xray(self) -> ComponentStatusDTO:
         t0 = time.perf_counter()
@@ -120,14 +121,14 @@ class OperationsService:
             monitored = {s.component_key: s for s in statuses}
             latency = int((time.perf_counter() - t0) * 1000)
             if "marzban" in monitored and monitored["marzban"].status != "ok":
-                return ComponentStatusDTO(status="degraded", latency_ms=latency, last_checked=now, message="Xray core degraded (parent marzban status)")
-            return ComponentStatusDTO(status="healthy", latency_ms=latency, last_checked=now, message="Xray core active")
+                return ComponentStatusDTO(status="degraded", reason="Xray core degraded (parent marzban status)", message="Xray core degraded (parent marzban status)", latency_ms=latency, last_checked=now)
+            return ComponentStatusDTO(status="healthy", reason=None, message="Xray core active", latency_ms=latency, last_checked=now)
         except asyncio.TimeoutError:
             latency = int((time.perf_counter() - t0) * 1000)
-            return ComponentStatusDTO(status="offline", latency_ms=latency, last_checked=now, message="Xray status check timed out (>1.5s)")
+            return ComponentStatusDTO(status="offline", reason="Xray status check timed out (>1.5s)", message="Xray status check timed out (>1.5s)", latency_ms=latency, last_checked=now)
         except Exception as exc:
             latency = int((time.perf_counter() - t0) * 1000)
-            return ComponentStatusDTO(status="degraded", latency_ms=latency, last_checked=now, message=f"Xray check error: {exc}")
+            return ComponentStatusDTO(status="degraded", reason=f"Xray check error: {exc}", message=f"Xray check error: {exc}", latency_ms=latency, last_checked=now)
 
     async def _probe_scheduler(self, app_state: Any = None) -> ComponentStatusDTO:
         now = datetime.now(timezone.utc)
@@ -135,22 +136,23 @@ class OperationsService:
             is_running = getattr(app_state.scheduler, "_running", False)
             st = "healthy" if is_running else "offline"
             msg = "Scheduler loop active" if is_running else "Scheduler stopped"
-            return ComponentStatusDTO(status=st, latency_ms=0, last_checked=now, message=msg)
-        return ComponentStatusDTO(status="not_configured", latency_ms=0, last_checked=now, message="Scheduler loop not attached to app state")
+            reason_val = None if is_running else "Scheduler loop stopped"
+            return ComponentStatusDTO(status=st, reason=reason_val, message=msg, latency_ms=0, last_checked=now)
+        return ComponentStatusDTO(status="not_configured", reason="Scheduler loop not attached to app state", message="Scheduler loop not attached to app state", latency_ms=0, last_checked=now)
 
     async def _probe_redis(self) -> ComponentStatusDTO:
         now = datetime.now(timezone.utc)
         redis_url = getattr(settings, "redis_url", None)
         if not redis_url:
-            return ComponentStatusDTO(status="not_configured", latency_ms=0, last_checked=now, message="Redis cache not configured in environment")
-        return ComponentStatusDTO(status="healthy", latency_ms=0, last_checked=now, message="Redis cache operational")
+            return ComponentStatusDTO(status="not_configured", reason="Redis cache not configured in environment", message="Redis cache not configured in environment", latency_ms=0, last_checked=now)
+        return ComponentStatusDTO(status="healthy", reason=None, message="Redis cache operational", latency_ms=0, last_checked=now)
 
     async def _probe_caddy(self) -> ComponentStatusDTO:
         now = datetime.now(timezone.utc)
         caddy_url = getattr(settings, "caddy_probe_url", None)
         if not caddy_url:
-            return ComponentStatusDTO(status="not_configured", latency_ms=0, last_checked=now, message="Caddy reverse proxy probe not configured")
-        return ComponentStatusDTO(status="healthy", latency_ms=0, last_checked=now, message="Caddy reverse proxy operational")
+            return ComponentStatusDTO(status="not_configured", reason="Caddy reverse proxy probe not configured", message="Caddy reverse proxy probe not configured", latency_ms=0, last_checked=now)
+        return ComponentStatusDTO(status="healthy", reason=None, message="Caddy reverse proxy operational", latency_ms=0, last_checked=now)
 
     async def get_infrastructure_status(self, app_state: Any = None) -> InfrastructureStatusDTO:
         """
@@ -167,7 +169,7 @@ class OperationsService:
                 return self._cached_status
 
             now = datetime.now(timezone.utc)
-            billing_api = ComponentStatusDTO(status="healthy", latency_ms=0, last_checked=now, message="Billing API operational")
+            billing_api = ComponentStatusDTO(status="healthy", reason=None, message="Billing API operational", latency_ms=0, last_checked=now)
 
             db_task = asyncio.create_task(self._probe_database())
             marzban_task = asyncio.create_task(self._probe_marzban())
@@ -184,7 +186,7 @@ class OperationsService:
             def _resolve_probe(res: Any, default_msg: str) -> ComponentStatusDTO:
                 if isinstance(res, ComponentStatusDTO):
                     return res
-                return ComponentStatusDTO(status="offline", latency_ms=None, last_checked=now, message=f"Probe exception: {res or default_msg}")
+                return ComponentStatusDTO(status="offline", reason=f"Probe exception: {res or default_msg}", message=f"Probe exception: {res or default_msg}", latency_ms=None, last_checked=now)
 
             database = _resolve_probe(results[0], "Database probe failure")
             marzban = _resolve_probe(results[1], "Marzban probe failure")
@@ -198,9 +200,9 @@ class OperationsService:
                 EdgeStatusDTO(
                     name=edge_name,
                     status=marzban.status,
-                    latency_ms=marzban.latency_ms,
-                    last_checked=marzban.last_checked,
+                    reason=marzban.reason,
                     message=marzban.message,
+                    latency_ms=marzban.latency_ms,
                 )
             ]
 
