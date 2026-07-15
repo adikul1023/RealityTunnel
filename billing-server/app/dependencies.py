@@ -179,7 +179,7 @@ async def get_provisioning_service(
     account_repo: AccountRepository = Depends(get_account_repo),
 ) -> ProvisioningService:
     from app.repositories.provisioning_repository import ProvisioningRepository
-    from app.services.provisioning.provider import MarzbanProvisioningProvider
+    from app.services.provisioning.marzban import MarzbanProvisioningProvider
     from app.services.provisioning.service import ProvisioningService
     
     prov_repo = ProvisioningRepository(session)
