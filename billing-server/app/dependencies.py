@@ -182,9 +182,8 @@ async def get_provisioning_service(
     from app.services.provisioning.marzban import MarzbanProvisioningProvider
     from app.services.provisioning.service import ProvisioningService
     
-    prov_repo = ProvisioningRepository(session)
     provider = MarzbanProvisioningProvider()
-    return ProvisioningService(prov_repo, account_repo, provider)
+    return ProvisioningService(session, provider)
 
 
 
