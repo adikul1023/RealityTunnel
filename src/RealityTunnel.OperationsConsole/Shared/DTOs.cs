@@ -1,0 +1,379 @@
+using System;
+using System.Collections.Generic;
+using System.Text.Json.Serialization;
+
+namespace RealityTunnel.OperationsConsole.Shared
+{
+    public class AdminLoginRequest
+    {
+        [JsonPropertyName("username")]
+        public string Username { get; set; } = string.Empty;
+
+        [JsonPropertyName("password")]
+        public string Password { get; set; } = string.Empty;
+    }
+
+    public class AdminLoginResponse
+    {
+        [JsonPropertyName("access_token")]
+        public string AccessToken { get; set; } = string.Empty;
+
+        [JsonPropertyName("token_type")]
+        public string TokenType { get; set; } = "Bearer";
+
+        [JsonPropertyName("expires_in")]
+        public int ExpiresIn { get; set; }
+
+        [JsonPropertyName("username")]
+        public string Username { get; set; } = string.Empty;
+
+        [JsonPropertyName("role")]
+        public string Role { get; set; } = string.Empty;
+    }
+
+    public class AdminProfileResponse
+    {
+        [JsonPropertyName("id")]
+        public string Id { get; set; } = string.Empty;
+
+        [JsonPropertyName("username")]
+        public string Username { get; set; } = string.Empty;
+
+        [JsonPropertyName("is_active")]
+        public bool IsActive { get; set; }
+
+        [JsonPropertyName("is_super_admin")]
+        public bool IsSuperAdmin { get; set; }
+
+        [JsonPropertyName("mfa_enabled")]
+        public bool MfaEnabled { get; set; }
+    }
+
+    public class AdminAccountResponse
+    {
+        [JsonPropertyName("id")]
+        public string Id { get; set; } = string.Empty;
+
+        [JsonPropertyName("account_id")]
+        public string AccountId { get; set; } = string.Empty;
+
+        [JsonPropertyName("status")]
+        public string Status { get; set; } = string.Empty;
+
+        [JsonPropertyName("plan_id")]
+        public string PlanId { get; set; } = string.Empty;
+
+        [JsonPropertyName("subscription_expires_at")]
+        public DateTime? SubscriptionExpiresAt { get; set; }
+
+        [JsonPropertyName("created_at")]
+        public DateTime? CreatedAt { get; set; }
+    }
+
+    public class AdminAccountListResponse
+    {
+        [JsonPropertyName("accounts")]
+        public List<AdminAccountResponse> Accounts { get; set; } = new();
+
+        [JsonPropertyName("total")]
+        public int Total { get; set; }
+    }
+
+    public class AdminDeviceResponse
+    {
+        [JsonPropertyName("device_guid")]
+        public string DeviceGuid { get; set; } = string.Empty;
+
+        [JsonPropertyName("friendly_name")]
+        public string? FriendlyName { get; set; }
+
+        [JsonPropertyName("is_active")]
+        public bool IsActive { get; set; }
+
+        [JsonPropertyName("first_seen_at")]
+        public DateTime? FirstSeenAt { get; set; }
+
+        [JsonPropertyName("last_seen_at")]
+        public DateTime? LastSeenAt { get; set; }
+    }
+
+    public class AdminDeviceListResponse
+    {
+        [JsonPropertyName("devices")]
+        public List<AdminDeviceResponse> Devices { get; set; } = new();
+    }
+
+    public class AdminLogoutAllResponse
+    {
+        [JsonPropertyName("revoked_count")]
+        public int RevokedCount { get; set; }
+    }
+
+    public class AdminSignalResponse
+    {
+        [JsonPropertyName("id")]
+        public string Id { get; set; } = string.Empty;
+
+        [JsonPropertyName("event_type")]
+        public string EventType { get; set; } = string.Empty;
+
+        [JsonPropertyName("source_ip")]
+        public string? SourceIp { get; set; }
+
+        [JsonPropertyName("user_agent")]
+        public string? UserAgent { get; set; }
+
+        [JsonPropertyName("occurred_at")]
+        public DateTime? OccurredAt { get; set; }
+
+        [JsonPropertyName("success")]
+        public bool Success { get; set; }
+    }
+
+    public class AdminSignalListResponse
+    {
+        [JsonPropertyName("signals")]
+        public List<AdminSignalResponse> Signals { get; set; } = new();
+
+        [JsonPropertyName("total")]
+        public int Total { get; set; }
+    }
+
+    public class AdminDashboardDTO
+    {
+        [JsonPropertyName("active_subscribers")]
+        public int ActiveSubscribers { get; set; }
+
+        [JsonPropertyName("online_users")]
+        public int OnlineUsers { get; set; }
+
+        [JsonPropertyName("monthly_revenue_est")]
+        public decimal MonthlyRevenueEst { get; set; }
+
+        [JsonPropertyName("total_devices")]
+        public int TotalDevices { get; set; }
+
+        [JsonPropertyName("active_subscriptions")]
+        public int ActiveSubscriptions { get; set; }
+
+        [JsonPropertyName("expired_subscriptions")]
+        public int ExpiredSubscriptions { get; set; }
+
+        [JsonPropertyName("bandwidth_today_bytes")]
+        public long BandwidthTodayBytes { get; set; }
+
+        [JsonPropertyName("bandwidth_month_bytes")]
+        public long BandwidthMonthBytes { get; set; }
+    }
+
+    public class AdminSubscriptionDTO
+    {
+        [JsonPropertyName("id")]
+        public string Id { get; set; } = string.Empty;
+
+        [JsonPropertyName("account_id")]
+        public string AccountId { get; set; } = string.Empty;
+
+        [JsonPropertyName("plan")]
+        public string Plan { get; set; } = string.Empty;
+
+        [JsonPropertyName("status")]
+        public string Status { get; set; } = string.Empty;
+
+        [JsonPropertyName("data_used_bytes")]
+        public long DataUsedBytes { get; set; }
+
+        [JsonPropertyName("data_limit_bytes")]
+        public long DataLimitBytes { get; set; }
+
+        [JsonPropertyName("expires_at")]
+        public DateTime? ExpiresAt { get; set; }
+    }
+
+    public class AdminSubscriptionListDTO
+    {
+        [JsonPropertyName("subscriptions")]
+        public List<AdminSubscriptionDTO> Subscriptions { get; set; } = new();
+
+        [JsonPropertyName("total")]
+        public int Total { get; set; }
+    }
+
+    public class AdminPaymentDTO
+    {
+        [JsonPropertyName("id")]
+        public string Id { get; set; } = string.Empty;
+
+        [JsonPropertyName("account_id")]
+        public string AccountId { get; set; } = string.Empty;
+
+        [JsonPropertyName("plan")]
+        public string Plan { get; set; } = string.Empty;
+
+        [JsonPropertyName("amount")]
+        public decimal Amount { get; set; }
+
+        [JsonPropertyName("status")]
+        public string Status { get; set; } = string.Empty;
+
+        [JsonPropertyName("created_at")]
+        public DateTime? CreatedAt { get; set; }
+    }
+
+    public class AdminPaymentListDTO
+    {
+        [JsonPropertyName("payments")]
+        public List<AdminPaymentDTO> Payments { get; set; } = new();
+
+        [JsonPropertyName("total")]
+        public int Total { get; set; }
+    }
+
+    public class AdminProvisioningDTO
+    {
+        [JsonPropertyName("id")]
+        public string Id { get; set; } = string.Empty;
+
+        [JsonPropertyName("account_id")]
+        public string AccountId { get; set; } = string.Empty;
+
+        [JsonPropertyName("vpn_profile_uuid")]
+        public string VpnProfileUuid { get; set; } = string.Empty;
+
+        [JsonPropertyName("marzban_username")]
+        public string MarzbanUsername { get; set; } = string.Empty;
+
+        [JsonPropertyName("inbound")]
+        public string Inbound { get; set; } = "VLESS TCP REALITY";
+
+        [JsonPropertyName("current_flow")]
+        public string CurrentFlow { get; set; } = string.Empty;
+
+        [JsonPropertyName("reality_public_key")]
+        public string RealityPublicKey { get; set; } = string.Empty;
+
+        [JsonPropertyName("sni")]
+        public string Sni { get; set; } = string.Empty;
+
+        [JsonPropertyName("last_provision_time")]
+        public DateTime? LastProvisionTime { get; set; }
+
+        [JsonPropertyName("provision_status")]
+        public string ProvisionStatus { get; set; } = string.Empty;
+    }
+
+    public class AdminProvisioningListDTO
+    {
+        [JsonPropertyName("profiles")]
+        public List<AdminProvisioningDTO> Profiles { get; set; } = new();
+
+        [JsonPropertyName("total")]
+        public int Total { get; set; }
+    }
+
+    public class ComponentStatusDTO
+    {
+        [JsonPropertyName("status")]
+        public string Status { get; set; } = "ok";
+
+        [JsonPropertyName("latency_ms")]
+        public double? LatencyMs { get; set; }
+
+        [JsonPropertyName("detail")]
+        public string? Detail { get; set; }
+    }
+
+    public class AdminHealthResponseDTO
+    {
+        [JsonPropertyName("status")]
+        public string Status { get; set; } = "ok";
+
+        [JsonPropertyName("version")]
+        public string? Version { get; set; }
+
+        [JsonPropertyName("components")]
+        public Dictionary<string, ComponentStatusDTO>? Components { get; set; }
+    }
+
+    public class AdminSystemHealthDTO : AdminHealthResponseDTO
+    {
+        [JsonPropertyName("postgres")]
+        public ComponentStatusDTO Postgres
+        {
+            get => Components != null && Components.TryGetValue("postgres", out var c) ? c : new ComponentStatusDTO { Status = "ok" };
+            set { if (Components == null) Components = new(); Components["postgres"] = value; }
+        }
+
+        [JsonPropertyName("marzban")]
+        public ComponentStatusDTO Marzban
+        {
+            get => Components != null && Components.TryGetValue("marzban", out var c) ? c : new ComponentStatusDTO { Status = "ok" };
+            set { if (Components == null) Components = new(); Components["marzban"] = value; }
+        }
+
+        [JsonPropertyName("razorpay")]
+        public ComponentStatusDTO Razorpay
+        {
+            get => Components != null && Components.TryGetValue("razorpay", out var c) ? c : new ComponentStatusDTO { Status = "ok" };
+            set { if (Components == null) Components = new(); Components["razorpay"] = value; }
+        }
+
+        [JsonPropertyName("redis")]
+        public ComponentStatusDTO Redis
+        {
+            get => Components != null && Components.TryGetValue("redis", out var c) ? c : new ComponentStatusDTO { Status = "ok" };
+            set { if (Components == null) Components = new(); Components["redis"] = value; }
+        }
+    }
+
+    public class AdminRetryItemDTO
+    {
+        [JsonPropertyName("id")]
+        public string Id { get; set; } = string.Empty;
+
+        [JsonPropertyName("operation_type")]
+        public string OperationType { get; set; } = string.Empty;
+
+        [JsonPropertyName("attempt_count")]
+        public int AttemptCount { get; set; }
+
+        [JsonPropertyName("next_retry_at")]
+        public DateTime? NextRetryAt { get; set; }
+
+        [JsonPropertyName("payload")]
+        public string? Payload { get; set; }
+    }
+
+    public class AdminRetryQueueDTO
+    {
+        [JsonPropertyName("pending_items")]
+        public List<AdminRetryItemDTO> PendingItems { get; set; } = new();
+
+        [JsonPropertyName("total")]
+        public int Total { get; set; }
+    }
+
+    public class AdminSubscriptionGraceRequest
+    {
+        [JsonPropertyName("grace_duration_days")]
+        public int GraceDurationDays { get; set; } = 7;
+    }
+
+    public class AdminSubscriptionRenewRequest
+    {
+        [JsonPropertyName("new_expires_at")]
+        public DateTime NewExpiresAt { get; set; }
+    }
+
+    public class AdminPaymentResolveRequest
+    {
+        [JsonPropertyName("reason")]
+        public string Reason { get; set; } = string.Empty;
+    }
+
+    public class ExtendSubscriptionRequest
+    {
+        [JsonPropertyName("days")]
+        public int Days { get; set; }
+    }
+}

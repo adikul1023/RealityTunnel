@@ -1,0 +1,161 @@
+<UserControl x:Class="RealityTunnel.OperationsConsole.Views.InfrastructureView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:conv="clr-namespace:RealityTunnel.OperationsConsole.Converters">
+    <UserControl.Resources>
+        <conv:BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <conv:StatusColorConverter x:Key="StatusColor" />
+    </UserControl.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Top Action Toolbar -->
+        <Grid Grid.Row="0" Margin="0,0,0,20">
+            <StackPanel Orientation="Horizontal">
+                <ui:SymbolIcon Symbol="Server24" FontSize="26" Foreground="#F87171" Margin="0,0,12,0"/>
+                <StackPanel>
+                    <TextBlock Text="Distributed Infrastructure &amp; Probes" FontSize="18" FontWeight="Bold" Foreground="White"/>
+                    <TextBlock Text="Oracle Billing Gateway (144.24.153.180) &amp; Contabo VPN Edge (217.216.79.209)" FontSize="12" Foreground="#9CA3AF"/>
+                </StackPanel>
+            </StackPanel>
+
+            <ui:Button Content="Refresh Diagnostic Probes" Appearance="Secondary" Icon="{ui:SymbolIcon ArrowClockwise24}" Command="{Binding LoadHealthAndStatusCommand}" HorizontalAlignment="Right"/>
+        </Grid>
+
+        <!-- 7 Core System Health Cards -->
+        <ItemsControl Grid.Row="1" ItemsSource="{Binding ServicesList}" Margin="0,0,0,24">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="12" Padding="16" Width="295" Margin="0,0,16,16">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <Grid Grid.Row="0" Margin="0,0,0,10">
+                                <TextBlock Text="{Binding ComponentName}" FontWeight="Bold" FontSize="14" Foreground="White" HorizontalAlignment="Left"/>
+                                <Border Background="#1F2937" CornerRadius="4" Padding="6,2" HorizontalAlignment="Right">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Ellipse Width="8" Height="8" Fill="{Binding Status, Converter={StaticResource StatusColor}}" Margin="0,0,6,0"/>
+                                        <TextBlock Text="{Binding Status}" FontWeight="Bold" FontSize="10" Foreground="White"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
+                            <TextBlock Grid.Row="1" Text="{Binding Detail}" FontSize="11" Foreground="#9CA3AF" TextWrapping="Wrap" MinHeight="28" Margin="0,0,0,8"/>
+
+                            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,12">
+                                <TextBlock Text="Latency: " FontSize="11" Foreground="#6B7280"/>
+                                <TextBlock Text="{Binding LatencyMs, TargetNullValue='-', StringFormat='{}{0} ms'}" FontSize="11" FontWeight="SemiBold" Foreground="#60A5FA"/>
+                            </StackPanel>
+
+                            <!-- Disabled action buttons per Step 0 API audit -->
+                            <StackPanel Grid.Row="3" Orientation="Horizontal">
+                                <ui:Button Content="Restart Service" Appearance="Secondary" Height="28" Padding="10,1" FontSize="11" Margin="0,0,8,0"
+                                           IsEnabled="{Binding DataContext.CanRestartServices, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                           ToolTip="{Binding DataContext.RestartButtonsTooltip, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                           Command="{Binding DataContext.RestartServiceActionCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                           CommandParameter="{Binding ComponentName}"/>
+
+                                <ui:Button Content="Reload Engine" Appearance="Secondary" Height="28" Padding="10,1" FontSize="11"
+                                           IsEnabled="{Binding DataContext.CanRestartServices, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                           ToolTip="{Binding DataContext.ReloadXrayTooltip, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                           Command="{Binding DataContext.ReloadXrayActionCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                           Visibility="{Binding ComponentKey, Converter={StaticResource NullToVis}}"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Bottom Row: Retry Queue & Recovery Backups -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Retry Queue Box -->
+            <Border Grid.Column="0" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="12" Padding="16">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
+                        <ui:SymbolIcon Symbol="ArrowRepeatAll24" FontSize="20" Foreground="#FBBF24" Margin="0,0,8,0"/>
+                        <TextBlock Text="Asynchronous Retry Queue (Marzban &amp; Webhooks)" FontSize="14" FontWeight="Bold" Foreground="White"/>
+                    </StackPanel>
+
+                    <DataGrid Grid.Row="1" ItemsSource="{Binding RetryQueueItems}" AutoGenerateColumns="False" CanUserAddRows="False"
+                              HeadersVisibility="Column" GridLinesVisibility="None" Background="Transparent" BorderThickness="0"
+                              RowBackground="Transparent" AlternatingRowBackground="#0D121F" Foreground="White" FontSize="12">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="UUID" Binding="{Binding Id}" Width="100" FontWeight="Bold" Foreground="#60A5FA"/>
+                            <DataGridTextColumn Header="OPERATION" Binding="{Binding OperationType}" Width="160" FontWeight="SemiBold"/>
+                            <DataGridTextColumn Header="ATTEMPTS" Binding="{Binding AttemptCount}" Width="80"/>
+                            <DataGridTextColumn Header="NEXT RETRY" Binding="{Binding NextRetryAt, StringFormat='HH:mm:ss'}" Width="110" Foreground="#9CA3AF"/>
+
+                            <DataGridTemplateColumn Header="SUPER-ADMIN" Width="*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal" Visibility="{Binding DataContext.IsSuperAdmin, RelativeSource={RelativeSource AncestorType=DataGrid}, Converter={StaticResource BoolToVis}}">
+                                            <ui:Button Content="Retry Now" Appearance="Primary" Height="24" Padding="8,1" FontSize="11" Margin="0,0,6,0"
+                                                       Command="{Binding DataContext.RetryItemNowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                       CommandParameter="{Binding}"/>
+                                            <ui:Button Content="Discard" Appearance="Danger" Height="24" Padding="8,1" FontSize="11"
+                                                       Command="{Binding DataContext.DiscardRetryItemCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                       CommandParameter="{Binding}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </Border>
+
+            <!-- Backups Snapshots Box -->
+            <Border Grid.Column="2" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="12" Padding="16">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid Grid.Row="0" Margin="0,0,0,12">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <ui:SymbolIcon Symbol="SaveCopy24" FontSize="20" Foreground="#34D399" Margin="0,0,8,0"/>
+                            <TextBlock Text="Disaster Recovery &amp; Database Backups" FontSize="14" FontWeight="Bold" Foreground="White"/>
+                        </StackPanel>
+                        <ui:Button Content="Snapshot Now" Appearance="Primary" Icon="{ui:SymbolIcon AddCircle24}" Height="30" HorizontalAlignment="Right"
+                                   Command="{Binding CreateBackupSnapshotCommand}"
+                                   Visibility="{Binding IsSuperAdmin, Converter={StaticResource BoolToVis}}"/>
+                    </Grid>
+
+                    <TextBlock Grid.Row="1" Text="Automated snapshots and recovery archives stored on remote Oracle cloud volume (/opt/realitytunnel/backups). Select snapshot or initiate live manual snapshot above."
+                               Foreground="#9CA3AF" FontSize="12" TextWrapping="Wrap" Margin="0,12,0,0"/>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Spinner -->
+        <Grid Grid.Row="0" Grid.RowSpan="3" Background="#80000000" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}">
+            <ui:ProgressRing IsIndeterminate="True" Width="60" Height="60" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Grid>
+    </Grid>
+</UserControl>

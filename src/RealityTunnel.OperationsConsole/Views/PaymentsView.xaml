@@ -1,0 +1,93 @@
+<UserControl x:Class="RealityTunnel.OperationsConsole.Views.PaymentsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:conv="clr-namespace:RealityTunnel.OperationsConsole.Converters">
+    <UserControl.Resources>
+        <conv:BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <conv:StatusColorConverter x:Key="StatusColor" />
+    </UserControl.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Filter Bar -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Filter by Status:" Foreground="#9CA3AF" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <ComboBox SelectedValue="{Binding SelectedStatusFilter}" SelectedValuePath="Content" Width="150" Height="36" Margin="0,0,12,0">
+                    <ComboBoxItem Content="ALL" IsSelected="True"/>
+                    <ComboBoxItem Content="succeeded"/>
+                    <ComboBoxItem Content="failed"/>
+                    <ComboBoxItem Content="pending"/>
+                </ComboBox>
+                <ui:Button Content="Apply Filter" Appearance="Primary" Icon="{ui:SymbolIcon Filter24}" Command="{Binding LoadPaymentsCommand}" Height="36"/>
+            </StackPanel>
+
+            <ui:Button Content="Refresh List" Appearance="Secondary" Icon="{ui:SymbolIcon ArrowClockwise24}" Command="{Binding LoadPaymentsCommand}" HorizontalAlignment="Right" Height="36"/>
+        </Grid>
+
+        <!-- Super-Admin Resolve Tool Box -->
+        <Border Grid.Row="1" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="10" Padding="16,12" Margin="0,0,0,16"
+                Visibility="{Binding IsSuperAdmin, Converter={StaticResource BoolToVis}}">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <ui:SymbolIcon Symbol="Wrench24" FontSize="20" Foreground="#FBBF24" Margin="0,0,8,0"/>
+                <TextBlock Text="Manual Resolve Reason:" FontWeight="SemiBold" Foreground="#FEF3C7" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                <ui:TextBox Text="{Binding ResolveReasonInput}" Width="320" Height="34" Margin="0,0,16,0" PlaceholderText="e.g. Manual resolution by operator"/>
+                <TextBlock Text="(Used when clicking 'Manual Resolve' below)" FontSize="11" Foreground="#9CA3AF" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Payments DataGrid -->
+        <DataGrid Grid.Row="2" ItemsSource="{Binding Payments}" AutoGenerateColumns="False" CanUserAddRows="False"
+                  HeadersVisibility="Column" GridLinesVisibility="None" Background="#111827" BorderBrush="#1F2937" BorderThickness="1"
+                  RowBackground="Transparent" AlternatingRowBackground="#0D121F" Foreground="White" FontSize="13"
+                  SelectedItem="{Binding SelectedPayment}">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="PAYMENT UUID" Binding="{Binding Id}" Width="260" FontWeight="SemiBold" Foreground="#60A5FA"/>
+                <DataGridTextColumn Header="ACCOUNT UUID" Binding="{Binding AccountId}" Width="260" Foreground="#9CA3AF"/>
+                <DataGridTextColumn Header="PLAN" Binding="{Binding Plan}" Width="140" FontWeight="SemiBold" Foreground="#D1D5DB"/>
+                <DataGridTextColumn Header="AMOUNT" Binding="{Binding Amount, StringFormat='₹{0:N2}'}" Width="130" FontWeight="Bold" Foreground="#34D399"/>
+
+                <DataGridTemplateColumn Header="STATUS" Width="130">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Border Background="#1F2937" CornerRadius="4" Padding="8,3" HorizontalAlignment="Left">
+                                <StackPanel Orientation="Horizontal">
+                                    <Ellipse Width="8" Height="8" Fill="{Binding Status, Converter={StaticResource StatusColor}}" Margin="0,0,6,0"/>
+                                    <TextBlock Text="{Binding Status}" FontWeight="Bold" FontSize="11" Foreground="White"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTextColumn Header="CREATED AT" Binding="{Binding CreatedAt, StringFormat='yyyy-MM-dd HH:mm:ss'}" Width="160" Foreground="#D1D5DB"/>
+
+                <!-- Super Admin Actions -->
+                <DataGridTemplateColumn Header="RECONCILIATION CONTROLS" Width="*">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" Visibility="{Binding DataContext.IsSuperAdmin, RelativeSource={RelativeSource AncestorType=DataGrid}, Converter={StaticResource BoolToVis}}">
+                                <ui:Button Content="Reconcile Gateway" Appearance="Secondary" Height="28" Padding="12,2" FontSize="11" Margin="0,0,8,0"
+                                           Command="{Binding DataContext.ReconcileCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                           CommandParameter="{Binding}"/>
+                                <ui:Button Content="Manual Resolve" Appearance="Primary" Height="28" Padding="12,2" FontSize="11"
+                                           Command="{Binding DataContext.ResolveCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                           CommandParameter="{Binding}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Spinner -->
+        <Grid Grid.Row="0" Grid.RowSpan="3" Background="#80000000" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}">
+            <ui:ProgressRing IsIndeterminate="True" Width="60" Height="60" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Grid>
+    </Grid>
+</UserControl>

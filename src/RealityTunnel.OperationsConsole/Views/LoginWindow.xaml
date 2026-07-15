@@ -1,0 +1,80 @@
+<ui:FluentWindow x:Class="RealityTunnel.OperationsConsole.Views.LoginWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 xmlns:conv="clr-namespace:RealityTunnel.OperationsConsole.Converters"
+                 Title="RealityTunnel Operations Console - Login"
+                 Width="460" Height="520"
+                 WindowStartupLocation="CenterScreen"
+                 ResizeMode="NoResize"
+                 ExtendsContentIntoTitleBar="True"
+                 WindowBackdropType="Mica">
+    <Window.Resources>
+        <conv:BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <conv:NullToVisibilityConverter x:Key="NullToVis" />
+    </Window.Resources>
+    <Grid Margin="32">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- TitleBar Header -->
+        <ui:TitleBar Title="RealityTunnel Console" Grid.Row="0" Margin="-32,-32,-32,0" Padding="16,8"/>
+
+        <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="0,24,0,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,8">
+                <ui:SymbolIcon Symbol="ShieldLock24" FontSize="40" Foreground="#60A5FA" Margin="0,0,12,0"/>
+                <StackPanel>
+                    <TextBlock Text="RealityTunnel" FontSize="24" FontWeight="Bold" Foreground="White" />
+                    <TextBlock Text="Operations Console (RAM-Only Session)" FontSize="12" Foreground="#9CA3AF" />
+                </StackPanel>
+            </StackPanel>
+
+            <Border Background="#1F2937" CornerRadius="8" Padding="20" Margin="0,16,0,0" BorderBrush="#374151" BorderThickness="1">
+                <StackPanel>
+                    <TextBlock Text="Server Gateway Base URL" FontSize="12" FontWeight="SemiBold" Foreground="#D1D5DB" Margin="0,0,0,6"/>
+                    <ui:TextBox Text="{Binding ServerUrl, UpdateSourceTrigger=PropertyChanged}" 
+                                PlaceholderText="https://api.stealthy.co.in" 
+                                Margin="0,0,0,16" />
+
+                    <TextBlock Text="Administrator Username" FontSize="12" FontWeight="SemiBold" Foreground="#D1D5DB" Margin="0,0,0,6"/>
+                    <ui:TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}" 
+                                PlaceholderText="e.g. admin" 
+                                Margin="0,0,0,16" />
+
+                    <TextBlock Text="Password" FontSize="12" FontWeight="SemiBold" Foreground="#D1D5DB" Margin="0,0,0,6"/>
+                    <ui:PasswordBox x:Name="PwdBox" 
+                                    PlaceholderText="••••••••••••" 
+                                    PasswordChanged="PwdBox_PasswordChanged"
+                                    Margin="0,0,0,20" />
+
+                    <!-- Error Alert -->
+                    <Border Background="#451A1A" BorderBrush="#EF4444" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,16"
+                            Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVis}}">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="ErrorCircle24" Foreground="#EF4444" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding ErrorMessage}" Foreground="#FECACA" TextWrapping="Wrap" VerticalAlignment="Center" MaxWidth="310"/>
+                        </StackPanel>
+                    </Border>
+
+                    <ui:Button Content="Authenticate &amp; Start Console" 
+                               Command="{Binding LoginCommand}" 
+                               Appearance="Primary" 
+                               HorizontalAlignment="Stretch" 
+                               Height="40" 
+                               FontWeight="SemiBold"
+                               IsEnabled="{Binding IsBusy, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}"/>
+
+                    <ui:ProgressRing IsIndeterminate="True" HorizontalAlignment="Center" Margin="0,12,0,0"
+                                     Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <!-- Footer Notice -->
+        <TextBlock Grid.Row="2" Text="Security Enforcement: Ed25519 memory-only JWT. No local disk or DPAPI storage. 10m inactivity timeout." 
+                   FontSize="10" Foreground="#6B7280" TextAlignment="Center" TextWrapping="Wrap" Margin="0,16,0,0"/>
+    </Grid>
+</ui:FluentWindow>

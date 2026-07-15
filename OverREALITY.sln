@@ -4,6 +4,10 @@ VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RealityTunnel", "RealityTunnel.csproj", "{286E45C0-381F-4DFF-1B83-2AE2E72B6382}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{AE68D334-ECAE-4197-9C14-789717B188C0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RealityTunnel.OperationsConsole", "src\RealityTunnel.OperationsConsole\RealityTunnel.OperationsConsole.csproj", "{C9F17E1E-766A-44D9-AA46-E16F8B20284F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -14,11 +18,18 @@ Global
 		{286E45C0-381F-4DFF-1B83-2AE2E72B6382}.Debug|x64.Build.0 = Debug|x64
 		{286E45C0-381F-4DFF-1B83-2AE2E72B6382}.Release|x64.ActiveCfg = Release|x64
 		{286E45C0-381F-4DFF-1B83-2AE2E72B6382}.Release|x64.Build.0 = Release|x64
+		{C9F17E1E-766A-44D9-AA46-E16F8B20284F}.Debug|x64.ActiveCfg = Debug|x64
+		{C9F17E1E-766A-44D9-AA46-E16F8B20284F}.Debug|x64.Build.0 = Debug|x64
+		{C9F17E1E-766A-44D9-AA46-E16F8B20284F}.Release|x64.ActiveCfg = Release|x64
+		{C9F17E1E-766A-44D9-AA46-E16F8B20284F}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {9D33225F-5D3D-4BA6-80A2-777FDEA8568F}
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{C9F17E1E-766A-44D9-AA46-E16F8B20284F} = {AE68D334-ECAE-4197-9C14-789717B188C0}
 	EndGlobalSection
 EndGlobal
