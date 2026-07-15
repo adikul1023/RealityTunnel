@@ -40,7 +40,7 @@ async def test_infrastructure_status_success(async_client, admin_auth_headers_fa
     for comp in expected_components:
         assert comp in body, f"Component {comp} missing in status response"
         assert "status" in body[comp]
-        assert body[comp]["status"] in ("healthy", "degraded", "offline")
+        assert body[comp]["status"] in ("healthy", "degraded", "offline", "not_configured")
         assert "last_checked" in body[comp]
 
 
@@ -111,6 +111,8 @@ async def test_version_endpoint_success(async_client, admin_auth_headers_factory
     assert "sing_box_min" in body
     assert "database_schema" in body
     assert "git_commit" in body
+    assert "build_time" in body
+    assert "environment" in body
 
 
 # ── Unified Account Lookup ────────────────────────────────────────────────────
@@ -133,6 +135,7 @@ async def test_unified_account_lookup_success(
     assert len(body["devices"]) == 1
     assert body["devices"][0]["device_guid"] == "device-ops-1"
     assert "provisioning" in body
+    assert "provisioning_state" in body
     assert "marzban" in body
     assert "vpn" in body
     assert "usage" in body
@@ -164,6 +167,7 @@ async def test_delete_device_super_admin_success(
     body = resp.json()
     assert body["removed"] is True
     assert body["remaining_devices"] == 1
+    assert "refresh_tokens_revoked" in body
 
     # Verify via listing
     resp_list = await async_client.get(f"/api/admin/accounts/{acc.account_id}/devices", headers=headers)

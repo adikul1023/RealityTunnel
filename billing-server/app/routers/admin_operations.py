@@ -59,7 +59,7 @@ async def list_audit_events(
     since: datetime | None = Query(default=None, description="Filter events since this timestamp"),
     source: str | None = Query(default=None, description="Filter by event source (billing, marzban, scheduler, operator, system)"),
     event_type: str | None = Query(default=None, description="Filter by exact event type"),
-    limit: int = Query(default=50, ge=1, le=200, description="Number of events to retrieve"),
+    limit: int = Query(default=20, ge=1, le=100, description="Number of events to retrieve (max 100)"),
     current_admin: AdminUser = Depends(get_current_admin),
     operations_service: OperationsService = Depends(get_operations_service),
 ) -> AuditEventCursorPageDTO:

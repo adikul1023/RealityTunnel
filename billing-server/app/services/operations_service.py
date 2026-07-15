@@ -72,6 +72,9 @@ class OperationsService:
         self.sub_repo = SubscriptionRepository(session)
         self.prov_repo = ProvisioningRepository(session)
         self.health_repo = SystemHealthRepository(session)
+        self._cached_status: InfrastructureStatusDTO | None = None
+        self._last_status_probe_time: float = 0.0
+        self._status_lock = asyncio.Lock()
 
     # ── Infrastructure Status Probes ────────────────────────────────────────
 
@@ -133,69 +136,87 @@ class OperationsService:
             st = "healthy" if is_running else "offline"
             msg = "Scheduler loop active" if is_running else "Scheduler stopped"
             return ComponentStatusDTO(status=st, latency_ms=0, last_checked=now, message=msg)
-        return ComponentStatusDTO(status="healthy", latency_ms=0, last_checked=now, message="Scheduler task active")
+        return ComponentStatusDTO(status="not_configured", latency_ms=0, last_checked=now, message="Scheduler loop not attached to app state")
 
     async def _probe_redis(self) -> ComponentStatusDTO:
         now = datetime.now(timezone.utc)
-        return ComponentStatusDTO(status="healthy", latency_ms=0, last_checked=now, message="Redis cache & rate limiter operational")
+        redis_url = getattr(settings, "redis_url", None)
+        if not redis_url:
+            return ComponentStatusDTO(status="not_configured", latency_ms=0, last_checked=now, message="Redis cache not configured in environment")
+        return ComponentStatusDTO(status="healthy", latency_ms=0, last_checked=now, message="Redis cache operational")
 
     async def _probe_caddy(self) -> ComponentStatusDTO:
         now = datetime.now(timezone.utc)
+        caddy_url = getattr(settings, "caddy_probe_url", None)
+        if not caddy_url:
+            return ComponentStatusDTO(status="not_configured", latency_ms=0, last_checked=now, message="Caddy reverse proxy probe not configured")
         return ComponentStatusDTO(status="healthy", latency_ms=0, last_checked=now, message="Caddy reverse proxy operational")
 
     async def get_infrastructure_status(self, app_state: Any = None) -> InfrastructureStatusDTO:
         """
-        Execute concurrent non-blocking health checks across all backend components.
+        Execute concurrent non-blocking health checks across all backend components with a 5-second TTL cache.
         Each component check is strictly bounded by a 1.5s timeout.
         """
-        now = datetime.now(timezone.utc)
-        billing_api = ComponentStatusDTO(status="healthy", latency_ms=0, last_checked=now, message="Billing API operational")
+        now_perf = time.perf_counter()
+        if self._cached_status and (now_perf - self._last_status_probe_time) < 5.0:
+            return self._cached_status
 
-        db_task = asyncio.create_task(self._probe_database())
-        marzban_task = asyncio.create_task(self._probe_marzban())
-        xray_task = asyncio.create_task(self._probe_xray())
-        scheduler_task = asyncio.create_task(self._probe_scheduler(app_state))
-        redis_task = asyncio.create_task(self._probe_redis())
-        caddy_task = asyncio.create_task(self._probe_caddy())
+        async with self._status_lock:
+            now_perf = time.perf_counter()
+            if self._cached_status and (now_perf - self._last_status_probe_time) < 5.0:
+                return self._cached_status
 
-        results = await asyncio.gather(
-            db_task, marzban_task, xray_task, scheduler_task, redis_task, caddy_task,
-            return_exceptions=True
-        )
+            now = datetime.now(timezone.utc)
+            billing_api = ComponentStatusDTO(status="healthy", latency_ms=0, last_checked=now, message="Billing API operational")
 
-        def _resolve_probe(res: Any, default_msg: str) -> ComponentStatusDTO:
-            if isinstance(res, ComponentStatusDTO):
-                return res
-            return ComponentStatusDTO(status="offline", latency_ms=None, last_checked=now, message=f"Probe exception: {res or default_msg}")
+            db_task = asyncio.create_task(self._probe_database())
+            marzban_task = asyncio.create_task(self._probe_marzban())
+            xray_task = asyncio.create_task(self._probe_xray())
+            scheduler_task = asyncio.create_task(self._probe_scheduler(app_state))
+            redis_task = asyncio.create_task(self._probe_redis())
+            caddy_task = asyncio.create_task(self._probe_caddy())
 
-        database = _resolve_probe(results[0], "Database probe failure")
-        marzban = _resolve_probe(results[1], "Marzban probe failure")
-        xray = _resolve_probe(results[2], "Xray probe failure")
-        scheduler = _resolve_probe(results[3], "Scheduler probe failure")
-        redis = _resolve_probe(results[4], "Redis probe failure")
-        caddy = _resolve_probe(results[5], "Caddy probe failure")
-
-        edge_name = getattr(settings, "edge_node_name", "contabo-eu-1")
-        edges = [
-            EdgeStatusDTO(
-                name=edge_name,
-                status=marzban.status,
-                latency_ms=marzban.latency_ms,
-                last_checked=marzban.last_checked,
-                message=marzban.message,
+            results = await asyncio.gather(
+                db_task, marzban_task, xray_task, scheduler_task, redis_task, caddy_task,
+                return_exceptions=True
             )
-        ]
 
-        return InfrastructureStatusDTO(
-            billing_api=billing_api,
-            database=database,
-            marzban=marzban,
-            xray=xray,
-            scheduler=scheduler,
-            redis=redis,
-            caddy=caddy,
-            edges=edges,
-        )
+            def _resolve_probe(res: Any, default_msg: str) -> ComponentStatusDTO:
+                if isinstance(res, ComponentStatusDTO):
+                    return res
+                return ComponentStatusDTO(status="offline", latency_ms=None, last_checked=now, message=f"Probe exception: {res or default_msg}")
+
+            database = _resolve_probe(results[0], "Database probe failure")
+            marzban = _resolve_probe(results[1], "Marzban probe failure")
+            xray = _resolve_probe(results[2], "Xray probe failure")
+            scheduler = _resolve_probe(results[3], "Scheduler probe failure")
+            redis = _resolve_probe(results[4], "Redis probe failure")
+            caddy = _resolve_probe(results[5], "Caddy probe failure")
+
+            edge_name = getattr(settings, "edge_node_name", "contabo-eu-1")
+            edges = [
+                EdgeStatusDTO(
+                    name=edge_name,
+                    status=marzban.status,
+                    latency_ms=marzban.latency_ms,
+                    last_checked=marzban.last_checked,
+                    message=marzban.message,
+                )
+            ]
+
+            status_dto = InfrastructureStatusDTO(
+                billing_api=billing_api,
+                database=database,
+                marzban=marzban,
+                xray=xray,
+                scheduler=scheduler,
+                redis=redis,
+                caddy=caddy,
+                edges=edges,
+            )
+            self._cached_status = status_dto
+            self._last_status_probe_time = time.perf_counter()
+            return status_dto
 
     # ── Unified Account Details ─────────────────────────────────────────────
 
@@ -248,17 +269,42 @@ class OperationsService:
                 except Exception as exc:
                     logger.warning("Could not fetch remote user from marzban for account %s: %s", account.account_id, exc)
 
+        # Determine explicit provisioning state
+        if not prov_profile:
+            prov_state = "Pending"
+        elif hasattr(prov_profile, "status") and getattr(prov_profile.status, "value", str(prov_profile.status)) == "error":
+            prov_state = "Failed"
+        elif hasattr(prov_profile, "sync_status") and getattr(prov_profile.sync_status, "value", str(prov_profile.sync_status)) == "error":
+            prov_state = "Failed"
+        elif hasattr(prov_profile, "sync_status") and getattr(prov_profile.sync_status, "value", str(prov_profile.sync_status)) == "pending_sync":
+            prov_state = "Needs Sync"
+        else:
+            prov_state = "Provisioned"
+
         last_seen = None
         if devices_models:
             seen_dates = [d.last_seen_at for d in devices_models if d.last_seen_at]
             if seen_dates:
                 last_seen = max(seen_dates)
 
-        vpn_facet = {
-            "last_seen": last_seen.isoformat() if last_seen else None,
-            "last_ip": getattr(account, "last_ip", None),
-            "last_handshake": last_seen.isoformat() if last_seen else None,
-        }
+        raw_ip = getattr(account, "last_ip", None) or (getattr(marzban_user_dto, "last_ip", None) if marzban_user_dto else None)
+        masked_ip = None
+        if raw_ip and isinstance(raw_ip, str):
+            parts = raw_ip.split(".")
+            if len(parts) == 4:
+                masked_ip = f"{parts[0]}.{parts[1]}.xxx.xxx"
+            else:
+                masked_ip = "Anonymized IP"
+
+        from app.services.operations_dtos import VpnStatusDTO
+        vpn_facet = VpnStatusDTO(
+            connected=bool(marzban_user_dto and getattr(marzban_user_dto, "status", None) == "active" and last_seen),
+            last_seen=last_seen.isoformat() if last_seen else None,
+            last_handshake=last_seen.isoformat() if last_seen else None,
+            last_ip=masked_ip,
+            edge_node=prov_profile.edge_node if prov_profile and hasattr(prov_profile, "edge_node") else None,
+            protocol="VLESS-Reality",
+        )
 
         data_used = marzban_user_dto.data_used if marzban_user_dto and marzban_user_dto.data_used is not None else 0
         data_limit = marzban_user_dto.data_limit if marzban_user_dto and marzban_user_dto.data_limit is not None else None
@@ -272,6 +318,7 @@ class OperationsService:
             subscription=sub_dto,
             devices=devices_resp,
             provisioning=prov_dto,
+            provisioning_state=prov_state,
             marzban=marzban_user_dto,
             vpn=vpn_facet,
             usage=usage_facet,
@@ -335,4 +382,6 @@ class OperationsService:
             sing_box_min="1.13.0",
             database_schema="12",
             git_commit=getattr(settings, "git_commit", "be1066a"),
+            build_time=getattr(settings, "build_time", datetime.now(timezone.utc).isoformat()[:10] + "T00:00:00Z"),
+            environment=getattr(settings, "environment", "development"),
         )

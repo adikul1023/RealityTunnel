@@ -63,6 +63,7 @@ async def test_admin_operations_complete_e2e_workflow(
     device_guids = {d["device_guid"] for d in unified_body["devices"]}
     assert device_guids == {"dev-e2e-keep", "dev-e2e-remove"}
     assert "provisioning" in unified_body
+    assert "provisioning_state" in unified_body
     assert "marzban" in unified_body
     assert "vpn" in unified_body
     assert "usage" in unified_body
@@ -76,6 +77,7 @@ async def test_admin_operations_complete_e2e_workflow(
     remove_body = remove_resp.json()
     assert remove_body["removed"] is True
     assert remove_body["remaining_devices"] == 1
+    assert "refresh_tokens_revoked" in remove_body
 
     # Verify unified view updates immediately
     unified_resp_after = await async_client.get(f"/api/admin/account/{acc.account_id}", headers=headers)

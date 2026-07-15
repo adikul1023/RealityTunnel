@@ -275,18 +275,20 @@ class DeviceService:
 
     async def remove_device(
         self, account_id: uuid.UUID, device_guid: str
-    ) -> None:
+    ) -> int:
         """
         Hard remove device. Delete from database and revoke tokens.
+        Returns the number of refresh tokens revoked.
         Must verify ownership.
         """
         device = await self._get_and_verify_ownership(account_id, device_guid, for_update=True)
-
+        revoked_count = 0
         if self.refresh_service:
-            await self.refresh_service.revoke_all_for_device(account_id, device_guid, "DEVICE_REMOVED")
+            revoked_count = await self.refresh_service.revoke_all_for_device(account_id, device_guid, "DEVICE_REMOVED")
 
         try:
             await self.device_repo.delete(device)
+            return revoked_count
         except RepositoryError as exc:
             logger.error("Repository error removing device")
             raise DeviceServiceError("Database error removing device") from exc

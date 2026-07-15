@@ -348,12 +348,18 @@ async def delete_account_device(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Service error")
 
     try:
-        await device_service.remove_device(account.id, device_guid)
+        revoked_count = await device_service.remove_device(account.id, device_guid)
         await audit_service.record_event(
             event_type="device_deletion",
             actor_id=str(current_admin.id),
             target_id=account_id,
-            details={"action": "remove_device", "device_guid": device_guid, "account_id": account_id, "source": "operator"},
+            details={
+                "action": "remove_device",
+                "device_guid": device_guid,
+                "account_id": account_id,
+                "refresh_tokens_revoked": revoked_count,
+                "source": "operator",
+            },
         )
     except DeviceNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
@@ -364,7 +370,11 @@ async def delete_account_device(
 
     remaining_devices = await device_service.get_devices_for_account(account.id)
     active_remaining = len([d for d in remaining_devices if d.is_active])
-    return DeviceRemovalResponseDTO(removed=True, remaining_devices=active_remaining)
+    return DeviceRemovalResponseDTO(
+        removed=True,
+        remaining_devices=active_remaining,
+        refresh_tokens_revoked=revoked_count,
+    )
 
 
 # ── Session endpoint ──────────────────────────────────────────────────────────
