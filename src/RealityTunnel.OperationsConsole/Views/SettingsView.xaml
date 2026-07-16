@@ -10,6 +10,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -74,8 +75,38 @@
             </StackPanel>
         </Border>
 
+        <!-- Password Change Box -->
+        <Border Grid.Row="2" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="12" Padding="24" Margin="0,0,0,20">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                    <ui:SymbolIcon Symbol="Key24" FontSize="22" Foreground="#F59E0B" Margin="0,0,10,0"/>
+                    <TextBlock Text="Change Super-Admin Password" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                </StackPanel>
+
+                <Grid Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="200" />
+                        <ColumnDefinition Width="300" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Current Password:" Foreground="#9CA3AF" FontSize="13" VerticalAlignment="Center"/>
+                    <ui:PasswordBox Grid.Column="1" Password="{Binding CurrentPassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Current Password" />
+                </Grid>
+
+                <Grid Margin="0,0,0,16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="200" />
+                        <ColumnDefinition Width="300" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="New Password:" Foreground="#9CA3AF" FontSize="13" VerticalAlignment="Center"/>
+                    <ui:PasswordBox Grid.Column="1" Password="{Binding NewPassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="New Password (min 12 chars)" />
+                </Grid>
+
+                <ui:Button Content="Change Password" Appearance="Primary" Icon="{ui:SymbolIcon Save24}" Command="{Binding ChangePasswordCommand}" HorizontalAlignment="Left" Height="36"/>
+            </StackPanel>
+        </Border>
+
         <!-- Memory Session Security Info Box -->
-        <Border Grid.Row="2" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="12" Padding="24" VerticalAlignment="Top">
+        <Border Grid.Row="3" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="12" Padding="24" VerticalAlignment="Top">
             <StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
                     <ui:SymbolIcon Symbol="ShieldLock24" FontSize="22" Foreground="#A78BFA" Margin="0,0,10,0"/>
@@ -118,7 +149,7 @@
         </Border>
 
         <!-- Spinner -->
-        <Grid Grid.Row="0" Grid.RowSpan="3" Background="#80000000" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}">
+        <Grid Grid.Row="0" Grid.RowSpan="4" Background="#80000000" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}">
             <ui:ProgressRing IsIndeterminate="True" Width="60" Height="60" HorizontalAlignment="Center" VerticalAlignment="Center"/>
         </Grid>
     </Grid>

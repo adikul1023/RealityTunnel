@@ -411,4 +411,13 @@ namespace RealityTunnel.OperationsConsole.Shared
         [JsonPropertyName("sync_status")]
         public string SyncStatus { get; set; } = string.Empty;
     }
+
+    public class AdminChangePasswordResponse
+    {
+        [JsonPropertyName("success")]
+        public bool Success { get; set; }
+
+        [JsonPropertyName("message")]
+        public string Message { get; set; } = string.Empty;
+    }
 }

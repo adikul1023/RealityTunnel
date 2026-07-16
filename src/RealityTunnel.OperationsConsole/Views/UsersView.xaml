@@ -41,7 +41,7 @@
         </Grid>
 
         <!-- DataGrid -->
-        <DataGrid Grid.Row="1" ItemsSource="{Binding Accounts}" AutoGenerateColumns="False" CanUserAddRows="False" 
+        <DataGrid Grid.Row="1" ItemsSource="{Binding Accounts}" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
                   HeadersVisibility="Column" GridLinesVisibility="None" Background="#111827" BorderBrush="#1F2937" BorderThickness="1"
                   RowBackground="Transparent" AlternatingRowBackground="#0D121F" Foreground="White" FontSize="13" SelectionMode="Single"
                   SelectedItem="{Binding SelectedAccount}">

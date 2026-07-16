@@ -50,33 +50,43 @@ namespace RealityTunnel.OperationsConsole.Views
 
                 if (viewInstance != null)
                 {
-                    // Trigger initialization on child views
-                    if (viewInstance is DashboardView dv && dv.DataContext is DashboardViewModel dvm)
-                    {
-                        await dvm.LoadDashboardAsync();
-                    }
-                    else if (viewInstance is UsersView uv && uv.DataContext is UsersViewModel uvm)
-                    {
-                        await uvm.LoadAccountsAsync();
-                    }
-                    else if (viewInstance is UserDetailsPanel udp && udp.DataContext is UserDetailsViewModel udvm && parameter is UserAccountDisplayModel acc)
-                    {
-                        await udvm.LoadDetailsAsync(acc);
-                    }
-                    else if (viewInstance is SubscriptionsView sv && sv.DataContext is SubscriptionsViewModel svm)
-                    {
-                        await svm.LoadSubscriptionsAsync();
-                    }
-                    else if (viewInstance is PaymentsView pv && pv.DataContext is PaymentsViewModel pvm)
-                    {
-                        await pvm.LoadPaymentsAsync();
-                    }
-                    else if (viewInstance is InfrastructureView iv && iv.DataContext is InfrastructureViewModel ivm)
-                    {
-                        await ivm.LoadHealthAndStatusAsync();
-                    }
-
+                    // IMPORTANT: Set the view FIRST so it is always shown,
+                    // even if the subsequent async data load fails.
                     _viewModel.CurrentViewContent = viewInstance;
+
+                    // Then trigger data initialization safely
+                    try
+                    {
+                        if (viewInstance is DashboardView dv && dv.DataContext is DashboardViewModel dvm)
+                        {
+                            await dvm.LoadDashboardAsync();
+                        }
+                        else if (viewInstance is UsersView uv && uv.DataContext is UsersViewModel uvm)
+                        {
+                            await uvm.LoadAccountsAsync();
+                        }
+                        else if (viewInstance is UserDetailsPanel udp && udp.DataContext is UserDetailsViewModel udvm && parameter is UserAccountDisplayModel acc)
+                        {
+                            await udvm.LoadDetailsAsync(acc);
+                        }
+                        else if (viewInstance is SubscriptionsView sv && sv.DataContext is SubscriptionsViewModel svm)
+                        {
+                            await svm.LoadSubscriptionsAsync();
+                        }
+                        else if (viewInstance is PaymentsView pv && pv.DataContext is PaymentsViewModel pvm)
+                        {
+                            await pvm.LoadPaymentsAsync();
+                        }
+                        else if (viewInstance is InfrastructureView iv && iv.DataContext is InfrastructureViewModel ivm)
+                        {
+                            await ivm.LoadHealthAndStatusAsync();
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        // View is already set above; data load failures are handled
+                        // internally by each ViewModel (they show error dialogs).
+                    }
                 }
             });
         }

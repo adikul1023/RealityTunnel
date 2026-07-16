@@ -49,6 +49,7 @@ namespace RealityTunnel.OperationsConsole.Services
             var client = _httpClientFactory.CreateClient("AdminApiClient");
             client.BaseAddress = new Uri(_sessionService.ServerBaseUrl);
             client.Timeout = TimeSpan.FromSeconds(15);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("RealityTunnel-OperationsConsole/1.0");
 
             if (_sessionService.IsAuthenticated)
             {
@@ -103,16 +104,28 @@ namespace RealityTunnel.OperationsConsole.Services
                     // Handle 401 Unauthorized
                     if (response.StatusCode == HttpStatusCode.Unauthorized)
                     {
-                        _sessionService.ClearSession();
-                        _navigationService.ShowLoginWindow();
-                        return ApiResult<T>.Failure("Session expired or unauthorized. Returning to login.", 401, isUnauthorized: true);
+                        string unauthErrText = await response.Content.ReadAsStringAsync(cancellationToken);
+                        string unauthErrMsg = ExtractDetailMessage(unauthErrText, 401);
+
+                        if (!route.Contains("login", StringComparison.OrdinalIgnoreCase))
+                        {
+                            _sessionService.ClearSession();
+                            _navigationService.ShowLoginWindow();
+                        }
+                        
+                        return ApiResult<T>.Failure(unauthErrMsg, 401, isUnauthorized: true);
                     }
 
                     // Handle 403 Forbidden
                     if (response.StatusCode == HttpStatusCode.Forbidden)
                     {
-                        await _dialogService.ShowErrorAsync("Permission Denied", "You do not have the required super-admin permissions to perform this action.");
-                        return ApiResult<T>.Failure("Permission denied.", 403, isForbidden: true);
+                        string forbiddenText = await response.Content.ReadAsStringAsync(cancellationToken);
+                        string forbiddenDetail = ExtractDetailMessage(forbiddenText, 403);
+                        string forbiddenMsg = forbiddenDetail.Contains("super-admin", StringComparison.OrdinalIgnoreCase)
+                            ? "You do not have the required super-admin permissions to perform this action."
+                            : $"Access denied (HTTP 403): {forbiddenDetail}";
+                        await _dialogService.ShowErrorAsync("Permission Denied", forbiddenMsg);
+                        return ApiResult<T>.Failure(forbiddenMsg, 403, isForbidden: true);
                     }
 
                     // Handle 5xx Server Errors (Retry once)
