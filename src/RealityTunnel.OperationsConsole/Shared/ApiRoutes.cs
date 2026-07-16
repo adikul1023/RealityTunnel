@@ -17,7 +17,8 @@ namespace RealityTunnel.OperationsConsole.Shared
             public const string Provisioning = "/api/admin/provisioning";
             public const string RetryQueue = "/api/admin/retry-queue";
             public const string SystemHealth = "/api/admin/system-health";
-            public const string DeepDiagnosticsHealth = "/admin/health";
+            public const string DeepDiagnosticsHealth = "/api/admin/system-health";
+            public const string AuditEvents = "/api/admin/audit-events";
 
             public static string GetAccount(string accountId) => $"/api/admin/accounts/{accountId}";
             public static string SuspendAccount(string accountId) => $"/api/admin/accounts/{accountId}/suspend";

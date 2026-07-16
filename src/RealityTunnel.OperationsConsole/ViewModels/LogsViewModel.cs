@@ -1,11 +1,15 @@
+using System.Collections.ObjectModel;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RealityTunnel.OperationsConsole.Services;
+using RealityTunnel.OperationsConsole.Shared;
 
 namespace RealityTunnel.OperationsConsole.ViewModels
 {
     public partial class LogsViewModel : ObservableObject
     {
+        private readonly IAdminApiService _apiService;
         private readonly IDialogService _dialogService;
 
         [ObservableProperty]
@@ -18,21 +22,43 @@ namespace RealityTunnel.OperationsConsole.ViewModels
         private int currentPage = 1;
 
         [ObservableProperty]
-        private bool canQueryLogs = false; // Disabled per MissingEndpoints.md
+        private bool isBusy = false;
 
         [ObservableProperty]
-        private string disabledTooltip = "Backend support required (GET /api/admin/logs)";
+        private ObservableCollection<AuditEventItemDTO> logs = new();
 
-        public LogsViewModel(IDialogService dialogService)
+        public LogsViewModel(IAdminApiService apiService, IDialogService dialogService)
         {
+            _apiService = apiService;
             _dialogService = dialogService;
         }
 
         [RelayCommand]
-        private void SearchLogs()
+        public async Task SearchLogsAsync()
         {
-            _ = _dialogService.ShowInfoAsync("Backend Support Required",
-                "System & action log querying (GET /api/admin/logs) is documented as a missing endpoint in Phase 1 and will be supported in Phase 2.");
+            if (IsBusy) return;
+            IsBusy = true;
+            try
+            {
+                var url = $"{ApiRoutes.Admin.AuditEvents}?limit=50";
+                var result = await _apiService.GetAsync<AuditEventCursorPageDTO>(url);
+                if (result.IsSuccess && result.Data != null)
+                {
+                    Logs.Clear();
+                    foreach (var item in result.Data.Items)
+                    {
+                        Logs.Add(item);
+                    }
+                }
+                else
+                {
+                    await _dialogService.ShowErrorAsync("Error", result.ErrorMessage ?? "Failed to load audit logs.");
+                }
+            }
+            finally
+            {
+                IsBusy = false;
+            }
         }
     }
 }

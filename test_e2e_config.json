@@ -1,0 +1,15 @@
+{
+  "vpn_profile": {
+    "uuid": "f02951e8-fb3b-456f-b079-0f8e553565b0",
+    "server_host": "edge.stealthy.co.in",
+    "server_port": 443,
+    "public_key": "EO7aALQ5lBwiu0pkQVrukY8leN9gySPjc_tCPURy_Co",
+    "short_id": "",
+    "sni": "dl.google.com",
+    "preferred_dns": "1.1.1.1"
+  },
+  "license_blob": {
+    "payload": "mock-payload",
+    "signature": "mock-signature"
+  }
+}

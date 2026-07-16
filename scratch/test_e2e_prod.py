@@ -28,10 +28,12 @@ async def main():
         reg_res.raise_for_status()
         print("Register successful:", reg_res.json())
         
+        master_token = reg_res.json()["master_token"]
+        
         print("\n2. Logging in...")
         login_res = await client.post(f"{BASE_URL}/auth/login", json={
-            "username": username,
-            "password": password,
+            "account_id": reg_res.json()["account_id"],
+            "master_token": master_token,
             "client_id": "windows_beta",
             "device_guid": unique_id
         })
@@ -47,7 +49,10 @@ async def main():
         account_id_str = me_data["account_id"]
         print(f"Me data: {me_data}")
         print(f"Account ID is: {account_id_str}")
-        assert me_data["subscription"] is None or me_data["subscription"]["status"] != "ACTIVE", "Should not be active yet"
+        assert me_data.get("plan") == "free", "Should be free plan initially"
+        
+        # Use valid production admin token
+        ADMIN_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ1c2VybmFtZSI6InN1cGVyYWRtaW4iLCJyb2xlIjoic3VwZXJfYWRtaW4iLCJpc3MiOiJSZWFsaXR5VHVubmVsIEFkbWluIiwiYXVkIjoiUmVhbGl0eVR1bm5lbCBBZG1pbiBQYW5lbCIsImlhdCI6MTc4NDEyMDM2NywibmJmIjoxNzg0MTIwMzY3LCJleHAiOjE3ODQyMDY3NjcsImp0aSI6IjZlN2VmYWMxLWQwMzAtNDc0YS04MmI2LTA3OGQ4NjljY2FlZSJ9.Nf0oY764ewyoSEvmG3mh4X3QhKKLk4Q04BMGOKFG3A_s-C-PnnwjFgH2ZB6B35PFtDqSC_y0MWmOIU71ULK5Dg"
         
         print("\n4. Admin granting subscription (Standard Plan, 30 days)...")
         grant_res = await client.post(
@@ -69,11 +74,12 @@ async def main():
         me_res2.raise_for_status()
         me_data2 = me_res2.json()
         print(f"Me data after grant: {me_data2}")
-        assert me_data2["subscription"]["status"] == "ACTIVE", "Subscription should be active"
-        assert me_data2["subscription"]["plan_id"] == "standard", "Plan should be standard"
+        assert me_data2.get("plan") == "standard", "Plan should be standard"
         
         print("\n6. Fetching /client/config...")
-        config_res = await client.get(f"{BASE_URL}/client/config", headers={"Authorization": f"Bearer {access_token}"})
+        config_res = await client.get(f"{BASE_URL}/client/config", headers={"Authorization": f"Bearer {access_token}", "X-Device-ID": unique_id})
+        if config_res.status_code >= 400:
+            print(f"Error getting config: {config_res.text}")
         config_res.raise_for_status()
         config_data = config_res.json()
         

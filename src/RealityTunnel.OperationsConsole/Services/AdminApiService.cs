@@ -97,7 +97,12 @@ namespace RealityTunnel.OperationsConsole.Services
                             return ApiResult<T>.Success(default!, (int)response.StatusCode);
                         }
 
-                        var data = await response.Content.ReadFromJsonAsync<T>(_jsonOptions, cancellationToken);
+                        var rawJson = await response.Content.ReadAsStringAsync(cancellationToken);
+                        if (route.Contains("/api/admin/dashboard"))
+                        {
+                            System.IO.File.WriteAllText(@"C:\Users\arun1\.gemini\antigravity-ide\brain\fd2c6752-4f1a-4ab6-8d6d-a5d946662fec\scratch\dashboard_response.json", rawJson);
+                        }
+                        var data = JsonSerializer.Deserialize<T>(rawJson, _jsonOptions);
                         return ApiResult<T>.Success(data!, (int)response.StatusCode);
                     }
 

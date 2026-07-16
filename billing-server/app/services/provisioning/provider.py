@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+import time
 
 
 @dataclass
@@ -25,6 +26,21 @@ class ProvisionedUserDTO:
     uuid: str | None = None
     links: list[str] = field(default_factory=list)
     last_ip: str | None = None
+
+
+@dataclass
+class RealityConfigDTO:
+    """
+    Unified authoritative REALITY inbound configuration fetched from the VPN edge.
+    Guarantees every client receives identical runtime configuration.
+    """
+    server_host: str
+    server_port: int
+    public_key: str
+    short_id: str
+    sni: str
+    inbound_tag: str
+    fetched_at: float = field(default_factory=time.time)
 
 
 class ProvisioningProvider(ABC):
@@ -88,5 +104,10 @@ class ProvisioningProvider(ABC):
     @abstractmethod
     async def health_check(self) -> bool:
         """Check connection health and readiness of the remote provisioning service."""
+        pass
+
+    @abstractmethod
+    async def get_reality_config(self) -> RealityConfigDTO:
+        """Fetch unified REALITY configuration from the provider."""
         pass
 

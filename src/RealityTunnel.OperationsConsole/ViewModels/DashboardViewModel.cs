@@ -16,31 +16,31 @@ namespace RealityTunnel.OperationsConsole.ViewModels
         private bool isBusy;
 
         [ObservableProperty]
-        private int activeSubscribers;
-
-        [ObservableProperty]
-        private int onlineUsers;
-
-        [ObservableProperty]
-        private decimal monthlyRevenueEst;
-
-        [ObservableProperty]
-        private int totalDevices;
+        private int totalAccounts;
 
         [ObservableProperty]
         private int activeSubscriptions;
 
         [ObservableProperty]
+        private int graceSubscriptions;
+
+        [ObservableProperty]
         private int expiredSubscriptions;
 
         [ObservableProperty]
-        private string bandwidthTodayFormatted = "0 B";
+        private int todayPayments;
 
         [ObservableProperty]
-        private string bandwidthMonthFormatted = "0 B";
+        private string todayRevenueFormatted = "$0.00";
 
         [ObservableProperty]
-        private int provisionQueuePending = 0;
+        private int provisioningFailures;
+
+        [ObservableProperty]
+        private int retryQueueSize;
+
+        [ObservableProperty]
+        private int activeAdmins;
 
         [ObservableProperty]
         private string lastUpdatedFormatted = "Never";
@@ -61,14 +61,15 @@ namespace RealityTunnel.OperationsConsole.ViewModels
                 var result = await _apiService.GetAsync<AdminDashboardDTO>(ApiRoutes.Admin.Dashboard);
                 if (result.IsSuccess && result.Data != null)
                 {
-                    ActiveSubscribers = result.Data.ActiveSubscribers;
-                    OnlineUsers = result.Data.OnlineUsers;
-                    MonthlyRevenueEst = result.Data.MonthlyRevenueEst;
-                    TotalDevices = result.Data.TotalDevices;
+                    TotalAccounts = result.Data.TotalAccounts;
                     ActiveSubscriptions = result.Data.ActiveSubscriptions;
+                    GraceSubscriptions = result.Data.GraceSubscriptions;
                     ExpiredSubscriptions = result.Data.ExpiredSubscriptions;
-                    BandwidthTodayFormatted = FormatBytes(result.Data.BandwidthTodayBytes);
-                    BandwidthMonthFormatted = FormatBytes(result.Data.BandwidthMonthBytes);
+                    TodayPayments = result.Data.TodayPayments;
+                    TodayRevenueFormatted = $"{(result.Data.TodayRevenueMinorUnits / 100m):C2}";
+                    ProvisioningFailures = result.Data.ProvisioningFailures;
+                    RetryQueueSize = result.Data.RetryQueueSize;
+                    ActiveAdmins = result.Data.ActiveAdmins;
                     LastUpdatedFormatted = DateTime.Now.ToString("HH:mm:ss");
                 }
                 else if (!result.IsUnauthorized && !result.IsForbidden)
@@ -76,11 +77,11 @@ namespace RealityTunnel.OperationsConsole.ViewModels
                     await _dialogService.ShowErrorAsync("Dashboard Error", result.ErrorMessage ?? "Failed to load dashboard metrics.");
                 }
 
-                // Load Provision Queue count
+                // Load Provision Queue count is now in DashboardDTO, but keeping retry queue API call just in case
                 var qRes = await _apiService.GetAsync<AdminRetryQueueDTO>(ApiRoutes.Admin.RetryQueue);
                 if (qRes.IsSuccess && qRes.Data != null)
                 {
-                    ProvisionQueuePending = qRes.Data.Total;
+                    RetryQueueSize = qRes.Data.Total;
                 }
             }
             finally

@@ -108,7 +108,7 @@ async def readyz() -> ReadyResponse:
 
 
 @router.get(
-    "/admin/health",
+    "/api/admin/system-health",
     summary="Deep diagnostics health check",
     response_model=AdminHealthResponse,
     dependencies=[Depends(get_current_admin)],

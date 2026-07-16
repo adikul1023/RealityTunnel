@@ -64,8 +64,7 @@
                                Appearance="Primary" 
                                HorizontalAlignment="Stretch" 
                                Height="40" 
-                               FontWeight="SemiBold"
-                               IsEnabled="{Binding IsBusy, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}"/>
+                               FontWeight="SemiBold" />
 
                     <ui:ProgressRing IsIndeterminate="True" HorizontalAlignment="Center" Margin="0,12,0,0"
                                      Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />

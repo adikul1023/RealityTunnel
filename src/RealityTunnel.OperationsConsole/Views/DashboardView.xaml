@@ -40,9 +40,9 @@
             <Border Grid.Column="0" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="12" Padding="20">
                 <Grid>
                     <StackPanel>
-                        <TextBlock Text="ACTIVE SUBSCRIBERS" FontSize="11" FontWeight="Bold" Foreground="#9CA3AF" Margin="0,0,0,8"/>
-                        <TextBlock Text="{Binding ActiveSubscribers}" FontSize="32" FontWeight="Bold" Foreground="#10B981" />
-                        <TextBlock Text="Total paying customers" FontSize="11" Foreground="#6B7280" Margin="0,4,0,0"/>
+                        <TextBlock Text="TOTAL ACCOUNTS" FontSize="11" FontWeight="Bold" Foreground="#9CA3AF" Margin="0,0,0,8"/>
+                        <TextBlock Text="{Binding TotalAccounts}" FontSize="32" FontWeight="Bold" Foreground="#10B981" />
+                        <TextBlock Text="Total registered accounts" FontSize="11" Foreground="#6B7280" Margin="0,4,0,0"/>
                     </StackPanel>
                     <ui:SymbolIcon Symbol="PeopleTeam24" FontSize="36" Foreground="#064E3B" HorizontalAlignment="Right" VerticalAlignment="Top"/>
                 </Grid>
@@ -52,9 +52,9 @@
             <Border Grid.Column="2" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="12" Padding="20">
                 <Grid>
                     <StackPanel>
-                        <TextBlock Text="ACTIVE SESSIONS" FontSize="11" FontWeight="Bold" Foreground="#9CA3AF" Margin="0,0,0,8"/>
-                        <TextBlock Text="{Binding OnlineUsers}" FontSize="32" FontWeight="Bold" Foreground="#60A5FA" />
-                        <TextBlock Text="Connected to VPN Gateways" FontSize="11" Foreground="#6B7280" Margin="0,4,0,0"/>
+                        <TextBlock Text="TODAY PAYMENTS" FontSize="11" FontWeight="Bold" Foreground="#9CA3AF" Margin="0,0,0,8"/>
+                        <TextBlock Text="{Binding TodayPayments}" FontSize="32" FontWeight="Bold" Foreground="#60A5FA" />
+                        <TextBlock Text="Payments processed today" FontSize="11" Foreground="#6B7280" Margin="0,4,0,0"/>
                     </StackPanel>
                     <ui:SymbolIcon Symbol="Pulse24" FontSize="36" Foreground="#1E3A8A" HorizontalAlignment="Right" VerticalAlignment="Top"/>
                 </Grid>
@@ -64,9 +64,9 @@
             <Border Grid.Column="4" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="12" Padding="20">
                 <Grid>
                     <StackPanel>
-                        <TextBlock Text="EST. MONTHLY REVENUE" FontSize="11" FontWeight="Bold" Foreground="#9CA3AF" Margin="0,0,0,8"/>
-                        <TextBlock Text="{Binding MonthlyRevenueEst, StringFormat='₹{0:N2}'}" FontSize="32" FontWeight="Bold" Foreground="#FBBF24" />
-                        <TextBlock Text="Based on active subscriptions" FontSize="11" Foreground="#6B7280" Margin="0,4,0,0"/>
+                        <TextBlock Text="TODAY REVENUE" FontSize="11" FontWeight="Bold" Foreground="#9CA3AF" Margin="0,0,0,8"/>
+                        <TextBlock Text="{Binding TodayRevenueFormatted}" FontSize="32" FontWeight="Bold" Foreground="#FBBF24" />
+                        <TextBlock Text="Revenue collected today" FontSize="11" Foreground="#6B7280" Margin="0,4,0,0"/>
                     </StackPanel>
                     <ui:SymbolIcon Symbol="Money24" FontSize="36" Foreground="#78350F" HorizontalAlignment="Right" VerticalAlignment="Top"/>
                 </Grid>
@@ -76,9 +76,9 @@
             <Border Grid.Column="6" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="12" Padding="20">
                 <Grid>
                     <StackPanel>
-                        <TextBlock Text="REGISTERED DEVICES" FontSize="11" FontWeight="Bold" Foreground="#9CA3AF" Margin="0,0,0,8"/>
-                        <TextBlock Text="{Binding TotalDevices}" FontSize="32" FontWeight="Bold" Foreground="#A78BFA" />
-                        <TextBlock Text="Across all customer profiles" FontSize="11" Foreground="#6B7280" Margin="0,4,0,0"/>
+                        <TextBlock Text="PROVISIONING FAILURES" FontSize="11" FontWeight="Bold" Foreground="#9CA3AF" Margin="0,0,0,8"/>
+                        <TextBlock Text="{Binding ProvisioningFailures}" FontSize="32" FontWeight="Bold" Foreground="#EF4444" />
+                        <TextBlock Text="Across all edge nodes" FontSize="11" Foreground="#6B7280" Margin="0,4,0,0"/>
                     </StackPanel>
                     <ui:SymbolIcon Symbol="Desktop24" FontSize="36" Foreground="#4C1D95" HorizontalAlignment="Right" VerticalAlignment="Top"/>
                 </Grid>
@@ -125,9 +125,9 @@
             <Border Grid.Column="4" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="12" Padding="20">
                 <Grid>
                     <StackPanel>
-                        <TextBlock Text="BANDWIDTH TODAY" FontSize="11" FontWeight="Bold" Foreground="#9CA3AF" Margin="0,0,0,8"/>
-                        <TextBlock Text="{Binding BandwidthTodayFormatted}" FontSize="26" FontWeight="Bold" Foreground="#34D399" />
-                        <TextBlock Text="Traversed across edge nodes" FontSize="11" Foreground="#6B7280" Margin="0,4,0,0"/>
+                        <TextBlock Text="GRACE SUBSCRIPTIONS" FontSize="11" FontWeight="Bold" Foreground="#9CA3AF" Margin="0,0,0,8"/>
+                        <TextBlock Text="{Binding GraceSubscriptions}" FontSize="26" FontWeight="Bold" Foreground="#34D399" />
+                        <TextBlock Text="Pending renewal or expiration" FontSize="11" Foreground="#6B7280" Margin="0,4,0,0"/>
                     </StackPanel>
                     <ui:SymbolIcon Symbol="ArrowTransfer24" FontSize="32" Foreground="#064E3B" HorizontalAlignment="Right" VerticalAlignment="Top"/>
                 </Grid>
@@ -137,9 +137,9 @@
             <Border Grid.Column="6" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="12" Padding="20">
                 <Grid>
                     <StackPanel>
-                        <TextBlock Text="BANDWIDTH MONTH" FontSize="11" FontWeight="Bold" Foreground="#9CA3AF" Margin="0,0,0,8"/>
-                        <TextBlock Text="{Binding BandwidthMonthFormatted}" FontSize="26" FontWeight="Bold" Foreground="#60A5FA" />
-                        <TextBlock Text="Billing period aggregate" FontSize="11" Foreground="#6B7280" Margin="0,4,0,0"/>
+                        <TextBlock Text="ACTIVE ADMINS" FontSize="11" FontWeight="Bold" Foreground="#9CA3AF" Margin="0,0,0,8"/>
+                        <TextBlock Text="{Binding ActiveAdmins}" FontSize="26" FontWeight="Bold" Foreground="#60A5FA" />
+                        <TextBlock Text="System operators" FontSize="11" Foreground="#6B7280" Margin="0,4,0,0"/>
                     </StackPanel>
                     <ui:SymbolIcon Symbol="DataUsage24" FontSize="32" Foreground="#1E3A8A" HorizontalAlignment="Right" VerticalAlignment="Top"/>
                 </Grid>
@@ -163,7 +163,7 @@
                 <Grid>
                     <StackPanel>
                         <TextBlock Text="PROVISION QUEUE" FontSize="11" FontWeight="Bold" Foreground="#9CA3AF" Margin="0,0,0,8"/>
-                        <TextBlock Text="{Binding ProvisionQueuePending, StringFormat='{}{0} pending'}" FontSize="28" FontWeight="Bold" Foreground="#FBBF24" />
+                        <TextBlock Text="{Binding RetryQueueSize, StringFormat='{}{0} pending'}" FontSize="28" FontWeight="Bold" Foreground="#FBBF24" />
                         <TextBlock Text="Failed or pending Marzban edge tunnel synchronizations" FontSize="11" Foreground="#6B7280" Margin="0,4,0,0"/>
                     </StackPanel>
                     <ui:SymbolIcon Symbol="ClockAlarm24" FontSize="32" Foreground="#B45309" HorizontalAlignment="Right" VerticalAlignment="Top"/>

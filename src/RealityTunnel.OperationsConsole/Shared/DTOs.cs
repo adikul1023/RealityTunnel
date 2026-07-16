@@ -141,29 +141,32 @@ namespace RealityTunnel.OperationsConsole.Shared
 
     public class AdminDashboardDTO
     {
-        [JsonPropertyName("active_subscribers")]
-        public int ActiveSubscribers { get; set; }
-
-        [JsonPropertyName("online_users")]
-        public int OnlineUsers { get; set; }
-
-        [JsonPropertyName("monthly_revenue_est")]
-        public decimal MonthlyRevenueEst { get; set; }
-
-        [JsonPropertyName("total_devices")]
-        public int TotalDevices { get; set; }
+        [JsonPropertyName("total_accounts")]
+        public int TotalAccounts { get; set; }
 
         [JsonPropertyName("active_subscriptions")]
         public int ActiveSubscriptions { get; set; }
 
+        [JsonPropertyName("grace_subscriptions")]
+        public int GraceSubscriptions { get; set; }
+
         [JsonPropertyName("expired_subscriptions")]
         public int ExpiredSubscriptions { get; set; }
 
-        [JsonPropertyName("bandwidth_today_bytes")]
-        public long BandwidthTodayBytes { get; set; }
+        [JsonPropertyName("today_payments")]
+        public int TodayPayments { get; set; }
 
-        [JsonPropertyName("bandwidth_month_bytes")]
-        public long BandwidthMonthBytes { get; set; }
+        [JsonPropertyName("today_revenue_minor_units")]
+        public int TodayRevenueMinorUnits { get; set; }
+
+        [JsonPropertyName("provisioning_failures")]
+        public int ProvisioningFailures { get; set; }
+
+        [JsonPropertyName("retry_queue_size")]
+        public int RetryQueueSize { get; set; }
+
+        [JsonPropertyName("active_admins")]
+        public int ActiveAdmins { get; set; }
     }
 
     public class AdminSubscriptionDTO
@@ -419,5 +422,56 @@ namespace RealityTunnel.OperationsConsole.Shared
 
         [JsonPropertyName("message")]
         public string Message { get; set; } = string.Empty;
+    }
+
+    public class AdminSystemConfigUpdateResponse
+    {
+        [JsonPropertyName("success")]
+        public bool Success { get; set; }
+
+        [JsonPropertyName("reloaded_services")]
+        public List<string> ReloadedServices { get; set; } = new();
+    }
+
+    public class AuditEventItemDTO
+    {
+        [JsonPropertyName("event_id")]
+        public string EventId { get; set; } = string.Empty;
+
+        [JsonPropertyName("timestamp")]
+        public string Timestamp { get; set; } = string.Empty;
+
+        [JsonPropertyName("event_type")]
+        public string EventType { get; set; } = string.Empty;
+
+        [JsonPropertyName("source")]
+        public string Source { get; set; } = string.Empty;
+
+        [JsonPropertyName("actor_id")]
+        public string? ActorId { get; set; }
+
+        [JsonPropertyName("target_id")]
+        public string? TargetId { get; set; }
+
+        [JsonPropertyName("details")]
+        public Dictionary<string, object>? Details { get; set; }
+
+        [JsonPropertyName("ip_hash")]
+        public string? IpHash { get; set; }
+    }
+
+    public class AuditEventCursorPageDTO
+    {
+        [JsonPropertyName("items")]
+        public List<AuditEventItemDTO> Items { get; set; } = new();
+
+        [JsonPropertyName("next_cursor")]
+        public string? NextCursor { get; set; }
+
+        [JsonPropertyName("prev_cursor")]
+        public string? PrevCursor { get; set; }
+
+        [JsonPropertyName("has_more")]
+        public bool HasMore { get; set; }
     }
 }

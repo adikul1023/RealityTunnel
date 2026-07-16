@@ -17,7 +17,7 @@ from app.services.exceptions import (
     ProvisioningUnavailableError,
     ProvisioningTimeoutError,
 )
-from app.services.provisioning.provider import ProvisioningProvider, ProvisionedUserDTO
+from app.services.provisioning.provider import ProvisioningProvider, ProvisionedUserDTO, RealityConfigDTO
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +41,8 @@ class MarzbanProvisioningProvider(ProvisioningProvider):
         self.timeout = timeout_seconds if timeout_seconds is not None else settings.marzban_timeout_seconds
         self.max_retries = max_retries if max_retries is not None else settings.marzban_max_retries
         self._external_client = client
+        self._cached_reality_config: RealityConfigDTO | None = None
+        self._cached_reality_time: float = 0.0
 
     @property
     def _headers(self) -> dict[str, str]:
@@ -316,3 +318,44 @@ class MarzbanProvisioningProvider(ProvisioningProvider):
         except Exception:
             logger.warning("Marzban health check failed")
             return False
+
+    async def get_reality_config(self) -> RealityConfigDTO:
+        import time
+        now = time.time()
+        if self._cached_reality_config and (now - self._cached_reality_time) < 300:
+            return self._cached_reality_config
+
+        path = "/api/inbounds"
+        try:
+            response = await self._request_with_retry("GET", path, expected_statuses=(200,))
+            data = response.json()
+            
+            target_inbound = None
+            if isinstance(data, dict) and "vless" in data:
+                inbounds = data["vless"]
+                target_inbound = next((ib for ib in inbounds if ib.get("tag") == "VLESS TCP REALITY"), None)
+            
+            if not target_inbound:
+                raise ProvisioningProviderError("VLESS TCP REALITY inbound not found in Marzban configuration")
+
+            stream_settings = target_inbound.get("stream_settings", {})
+            reality_settings = stream_settings.get("reality_settings", {})
+            server_names = reality_settings.get("server_names", [""])
+            short_ids = reality_settings.get("short_ids", [""])
+
+            config = RealityConfigDTO(
+                server_host=settings.vpn_server_ip,
+                server_port=target_inbound.get("port", 443),
+                public_key=reality_settings.get("public_key", ""),
+                short_id=short_ids[0] if short_ids else "",
+                sni=server_names[0] if server_names else "",
+                inbound_tag=target_inbound.get("tag", "VLESS TCP REALITY")
+            )
+            
+            self._cached_reality_config = config
+            self._cached_reality_time = now
+            return config
+        except ProvisioningProviderError:
+            raise
+        except Exception as exc:
+            raise ProvisioningProviderError("Failed to fetch REALITY configuration from Marzban") from exc
