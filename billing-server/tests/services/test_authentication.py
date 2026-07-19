@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import RepositoryError
-from app.models import SubscriptionStatus
+from app.models import AccountStatus
 from app.repositories import AccountRepository
 from app.security import hash_master_token
 from app.services import (
@@ -34,7 +34,7 @@ async def test_authenticate_success(db_session: AsyncSession, account_factory):
     acc = await account_factory(
         account_id="RT-AUTH-SUCC-0001",
         master_token_hash=token_hash,
-        status=SubscriptionStatus.ACTIVE,
+        status=AccountStatus.ACTIVE,
         subscription_expires_at=future_expiry,
     )
 
@@ -70,7 +70,7 @@ async def test_authenticate_wrong_master_token(db_session: AsyncSession, account
     await account_factory(
         account_id="RT-AUTH-WRONG-001",
         master_token_hash=token_hash,
-        status=SubscriptionStatus.ACTIVE,
+        status=AccountStatus.ACTIVE,
     )
 
     result = await service.authenticate("RT-AUTH-WRONG-001", "wrong_master_token_attempt")
@@ -91,7 +91,7 @@ async def test_authenticate_suspended_account(db_session: AsyncSession, account_
     acc = await account_factory(
         account_id="RT-AUTH-SUSP-001",
         master_token_hash=token_hash,
-        status=SubscriptionStatus.SUSPENDED,
+        status=AccountStatus.SUSPENDED,
     )
 
     result = await service.authenticate("RT-AUTH-SUSP-001", raw_token)
@@ -113,7 +113,7 @@ async def test_authenticate_pending_account(db_session: AsyncSession, account_fa
     acc = await account_factory(
         account_id="RT-AUTH-PEND-001",
         master_token_hash=token_hash,
-        status=SubscriptionStatus.PENDING,
+        status=AccountStatus.PENDING,
     )
 
     result = await service.authenticate("RT-AUTH-PEND-001", raw_token)
@@ -135,7 +135,7 @@ async def test_authenticate_expired_status(db_session: AsyncSession, account_fac
     acc = await account_factory(
         account_id="RT-AUTH-EXPS-001",
         master_token_hash=token_hash,
-        status=SubscriptionStatus.EXPIRED,
+        status=AccountStatus.EXPIRED,
     )
 
     result = await service.authenticate("RT-AUTH-EXPS-001", raw_token)
@@ -158,7 +158,7 @@ async def test_authenticate_expired_timestamp(db_session: AsyncSession, account_
     acc = await account_factory(
         account_id="RT-AUTH-EXPT-001",
         master_token_hash=token_hash,
-        status=SubscriptionStatus.ACTIVE,
+        status=AccountStatus.ACTIVE,
         subscription_expires_at=past_expiry,
     )
 
@@ -214,21 +214,21 @@ async def test_get_active_account_by_uuid_validation(db_session: AsyncSession, a
     repo = AccountRepository(db_session)
     service = AuthenticationService(repo)
 
-    active_acc = await account_factory(account_id="RT-ACT-001", status=SubscriptionStatus.ACTIVE)
+    active_acc = await account_factory(account_id="RT-ACT-001", status=AccountStatus.ACTIVE)
     res_active = await service.get_active_account_by_uuid(active_acc.id)
     assert res_active.id == active_acc.id
 
-    susp_acc = await account_factory(account_id="RT-SUSP-001", status=SubscriptionStatus.SUSPENDED)
+    susp_acc = await account_factory(account_id="RT-SUSP-001", status=AccountStatus.SUSPENDED)
     with pytest.raises(AccountNotActiveError) as exc_info:
         await service.get_active_account_by_uuid(susp_acc.id)
     assert "suspended" in str(exc_info.value).lower()
 
-    pend_acc = await account_factory(account_id="RT-PEND-001", status=SubscriptionStatus.PENDING)
+    pend_acc = await account_factory(account_id="RT-PEND-001", status=AccountStatus.PENDING)
     with pytest.raises(AccountNotActiveError) as exc_info:
         await service.get_active_account_by_uuid(pend_acc.id)
     assert "pending" in str(exc_info.value).lower()
 
-    exp_acc = await account_factory(account_id="RT-EXP-001", status=SubscriptionStatus.EXPIRED)
+    exp_acc = await account_factory(account_id="RT-EXP-001", status=AccountStatus.EXPIRED)
     with pytest.raises(AccountNotActiveError) as exc_info:
         await service.get_active_account_by_uuid(exp_acc.id)
     assert "expired" in str(exc_info.value).lower()
@@ -236,7 +236,7 @@ async def test_get_active_account_by_uuid_validation(db_session: AsyncSession, a
     past_expiry = datetime.now(timezone.utc) - timedelta(minutes=5)
     expt_acc = await account_factory(
         account_id="RT-EXPT-001",
-        status=SubscriptionStatus.ACTIVE,
+        status=AccountStatus.ACTIVE,
         subscription_expires_at=past_expiry,
     )
     with pytest.raises(AccountNotActiveError) as exc_info:

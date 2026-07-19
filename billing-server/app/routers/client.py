@@ -44,7 +44,7 @@ from fastapi import Header
 from app.services.provisioning.service import ProvisioningService
 from app.dependencies import get_provisioning_service
 from app.config import settings
-from app.models.base import SubscriptionStatus
+from app.models.base import AccountStatus
 
 @router.get(
     "/config",
@@ -71,7 +71,7 @@ async def get_client_config(
         raise HTTPException(status_code=401, detail="Device not registered")
         
     # Verify Active Subscription
-    if current_account.status != SubscriptionStatus.ACTIVE:
+    if current_account.status != AccountStatus.ACTIVE:
         raise HTTPException(status_code=403, detail="Account requires an active subscription")
 
     # Retrieve cached VPN identity (lazy-syncing legacy users if needed)

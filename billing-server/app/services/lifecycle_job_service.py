@@ -15,7 +15,8 @@ import time
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.observability import metrics_registry
 
-from app.models import ProvisioningState, RetryItemStatus, SubscriptionLifecycleStatus
+from app.models import ProvisioningProfile, ProvisioningState, SubscriptionLifecycleStatus
+from app.models.provisioning_retry import ProvisioningRetryItem, RetryItemStatus, ProvisioningAction
 from app.repositories import (
     SubscriptionRepository,
     PaymentRepository,
@@ -210,7 +211,8 @@ class LifecycleJobService:
                 await self.session.rollback()
 
         try:
-            from app.core.feature_flags import flags
+            from app.core.feature_flags import FeatureFlags
+            flags = FeatureFlags.from_env()
             if not flags.payments_enabled:
                 payment_ok = True
                 message = "Payment Gateway disabled via PAYMENTS_ENABLED"
@@ -282,12 +284,23 @@ class LifecycleJobService:
         for item in pending_items:
             item_id = item.id
             try:
-                await self.provisioning_service.provision_subscription(
-                    item.account_id,
-                    item.plan_id,
-                    expire_at=item.expires_at,
-                    commit=True,
-                )
+                if item.action == ProvisioningAction.TERMINATE:
+                    await self.provisioning_service.terminate_subscription(
+                        item.account_id,
+                        commit=True,
+                    )
+                elif item.action == ProvisioningAction.SUSPEND:
+                    await self.provisioning_service.suspend_subscription(
+                        item.account_id,
+                        commit=True,
+                    )
+                else:
+                    await self.provisioning_service.provision_subscription(
+                        item.account_id,
+                        item.plan_id,
+                        expire_at=item.expires_at,
+                        commit=True,
+                    )
                 item.status = RetryItemStatus.COMPLETED
                 item.updated_at = datetime.now(timezone.utc)
                 await self.retry_repo.update(item, commit=True)

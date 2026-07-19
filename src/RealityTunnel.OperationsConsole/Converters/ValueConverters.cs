@@ -62,4 +62,48 @@ namespace RealityTunnel.OperationsConsole.Converters
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
             throw new NotImplementedException();
     }
+
+    /// <summary>
+    /// Shows a UI element only when the bound string matches the ConverterParameter (case-insensitive).
+    /// Use Invert=true to show when it does NOT match.
+    /// Example: Visibility="{Binding Status, Converter={StaticResource StatusEqVis}, ConverterParameter=active}"
+    /// </summary>
+    public class StringEqualsToVisibilityConverter : IValueConverter
+    {
+        public bool Invert { get; set; } = false;
+
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            string strValue = value?.ToString() ?? string.Empty;
+            string match = parameter?.ToString() ?? string.Empty;
+            bool equals = strValue.Equals(match, StringComparison.OrdinalIgnoreCase);
+            if (Invert) equals = !equals;
+            return equals ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+            throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Shows a UI element when the bound string matches ANY of the pipe-separated ConverterParameter values.
+    /// Example: ConverterParameter="active|grace"
+    /// </summary>
+    public class StringInSetToVisibilityConverter : IValueConverter
+    {
+        public bool Invert { get; set; } = false;
+
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            string strValue = value?.ToString() ?? string.Empty;
+            string paramStr = parameter?.ToString() ?? string.Empty;
+            var matches = paramStr.Split('|');
+            bool found = Array.Exists(matches, m => m.Equals(strValue, StringComparison.OrdinalIgnoreCase));
+            if (Invert) found = !found;
+            return found ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+            throw new NotImplementedException();
+    }
 }

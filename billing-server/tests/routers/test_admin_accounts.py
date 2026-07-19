@@ -21,7 +21,7 @@ import uuid
 import pytest
 import pytest_asyncio
 
-from app.models import SubscriptionStatus
+from app.models import AccountStatus
 from app.security import hash_master_token
 
 pytestmark = pytest.mark.asyncio
@@ -118,7 +118,7 @@ async def test_get_account_requires_auth(async_client):
 
 
 async def test_suspend_account_super_admin(async_client, account_factory, admin_auth_headers_factory):
-    acc = await account_factory(account_id="TEST-SUSP-001", status=SubscriptionStatus.ACTIVE)
+    acc = await account_factory(account_id="TEST-SUSP-001", status=AccountStatus.ACTIVE)
     headers, _ = await admin_auth_headers_factory(is_super_admin=True)
 
     resp = await async_client.patch(f"/api/admin/accounts/{acc.account_id}/suspend", headers=headers)
@@ -143,7 +143,7 @@ async def test_suspend_account_unknown(async_client, admin_auth_headers_factory)
 
 
 async def test_suspend_idempotent(async_client, account_factory, admin_auth_headers_factory):
-    acc = await account_factory(account_id="TEST-SUSP-IDEM", status=SubscriptionStatus.ACTIVE)
+    acc = await account_factory(account_id="TEST-SUSP-IDEM", status=AccountStatus.ACTIVE)
     headers, _ = await admin_auth_headers_factory(is_super_admin=True)
 
     for _ in range(3):
@@ -156,7 +156,7 @@ async def test_suspend_idempotent(async_client, account_factory, admin_auth_head
 
 
 async def test_activate_account_super_admin(async_client, account_factory, admin_auth_headers_factory):
-    acc = await account_factory(account_id="TEST-ACT-001", status=SubscriptionStatus.SUSPENDED)
+    acc = await account_factory(account_id="TEST-ACT-001", status=AccountStatus.SUSPENDED)
     headers, _ = await admin_auth_headers_factory(is_super_admin=True)
 
     resp = await async_client.patch(f"/api/admin/accounts/{acc.account_id}/activate", headers=headers)
@@ -178,7 +178,7 @@ async def test_activate_account_readonly_admin_forbidden(async_client, account_f
 
 
 async def test_extend_subscription_super_admin(async_client, account_factory, admin_auth_headers_factory):
-    acc = await account_factory(account_id="TEST-EXT-001", status=SubscriptionStatus.ACTIVE)
+    acc = await account_factory(account_id="TEST-EXT-001", status=AccountStatus.ACTIVE)
     headers, _ = await admin_auth_headers_factory(is_super_admin=True)
 
     resp = await async_client.patch(
@@ -205,7 +205,7 @@ async def test_extend_subscription_readonly_admin_forbidden(async_client, accoun
 
 
 async def test_extend_subscription_expired_reactivates(async_client, account_factory, admin_auth_headers_factory):
-    acc = await account_factory(account_id="TEST-EXT-003", status=SubscriptionStatus.EXPIRED)
+    acc = await account_factory(account_id="TEST-EXT-003", status=AccountStatus.EXPIRED)
     headers, _ = await admin_auth_headers_factory(is_super_admin=True)
 
     resp = await async_client.patch(

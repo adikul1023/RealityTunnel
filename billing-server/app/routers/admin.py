@@ -158,7 +158,50 @@ async def get_unified_account(
     except AdminAccountNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
     except AdminServiceError as exc:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Service error")
+
+
+@router.delete(
+    "/accounts/{account_id}",
+    summary="Logically delete an account (super-admin only)",
+    response_model=AdminAccountResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {"description": "Admin authentication required"},
+        403: {"description": "Super-admin privilege required"},
+        404: {"description": "Account not found"},
+    },
+)
+async def delete_account(
+    account_id: str,
+    current_admin: AdminUser = Depends(require_super_admin),
+    admin_account_service: AdminAccountService = Depends(get_admin_account_service),
+) -> AdminAccountResponse:
+    """
+    Logically delete a customer account. Sets status to DELETED, revokes all refresh tokens,
+    and terminates VPN provisioning in Marzban immediately.
+    Leaves audit logs and payment history intact.
+    """
+    logger.info("Admin %s logically deleting account %s", current_admin.id, account_id)
+    try:
+        account = await admin_account_service.delete_account(account_id)
+        
+        await audit_service.record_event(
+            event_type="account_deletion",
+            actor_id=str(current_admin.id),
+            target_id=account_id,
+            details={
+                "action": "delete_account",
+                "account_id": account_id,
+                "source": "operator",
+            },
+        )
+    except AdminAccountNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
+    except AdminServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Service error")
+    
+    return _build_account_dto(account)
 
 
 @router.patch(

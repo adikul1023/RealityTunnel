@@ -12,7 +12,7 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import AsyncSessionLocal
-from app.models import Account, SubscriptionStatus
+from app.models import Account, AccountStatus
 from app.repositories import AccountRepository
 
 
@@ -53,7 +53,7 @@ async def account_factory(db_session: AsyncSession) -> AsyncGenerator[Callable[.
         account_id: str | None = None,
         master_token_hash: str | None = None,
         marzban_username: str | None = None,
-        status: SubscriptionStatus = SubscriptionStatus.ACTIVE,
+        status: AccountStatus = AccountStatus.ACTIVE,
         subscription_expires_at=None,
         **kwargs,
     ) -> Account:

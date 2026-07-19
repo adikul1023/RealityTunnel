@@ -1,7 +1,7 @@
 """
 Models package for RealityTunnel Billing/Auth API.
 """
-from app.models.base import SubscriptionStatus, SubscriptionLifecycleStatus, TimestampMixin
+from app.models.base import AccountStatus, SubscriptionLifecycleStatus, TimestampMixin
 from app.models.account import Account
 from app.models.device import Device
 from app.models.refresh_token import RefreshToken
@@ -17,7 +17,7 @@ from app.models.audit_event import AuditEvent
 from app.models.exchange_token import ExchangeToken
 
 __all__ = [
-    "SubscriptionStatus",
+    "AccountStatus",
     "SubscriptionLifecycleStatus",
     "TimestampMixin",
     "Account",

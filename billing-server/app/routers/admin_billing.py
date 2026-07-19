@@ -24,6 +24,8 @@ from app.services.admin_billing_dtos import (
     AdminSubscriptionListDTO,
     AdminSubscriptionRenewRequest,
     AdminSubscriptionGraceRequest,
+    AdminSubscriptionRevokeRequest,
+    AdminSubscriptionPlanRequest,
     AdminPaymentDTO,
     AdminPaymentListDTO,
     AdminPaymentResolveRequest,
@@ -212,6 +214,56 @@ async def cancel_subscription(
         return result
     except Exception as exc:
         _handle_error(exc, "cancel_subscription")
+
+
+@router.post(
+    "/subscription/{id}/revoke",
+    response_model=AdminSubscriptionDTO,
+    summary="Revoke subscription",
+)
+async def revoke_subscription(
+    id: str,
+    body: AdminSubscriptionRevokeRequest,
+    _admin: AdminUser = Depends(require_super_admin),
+    service: AdminBillingService = Depends(get_admin_billing_service),
+) -> AdminSubscriptionDTO:
+    """Administratively revoke a subscription."""
+    try:
+        result = await service.revoke_subscription(id, str(_admin.id), body.reason)
+        await audit_service.record_event(
+            event_type="subscription_change",
+            actor_id=str(_admin.id),
+            target_id=id,
+            details={"action": "revoke_subscription", "subscription_id": id, "reason": body.reason},
+        )
+        return result
+    except Exception as exc:
+        _handle_error(exc, "revoke_subscription")
+
+
+@router.put(
+    "/subscription/{id}/plan",
+    response_model=AdminSubscriptionDTO,
+    summary="Change subscription plan",
+)
+async def edit_subscription_plan(
+    id: str,
+    body: AdminSubscriptionPlanRequest,
+    _admin: AdminUser = Depends(require_super_admin),
+    service: AdminBillingService = Depends(get_admin_billing_service),
+) -> AdminSubscriptionDTO:
+    """Administratively change a subscription's plan."""
+    try:
+        result = await service.edit_plan(id, body.new_plan_id)
+        await audit_service.record_event(
+            event_type="subscription_change",
+            actor_id=str(_admin.id),
+            target_id=id,
+            details={"action": "edit_subscription_plan", "subscription_id": id, "new_plan_id": body.new_plan_id},
+        )
+        return result
+    except Exception as exc:
+        _handle_error(exc, "edit_subscription_plan")
 
 
 @router.post(
@@ -549,3 +601,28 @@ async def get_system_health(
         return await service.get_system_health()
     except Exception as exc:
         _handle_error(exc, "get_system_health")
+
+
+@router.get(
+    "/plans",
+    response_model=list[dict],
+    summary="List all available subscription plans",
+)
+async def list_admin_plans(
+    admin: AdminUser = Depends(get_current_admin)
+) -> list[dict]:
+    """
+    Returns a list of all subscription plans available in the system.
+    Sourced from the immutable PLANS_REGISTRY — the single source of truth.
+    Requires admin privileges.
+    """
+    from app.models.subscription_plan import PLANS_REGISTRY
+    plans = []
+    for plan_id, plan in PLANS_REGISTRY.items():
+        plans.append({
+            "id": plan_id,
+            "name": plan.display_name,
+            "data_limit_bytes": plan.data_quota_bytes,
+            "price_minor_units": plan.price_minor_units
+        })
+    return plans

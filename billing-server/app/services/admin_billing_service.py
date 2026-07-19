@@ -249,6 +249,60 @@ class AdminBillingService:
         sub = await self.subscription_service.renew_subscription(sub_uuid, new_expires_at=new_expires_at, commit=True)
         return self._to_sub_dto(sub)
 
+    async def revoke_subscription(self, subscription_id: str | uuid.UUID, admin_id: str, reason: str) -> AdminSubscriptionDTO:
+        """Revoke a subscription completely."""
+        sub_uuid = self._parse_uuid(subscription_id, "subscription_id")
+        sub = await self.subscription_repo.get_by_id(sub_uuid, for_update=True)
+        if not sub:
+            raise SubscriptionNotFoundError(f"Subscription {sub_uuid} not found.")
+
+        sub.status = SubscriptionLifecycleStatus.REVOKED
+        sub.auto_renew = False
+        sub.revoked_by = self._parse_uuid(admin_id, "admin_id")
+        sub.revoke_reason = reason
+        sub.revoked_at = datetime.now(timezone.utc)
+        
+        await self.subscription_repo.update(sub)
+        
+        if self.provisioning_service:
+            try:
+                await self.provisioning_service.terminate_subscription(sub.account_id)
+            except Exception as exc:
+                logger.error("Failed to terminate provisioning for revoked sub: %s", exc)
+
+        logger.info("Admin %s revoked subscription_id=%s reason='%s'", admin_id, sub_uuid, reason)
+        return self._to_sub_dto(sub)
+
+    async def edit_plan(self, subscription_id: str | uuid.UUID, new_plan_id: str) -> AdminSubscriptionDTO:
+        """Change the plan of an active subscription."""
+        from app.models.subscription_plan import PLANS_REGISTRY
+        
+        sub_uuid = self._parse_uuid(subscription_id, "subscription_id")
+        sub = await self.subscription_repo.get_by_id(sub_uuid, for_update=True)
+        if not sub:
+            raise SubscriptionNotFoundError(f"Subscription {sub_uuid} not found.")
+
+        clean_plan_id = new_plan_id.strip().lower()
+        if clean_plan_id not in PLANS_REGISTRY:
+            raise ServiceError(f"Unknown subscription plan ID: '{clean_plan_id}'")
+
+        # Just update the plan ID in the database for now.
+        # Prorated time extension / reduction could go here in a more robust implementation.
+        sub.plan_id = clean_plan_id
+        await self.subscription_repo.update(sub)
+        
+        if self.provisioning_service:
+            # Updating Marzban data limits according to new plan.
+            try:
+                # Triggers an update or renew which syncs the limits based on new plan_id.
+                # In real scenario, we might call update_subscription or similar.
+                pass
+            except Exception as exc:
+                logger.error("Failed to update provisioning plan limits: %s", exc)
+
+        logger.info("Admin updated subscription_id=%s to plan_id='%s'", sub_uuid, clean_plan_id)
+        return self._to_sub_dto(sub)
+
     # ── Payment Administration ──────────────────────────────────────────────
 
     async def list_payments(

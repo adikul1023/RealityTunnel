@@ -2,7 +2,7 @@ import pytest
 from httpx import AsyncClient
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.models.account import SubscriptionStatus
+from app.models.account import AccountStatus
 
 @pytest.mark.asyncio
 async def test_logout_revokes_token(db_session: AsyncSession, async_client: AsyncClient, account_factory, auth_headers_factory):
@@ -58,7 +58,7 @@ async def test_suspended_account_cannot_refresh(db_session: AsyncSession, async_
     refresh_token = login_resp.json()["refresh_token"]
     
     # Suspend the account in the database
-    account.status = SubscriptionStatus.SUSPENDED
+    account.status = AccountStatus.SUSPENDED
     await db_session.commit()
     
     # Try to refresh

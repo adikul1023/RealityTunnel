@@ -11,7 +11,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import Uuid
 
 from app.database import Base
-from app.models.base import SubscriptionStatus, TimestampMixin
+from app.models.base import AccountStatus, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.device import Device
@@ -53,18 +53,21 @@ class Account(Base, TimestampMixin):
         default="free",
         server_default="free",
     )
-    status: Mapped[SubscriptionStatus] = mapped_column(
+    status: Mapped[AccountStatus] = mapped_column(
         SQLEnum(
-            SubscriptionStatus,
-            name="subscription_status",
+            AccountStatus,
+            name="account_status",
             create_constraint=True,
             native_enum=True,
         ),
-        default=SubscriptionStatus.PENDING,
+        default=AccountStatus.PENDING,
         nullable=False,
         index=True,
     )
     subscription_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), index=True, nullable=True
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), index=True, nullable=True
     )
 

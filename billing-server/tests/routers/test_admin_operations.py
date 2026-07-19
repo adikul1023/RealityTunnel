@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import pytest
 import pytest_asyncio
-from app.models import SubscriptionStatus
+from app.models import AccountStatus
 from app.security_hardening.audit import audit_service
 
 pytestmark = pytest.mark.asyncio
@@ -122,7 +122,7 @@ async def test_version_endpoint_success(async_client, admin_auth_headers_factory
 async def test_unified_account_lookup_success(
     async_client, account_factory, admin_auth_headers_factory, device_service
 ):
-    acc = await account_factory(account_id="TEST-OPS-UNI-01", status=SubscriptionStatus.ACTIVE)
+    acc = await account_factory(account_id="TEST-OPS-UNI-01", status=AccountStatus.ACTIVE)
     await device_service.register_device(acc.id, "device-ops-1")
 
     headers, _ = await admin_auth_headers_factory(is_super_admin=False)
@@ -154,7 +154,7 @@ async def test_unified_account_lookup_not_found(async_client, admin_auth_headers
 async def test_delete_device_super_admin_success(
     async_client, account_factory, admin_auth_headers_factory, device_service
 ):
-    acc = await account_factory(account_id="TEST-OPS-DEV-01", status=SubscriptionStatus.ACTIVE)
+    acc = await account_factory(account_id="TEST-OPS-DEV-01", status=AccountStatus.ACTIVE)
     await device_service.register_device(acc.id, "dev-remove-1")
     await device_service.register_device(acc.id, "dev-keep-2")
 

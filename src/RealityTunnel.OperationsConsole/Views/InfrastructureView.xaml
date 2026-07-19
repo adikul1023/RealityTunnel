@@ -65,16 +65,10 @@
                             <!-- Disabled action buttons per Step 0 API audit -->
                             <StackPanel Grid.Row="3" Orientation="Horizontal">
                                 <ui:Button Content="Restart Service" Appearance="Secondary" Height="28" Padding="10,1" FontSize="11" Margin="0,0,8,0"
-                                           IsEnabled="{Binding DataContext.CanRestartServices, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                           ToolTip="{Binding DataContext.RestartButtonsTooltip, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                           Command="{Binding DataContext.RestartServiceActionCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                           CommandParameter="{Binding ComponentName}"/>
-
-                                <ui:Button Content="Reload Engine" Appearance="Secondary" Height="28" Padding="10,1" FontSize="11"
-                                           IsEnabled="{Binding DataContext.CanRestartServices, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                           ToolTip="{Binding DataContext.ReloadXrayTooltip, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                           Command="{Binding DataContext.ReloadXrayActionCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                           Visibility="{Binding ComponentKey, Converter={StaticResource NullToVis}}"/>
+                                           IsEnabled="{Binding DataContext.CanRestartServices, RelativeSource={RelativeSource AncestorType={x:Type ItemsControl}}}"
+                                           ToolTip="{Binding DataContext.RestartButtonsTooltip, RelativeSource={RelativeSource AncestorType={x:Type ItemsControl}}}"
+                                           Command="{Binding DataContext.RestartServiceActionCommand, RelativeSource={RelativeSource AncestorType={x:Type ItemsControl}}}"
+                                           CommandParameter="{Binding ComponentKey}"/>
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -114,16 +108,16 @@
                             <DataGridTemplateColumn Header="SUPER-ADMIN" Width="*">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <StackPanel Orientation="Horizontal" Visibility="{Binding DataContext.IsSuperAdmin, RelativeSource={RelativeSource AncestorType=DataGrid}, Converter={StaticResource BoolToVis}}">
+                                        <StackPanel Orientation="Horizontal" Visibility="{Binding DataContext.IsSuperAdmin, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}, Converter={StaticResource BoolToVis}}">
                                             <ui:Button Content="Retry Now" Appearance="Primary" Height="24" Padding="8,1" FontSize="11" Margin="0,0,6,0"
-                                                       IsEnabled="{Binding DataContext.CanExecuteAdvancedRecovery, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                                       ToolTip="{Binding DataContext.AdvancedRecoveryTooltip, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                                       Command="{Binding DataContext.RetryItemNowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                       IsEnabled="{Binding DataContext.CanExecuteAdvancedRecovery, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
+                                                       ToolTip="{Binding DataContext.AdvancedRecoveryTooltip, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
+                                                       Command="{Binding DataContext.RetryItemNowCommand, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
                                                        CommandParameter="{Binding}"/>
                                             <ui:Button Content="Discard" Appearance="Danger" Height="24" Padding="8,1" FontSize="11"
-                                                       IsEnabled="{Binding DataContext.CanExecuteAdvancedRecovery, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                                       ToolTip="{Binding DataContext.AdvancedRecoveryTooltip, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                                       Command="{Binding DataContext.DiscardRetryItemCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                       IsEnabled="{Binding DataContext.CanExecuteAdvancedRecovery, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
+                                                       ToolTip="{Binding DataContext.AdvancedRecoveryTooltip, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
+                                                       Command="{Binding DataContext.DiscardRetryItemCommand, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
                                                        CommandParameter="{Binding}"/>
                                         </StackPanel>
                                     </DataTemplate>
@@ -146,15 +140,54 @@
                             <ui:SymbolIcon Symbol="SaveCopy24" FontSize="20" Foreground="#34D399" Margin="0,0,8,0"/>
                             <TextBlock Text="Disaster Recovery &amp; Database Backups" FontSize="14" FontWeight="Bold" Foreground="White"/>
                         </StackPanel>
-                        <ui:Button Content="Snapshot Now" Appearance="Primary" Icon="{ui:SymbolIcon AddCircle24}" Height="30" HorizontalAlignment="Right"
-                                   IsEnabled="{Binding CanExecuteAdvancedRecovery}"
-                                   ToolTip="{Binding AdvancedRecoveryTooltip}"
-                                   Command="{Binding CreateBackupSnapshotCommand}"
-                                   Visibility="{Binding IsSuperAdmin, Converter={StaticResource BoolToVis}}"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <ui:Button Content="Prune Expired" Appearance="Danger" Height="30" Margin="0,0,8,0"
+                                       IsEnabled="{Binding CanExecuteAdvancedRecovery}"
+                                       Command="{Binding PruneBackupsCommand}"
+                                       Visibility="{Binding IsSuperAdmin, Converter={StaticResource BoolToVis}}"/>
+                            <ui:Button Content="Snapshot Now" Appearance="Primary" Icon="{ui:SymbolIcon AddCircle24}" Height="30"
+                                       IsEnabled="{Binding CanExecuteAdvancedRecovery}"
+                                       ToolTip="{Binding AdvancedRecoveryTooltip}"
+                                       Command="{Binding CreateBackupSnapshotCommand}"
+                                       Visibility="{Binding IsSuperAdmin, Converter={StaticResource BoolToVis}}"/>
+                        </StackPanel>
                     </Grid>
 
-                    <TextBlock Grid.Row="1" Text="Automated snapshots and recovery archives stored on remote Oracle cloud volume (/opt/realitytunnel/backups). Select snapshot or initiate live manual snapshot above."
-                               Foreground="#9CA3AF" FontSize="12" TextWrapping="Wrap" Margin="0,12,0,0"/>
+                    <DataGrid Grid.Row="1" ItemsSource="{Binding Backups}" AutoGenerateColumns="False" CanUserAddRows="False"
+                              HeadersVisibility="Column" GridLinesVisibility="None" Background="Transparent" BorderThickness="0"
+                              RowBackground="Transparent" AlternatingRowBackground="#0D121F" Foreground="White" FontSize="12">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="BACKUP ID" Binding="{Binding BackupId}" Width="160">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="FontWeight" Value="Bold"/>
+                                        <Setter Property="Foreground" Value="#34D399"/>
+                                        <Setter Property="VerticalAlignment" Value="Center"/>
+                                        <Setter Property="Padding" Value="4,0,0,0"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="CREATED" Binding="{Binding CreatedAt, StringFormat='MM/dd/yyyy HH:mm'}" Width="120"/>
+                            <DataGridTextColumn Header="VERSION" Binding="{Binding ApplicationVersion}" Width="70"/>
+                            <DataGridTextColumn Header="DB REV" Binding="{Binding PostgresRevision}" Width="100"/>
+                            <DataGridTextColumn Header="SIZE (B)" Binding="{Binding BackupSizeBytes}" Width="80"/>
+
+                            <DataGridTemplateColumn Header="ACTIONS" Width="*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal" Visibility="{Binding DataContext.IsSuperAdmin, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}, Converter={StaticResource BoolToVis}}">
+                                            <ui:Button Content="Preview" Appearance="Secondary" Height="24" Padding="8,1" FontSize="11" Margin="0,0,6,0"
+                                                       Command="{Binding DataContext.PreviewBackupCommand, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
+                                                       CommandParameter="{Binding}"/>
+                                            <ui:Button Content="Verify" Appearance="Secondary" Height="24" Padding="8,1" FontSize="11" Margin="0,0,6,0"
+                                                       Command="{Binding DataContext.VerifyBackupCommand, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
+                                                       CommandParameter="{Binding}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
                 </Grid>
             </Border>
         </Grid>

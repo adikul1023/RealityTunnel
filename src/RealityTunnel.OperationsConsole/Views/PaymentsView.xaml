@@ -76,12 +76,12 @@
                 <DataGridTemplateColumn Header="RECONCILIATION CONTROLS" Width="*">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <StackPanel Orientation="Horizontal" Visibility="{Binding DataContext.IsSuperAdmin, RelativeSource={RelativeSource AncestorType=DataGrid}, Converter={StaticResource BoolToVis}}">
+                            <StackPanel Orientation="Horizontal" Visibility="{Binding DataContext.IsSuperAdmin, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}, Converter={StaticResource BoolToVis}}">
                                 <ui:Button Content="Reconcile Gateway" Appearance="Secondary" Height="28" Padding="12,2" FontSize="11" Margin="0,0,8,0"
-                                           Command="{Binding DataContext.ReconcileCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                           Command="{Binding DataContext.ReconcileCommand, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
                                            CommandParameter="{Binding}"/>
                                 <ui:Button Content="Manual Resolve" Appearance="Primary" Height="28" Padding="12,2" FontSize="11"
-                                           Command="{Binding DataContext.ResolveCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                           Command="{Binding DataContext.ResolveCommand, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
                                            CommandParameter="{Binding}"/>
                             </StackPanel>
                         </DataTemplate>

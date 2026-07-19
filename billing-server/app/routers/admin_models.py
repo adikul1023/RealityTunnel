@@ -36,3 +36,13 @@ class AdminProfileResponse(BaseModel):
     is_active: bool = Field(..., description="Whether the account is active")
     is_super_admin: bool = Field(..., description="Whether the account has super admin privileges")
     mfa_enabled: bool = Field(..., description="Whether MFA is enabled on this account")
+
+class AdminChangePasswordRequest(BaseModel):
+    """Payload for POST /api/admin/change-password."""
+    current_password: str = Field(..., description="Current administrative password")
+    new_password: str = Field(..., description="New administrative password")
+
+
+class AdminChangePasswordResponse(BaseModel):
+    """Response for POST /api/admin/change-password."""
+    message: str = Field(..., description="Result message")

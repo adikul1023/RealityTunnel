@@ -27,6 +27,15 @@ class RetryItemStatus(str, Enum):
     FAILED = "FAILED"
 
 
+class ProvisioningAction(str, Enum):
+    """
+    Action to retry.
+    """
+    PROVISION = "PROVISION"
+    TERMINATE = "TERMINATE"
+    SUSPEND = "SUSPEND"
+
+
 class ProvisioningRetryItem(Base, TimestampMixin):
     """
     ProvisioningRetryItem table (provisioning_retry_queue).
@@ -49,6 +58,11 @@ class ProvisioningRetryItem(Base, TimestampMixin):
     )
     plan_id: Mapped[str] = mapped_column(
         String(50),
+        nullable=False,
+    )
+    action: Mapped[ProvisioningAction] = mapped_column(
+        SQLEnum(ProvisioningAction, name="provisioning_action"),
+        default=ProvisioningAction.PROVISION,
         nullable=False,
     )
     expires_at: Mapped[datetime] = mapped_column(

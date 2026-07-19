@@ -106,6 +106,8 @@ class AdminAuthenticationService:
         try:
             await self.admin_repo.update(admin, last_login_at=datetime.now(timezone.utc))
         except Exception as exc:
+            import traceback
+            traceback.print_exc()
             logger.error("Failed to update last_login_at for admin account: %s", exc, exc_info=True)
             # We log but do not abort successful authentication if timestamp update fails
 

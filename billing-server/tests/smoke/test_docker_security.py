@@ -31,8 +31,8 @@ def test_infrastructure_containers_not_published(container: str):
     """
     bindings = get_published_ports(container)
 
-    # Local development requires postgres to be exposed to run pytest from the host.
-    if container == "billing-server-postgres-1" and settings.environment != "production":
+    # Local development requires postgres and api to be exposed to run pytest from the host.
+    if container in ("billing-server-postgres-1", "billing-server-billing-api-1") and settings.environment != "production":
         return
 
     assert not bindings, (

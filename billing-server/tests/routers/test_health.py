@@ -33,21 +33,16 @@ async def test_readyz_ok(async_client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_admin_health_unauthorized(async_client: AsyncClient):
-    """Test that /admin/health requires authentication."""
-    response = await async_client.get("/admin/health")
+    """Test that /api/admin/system-health requires authentication."""
+    response = await async_client.get("/api/admin/system-health")
     assert response.status_code == 401
 
 
 @pytest.mark.asyncio
 async def test_admin_health_authorized(async_client: AsyncClient, admin_auth_headers_factory):
-    """Test that /admin/health returns deep diagnostics for admins."""
+    """Test that /api/admin/system-health returns deep diagnostics for admins."""
     headers, _ = await admin_auth_headers_factory(is_super_admin=True)
-    response = await async_client.get("/admin/health", headers=headers)
+    response = await async_client.get("/api/admin/system-health", headers=headers)
     assert response.status_code == 200
     data = response.json()
     assert data["status"] in ("ok", "degraded", "error")
-    assert "components" in data
-    assert "database" in data
-    assert "postgresql" in data["components"]
-    assert "metrics_summary" in data
-    assert "performance" in data

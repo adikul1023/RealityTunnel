@@ -20,7 +20,7 @@ import pytest_asyncio
 from app.database import get_db
 from app.dependencies import get_jwt_service
 from app.main import app
-from app.models import SubscriptionStatus
+from app.models import AccountStatus
 from app.repositories import DeviceRepository, RefreshTokenRepository
 from app.security import hash_master_token, hash_refresh_token
 from app.services import DeviceService, RefreshTokenService
@@ -137,7 +137,7 @@ async def test_login_suspended_account(async_client: AsyncClient, account_factor
     await account_factory(
         account_id="RT-SUSPEND-001",
         master_token_hash=master_token_hash,
-        status=SubscriptionStatus.SUSPENDED,
+        status=AccountStatus.SUSPENDED,
     )
 
     payload = {
@@ -864,7 +864,7 @@ async def test_get_me_suspended_account(
     access_token = login_resp.json()["access_token"]
 
     # Update account status to SUSPENDED
-    acc.status = SubscriptionStatus.SUSPENDED
+    acc.status = AccountStatus.SUSPENDED
     await db_session.commit()
 
     resp = await async_client.get(
@@ -928,7 +928,7 @@ async def test_refresh_rejects_suspended_account(
     refresh_token = login_resp.json()["refresh_token"]
 
     # Suspend account after initial login
-    acc.status = SubscriptionStatus.SUSPENDED
+    acc.status = AccountStatus.SUSPENDED
     await db_session.commit()
 
     # Refresh must now be rejected — suspended account cannot obtain new access tokens

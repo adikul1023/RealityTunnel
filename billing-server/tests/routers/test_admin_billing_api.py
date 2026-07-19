@@ -512,8 +512,8 @@ async def test_admin_system_health(async_client, admin_auth_headers_factory):
     body = resp.json()
     _assert_no_sensitive_fields(body)
     assert body["status"] in ("ok", "degraded")
-    assert isinstance(body["components"], list)
-    assert any(c["component"] == "postgres" for c in body["components"])
+    assert isinstance(body["components"], dict)
+    assert "postgresql" in body["components"]
 
 
 # ── 7. Security Isolation: Customer JWT Rejection ───────────────────────────

@@ -68,10 +68,12 @@
             </StackPanel>
         </Grid>
 
-        <!-- Super-Admin Action Bar -->
-        <Border Grid.Row="1" Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="10" Padding="16,12" Margin="0,0,0,20"
-                Visibility="{Binding IsSuperAdmin, Converter={StaticResource BoolToVis}}">
-            <Grid>
+        <!-- Admin Actions (Stacked to avoid overlap) -->
+        <StackPanel Grid.Row="1" Margin="0,0,0,20">
+            <!-- Super-Admin Action Bar -->
+            <Border Background="#111827" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="10" Padding="16,12" Margin="0,0,0,16"
+                    Visibility="{Binding IsSuperAdmin, Converter={StaticResource BoolToVis}}">
+                <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
@@ -79,7 +81,7 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <ui:SymbolIcon Symbol="ShieldPerson24" FontSize="20" Foreground="#A78BFA" Margin="0,0,8,0"/>
+                    <ui:SymbolIcon Symbol="Shield24" FontSize="20" Foreground="#A78BFA" Margin="0,0,8,0"/>
                     <TextBlock Text="Super-Admin Account Controls:" FontWeight="Bold" Foreground="#DDD6FE" VerticalAlignment="Center" Margin="0,0,16,0"/>
 
                     <ui:Button Content="Suspend Account" Appearance="Danger" Command="{Binding SuspendAccountCommand}" Height="34" Margin="0,0,8,0"/>
@@ -91,21 +93,16 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <ui:Button Content="Delete User" Appearance="Danger" Icon="{ui:SymbolIcon Delete24}" Command="{Binding DeleteAccountCommand}" Height="34" Margin="0,0,8,0"/>
                     <ui:Button Content="Force Revoke All Sessions" Appearance="Danger" Icon="{ui:SymbolIcon ShieldDismiss24}" Command="{Binding ForceLogoutAllSessionsCommand}" Height="34"/>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- Beta Onboarding / Manual Grant -->
-        <Border Grid.Row="1" Background="#1E1B4B" BorderBrush="#4338CA" BorderThickness="1" CornerRadius="10" Padding="16,12" Margin="0,0,0,20"
-                Visibility="{Binding IsSuperAdmin, Converter={StaticResource BoolToVis}}"
-                VerticalAlignment="Top">
-            <Border.Style>
-                <Style TargetType="Border">
-                    <Setter Property="Margin" Value="0,70,0,20" />
-                </Style>
-            </Border.Style>
-            <Grid>
+            <!-- Beta Onboarding / Manual Grant -->
+            <Border Background="#1E1B4B" BorderBrush="#4338CA" BorderThickness="1" CornerRadius="10" Padding="16,12"
+                    Visibility="{Binding IsSuperAdmin, Converter={StaticResource BoolToVis}}">
+                <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
@@ -130,10 +127,11 @@
                     <ui:Button Content="Grant Subscription" Appearance="Primary" Command="{Binding GrantSubscriptionCommand}" Height="34"/>
                 </StackPanel>
             </Grid>
-        </Border>
+            </Border>
+        </StackPanel>
 
         <!-- Multi-Section Layout -->
-        <Grid Grid.Row="2" Margin="0,150,0,0">
+        <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="420" />
                 <ColumnDefinition Width="20" />
@@ -246,7 +244,7 @@
                             <TextBlock Text="{Binding Account.FormattedDataUsage}" FontWeight="Bold" FontSize="18" Foreground="#34D399" HorizontalAlignment="Left"/>
                             <TextBlock Text="{Binding Account.UsagePercentage, StringFormat='{}{0}% used'}" FontSize="12" Foreground="#9CA3AF" HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
                         </Grid>
-                        <ProgressBar Value="{Binding Account.UsagePercentage}" Maximum="100" Height="8" Foreground="#34D399" Background="#1F2937" BorderThickness="0"/>
+                        <ProgressBar Value="{Binding Account.UsagePercentage, Mode=OneWay}" Maximum="100" Height="8" Foreground="#34D399" Background="#1F2937" BorderThickness="0"/>
                     </StackPanel>
                 </Border>
             </StackPanel>
@@ -268,7 +266,7 @@
                         </Grid.RowDefinitions>
                         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
                             <ui:SymbolIcon Symbol="Desktop24" FontSize="20" Foreground="#A78BFA" Margin="0,0,8,0"/>
-                            <TextBlock Text="Registered Devices (Single-device removal disabled per Step 0 audit)" FontSize="15" FontWeight="Bold" Foreground="White"/>
+                            <TextBlock Text="Registered Devices" FontSize="15" FontWeight="Bold" Foreground="White"/>
                         </StackPanel>
 
                         <DataGrid Grid.Row="1" ItemsSource="{Binding Devices}" AutoGenerateColumns="False" CanUserAddRows="False"
@@ -285,9 +283,9 @@
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <ui:Button Content="Remove Device" Appearance="Danger" Height="24" Padding="8,1" FontSize="11"
-                                                       IsEnabled="{Binding DataContext.CanRemoveSingleDevice, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                                       ToolTip="{Binding DataContext.RemoveDeviceTooltip, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                                       Command="{Binding DataContext.RemoveSingleDeviceCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                       IsEnabled="{Binding DataContext.CanRemoveSingleDevice, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
+                                                       ToolTip="{Binding DataContext.RemoveDeviceTooltip, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
+                                                       Command="{Binding DataContext.RemoveSingleDeviceCommand, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
                                                        CommandParameter="{Binding}"/>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>

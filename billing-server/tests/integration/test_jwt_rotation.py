@@ -13,7 +13,7 @@ pytestmark = pytest.mark.asyncio
 
 async def test_jwt_key_rotation_drill(
     async_client: AsyncClient,
-    admin_user_factory,
+    account_factory,
     db_session: AsyncSession
 ):
     """
@@ -22,13 +22,18 @@ async def test_jwt_key_rotation_drill(
     3. Old access token and old refresh token should FAIL.
     4. New login should succeed and yield new working tokens.
     """
-    # Create admin
-    admin = await admin_user_factory("admin@example.com", "SecurePassword123!")
+    from app.security import hash_master_token
+    master_token = "a" * 64
+    master_token_hash = hash_master_token(master_token)
+    
+    # Create customer account
+    account = await account_factory(account_id="RT-JWT-0001", master_token_hash=master_token_hash)
 
     # 1. Standard login
-    resp = await async_client.post("/api/v1/auth/login", json={
-        "email": "admin@example.com",
-        "password": "SecurePassword123!"
+    resp = await async_client.post("/api/auth/login", json={
+        "account_id": "RT-JWT-0001",
+        "master_token": master_token,
+        "device_guid": "device-jwt-123"
     })
     assert resp.status_code == 200
     tokens = resp.json()
@@ -36,15 +41,15 @@ async def test_jwt_key_rotation_drill(
     old_refresh = tokens["refresh_token"]
 
     # Verify old access works
-    resp = await async_client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {old_access}"})
+    resp = await async_client.get("/api/auth/me", headers={"Authorization": f"Bearer {old_access}"})
     assert resp.status_code == 200
 
     # Verify old refresh works
-    resp = await async_client.post("/api/v1/auth/refresh", json={"refresh_token": old_refresh})
+    resp = await async_client.post("/api/auth/refresh", json={"refresh_token": old_refresh})
     assert resp.status_code == 200
 
     # 2. ROTATE THE KEY (simulate env change)
-    from app.dependencies.security import get_jwt_service, get_admin_jwt_service
+    from app.dependencies import get_jwt_service, get_admin_jwt_service
     from cryptography.hazmat.primitives.asymmetric import ed25519
     from cryptography.hazmat.primitives import serialization
     from app.main import app
@@ -76,16 +81,17 @@ async def test_jwt_key_rotation_drill(
 
     try:
         # 3. Old tokens should now fail signature verification
-        resp = await async_client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {old_access}"})
+        resp = await async_client.get("/api/auth/me", headers={"Authorization": f"Bearer {old_access}"})
         assert resp.status_code == 401, "Old access token should be rejected after rotation"
 
-        resp = await async_client.post("/api/v1/auth/refresh", json={"refresh_token": old_refresh})
+        resp = await async_client.post("/api/auth/refresh", json={"refresh_token": old_refresh})
         assert resp.status_code == 401, "Old refresh token should be rejected after rotation"
 
         # 4. New login with new key
-        resp = await async_client.post("/api/v1/auth/login", json={
-            "email": "admin@example.com",
-            "password": "SecurePassword123!"
+        resp = await async_client.post("/api/auth/login", json={
+            "account_id": "RT-JWT-0001",
+            "master_token": master_token,
+            "device_guid": "device-jwt-123"
         })
         assert resp.status_code == 200
         new_tokens = resp.json()
@@ -93,10 +99,10 @@ async def test_jwt_key_rotation_drill(
         new_refresh = new_tokens["refresh_token"]
 
         # New tokens should work
-        resp = await async_client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {new_access}"})
+        resp = await async_client.get("/api/auth/me", headers={"Authorization": f"Bearer {new_access}"})
         assert resp.status_code == 200
 
-        resp = await async_client.post("/api/v1/auth/refresh", json={"refresh_token": new_refresh})
+        resp = await async_client.post("/api/auth/refresh", json={"refresh_token": new_refresh})
         assert resp.status_code == 200
 
     finally:

@@ -58,6 +58,16 @@ class AdminSubscriptionGraceRequest(BaseModel):
     grace_duration_days: int = Field(default=7, ge=1, le=30, description="Duration of grace period in days.")
 
 
+class AdminSubscriptionRevokeRequest(BaseModel):
+    """Request payload for revoking a subscription."""
+    reason: str = Field(..., min_length=3, max_length=255, description="Reason for revoking the subscription.")
+
+
+class AdminSubscriptionPlanRequest(BaseModel):
+    """Request payload for editing a subscription plan."""
+    new_plan_id: str = Field(..., min_length=1, description="The ID of the new plan from the Plans Registry.")
+
+
 class AdminPaymentDTO(BaseModel):
     """
     Administrative view of a payment transaction.

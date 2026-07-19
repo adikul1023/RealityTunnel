@@ -9,15 +9,16 @@ from sqlalchemy import DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 
-class SubscriptionStatus(str, enum.Enum):
+class AccountStatus(str, enum.Enum):
     """
-    PostgreSQL ENUM for subscription status.
+    PostgreSQL ENUM for account status.
     Enforces valid state boundaries at the database layer.
     """
     ACTIVE = "ACTIVE"
     EXPIRED = "EXPIRED"
     SUSPENDED = "SUSPENDED"
     PENDING = "PENDING"
+    DELETED = "DELETED"
 
 
 class SubscriptionLifecycleStatus(str, enum.Enum):
@@ -29,6 +30,7 @@ class SubscriptionLifecycleStatus(str, enum.Enum):
     GRACE = "GRACE"
     EXPIRED = "EXPIRED"
     CANCELLED = "CANCELLED"
+    REVOKED = "REVOKED"
 
 
 class RevocationReason(str, enum.Enum):

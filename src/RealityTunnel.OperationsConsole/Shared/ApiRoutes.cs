@@ -15,17 +15,24 @@ namespace RealityTunnel.OperationsConsole.Shared
             public const string Subscriptions = "/api/admin/subscriptions";
             public const string Payments = "/api/admin/payments";
             public const string Provisioning = "/api/admin/provisioning";
+            public const string Plans = "/api/admin/plans";
             public const string RetryQueue = "/api/admin/retry-queue";
             public const string SystemHealth = "/api/admin/system-health";
             public const string DeepDiagnosticsHealth = "/api/admin/system-health";
             public const string AuditEvents = "/api/admin/audit-events";
 
             public static string GetAccount(string accountId) => $"/api/admin/accounts/{accountId}";
+            public static string DeleteAccount(string accountId) => $"/api/admin/accounts/{accountId}";
             public static string SuspendAccount(string accountId) => $"/api/admin/accounts/{accountId}/suspend";
             public static string ActivateAccount(string accountId) => $"/api/admin/accounts/{accountId}/activate";
             public static string ExtendSubscription(string accountId) => $"/api/admin/accounts/{accountId}/extend-subscription";
             public static string GrantSubscription(string accountId) => $"/api/admin/accounts/{accountId}/grant-subscription";
+            
+            public static string EditSubscriptionPlan(string subId) => $"/api/admin/subscription/{subId}/plan";
+            public static string RevokeSubscription(string subId) => $"/api/admin/subscription/{subId}/revoke";
+
             public static string GetDevices(string accountId) => $"/api/admin/accounts/{accountId}/devices";
+            public static string RemoveDevice(string accountId, string deviceGuid) => $"/api/admin/accounts/{accountId}/devices/{deviceGuid}";
             public static string LogoutAllSessions(string accountId) => $"/api/admin/accounts/{accountId}/logout-all";
             public static string GetSignals(string accountId) => $"/api/admin/accounts/{accountId}/signals";
 
@@ -49,10 +56,10 @@ namespace RealityTunnel.OperationsConsole.Shared
             public static string RetryQueueItemNow(string retryId) => $"/api/admin/retry/{retryId}/retry-now";
             public static string DiscardRetryQueueItem(string retryId) => $"/api/admin/retry/{retryId}/discard";
 
-            // Phase 2 Missing Endpoints (documented in MissingEndpoints.md)
+            // Phase 2 Endpoints
             public const string LogsQuery = "/api/admin/logs";
-            public const string RestartService = "/api/admin/infrastructure/restart-service";
-            public const string ReloadXray = "/api/admin/infrastructure/reload-xray";
+            public static string RestartService(string serviceName) => $"/api/admin/infrastructure/{serviceName}/restart";
+            public const string ReloadXray = "/api/admin/infrastructure/xray/reload";
             public static string DeleteDevice(string accountId, string deviceGuid) => $"/api/admin/accounts/{accountId}/devices/{deviceGuid}";
         }
 

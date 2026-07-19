@@ -1,0 +1,30 @@
+{
+  "backup_id": "backup_20260719_065021_944e5da0",
+  "created_at": "2026-07-19T06:50:21.842836+00:00",
+  "postgres_revision": "16a49510ad7c",
+  "git_commit_hash": "97c7bad8ba19273e427c55da21582aaaf12d33ec",
+  "application_version": "1.0.0",
+  "configuration_fingerprint": {
+    "environment": "development",
+    "version": "1.0.0",
+    "git_commit": "97c7bad",
+    "feature_flags": {
+      "PAYMENTS_ENABLED": true,
+      "PROVISIONING_ENABLED": true,
+      "WEBHOOKS_ENABLED": true,
+      "ADMIN_API_ENABLED": true,
+      "BACKGROUND_JOBS_ENABLED": true,
+      "METRICS_ENABLED": true
+    },
+    "enabled_providers": [
+      "marzban"
+    ],
+    "debug_mode": false
+  },
+  "checksums": {
+    "database.sql.gz": "f0afe08c203c00ca666eec04b356dd700e6b8e28dc3d99fd1f0b8bfc28295e92",
+    "configuration.json.gz": "e79f991db0f5c53c7a50bebf3a5d5f2691b098e6c69c6ffca4b55dd4a8daaba0"
+  },
+  "backup_size_bytes": 3050,
+  "compression_algorithm": "gzip"
+}

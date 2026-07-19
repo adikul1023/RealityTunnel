@@ -74,6 +74,20 @@ class Subscription(Base, TimestampMixin):
         server_default="true",
         nullable=False,
     )
+    revoked_by: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("admin_users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    revoke_reason: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
 
     # Relationships
     account: Mapped[Account] = relationship(

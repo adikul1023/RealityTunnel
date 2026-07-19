@@ -13,11 +13,16 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from app.dependencies import get_admin_auth_service, get_current_admin
 from app.models.admin_user import AdminUser
 from app.rate_limit import require_rate_limit, RateLimiter, get_rate_limiter, KeyType
+from app.database import get_db
 from app.routers.admin_models import (
     AdminLoginRequest,
     AdminLoginResponse,
     AdminProfileResponse,
+    AdminChangePasswordRequest,
+    AdminChangePasswordResponse,
 )
+from app.security.admin_password import AdminPasswordService
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.admin_auth import AdminAuthenticationService
 from app.security_hardening.audit import audit_service
 
@@ -113,3 +118,47 @@ async def me(
         is_super_admin=current_admin.is_super_admin,
         mfa_enabled=current_admin.mfa_enabled,
     )
+
+@router.post(
+    "/change-password",
+    summary="Change administrative password",
+    response_model=AdminChangePasswordResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {"description": "Invalid current password"},
+    },
+)
+async def change_password(
+    request: AdminChangePasswordRequest,
+    current_admin: AdminUser = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_db),
+) -> AdminChangePasswordResponse:
+    """
+    Change the currently authenticated administrator's password.
+    """
+    password_service = AdminPasswordService()
+    
+    if not password_service.verify_password(request.current_password, current_admin.password_hash):
+        logger.warning(f"Failed password change attempt for admin {current_admin.username}")
+        # dummy defense? We know the user exists and they are authenticated, but if current_password fails, we reject.
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid current password.",
+        )
+    
+    current_admin.password_hash = password_service.hash_password(request.new_password)
+    session.add(current_admin)
+    await session.commit()
+    
+    logger.info(f"Password successfully changed for admin {current_admin.username}")
+    
+    # Audit log could be triggered here if there is one for password changes, but audit_service is available.
+    await audit_service.record_event(
+        event_type="admin_action",
+        actor_id=str(current_admin.id),
+        target_id=str(current_admin.id),
+        details={"action": "ADMIN_PASSWORD_CHANGED", "username": current_admin.username},
+        ip_hash="0000000000000000", # dummy
+    )
+    
+    return AdminChangePasswordResponse(message="Password successfully updated.")

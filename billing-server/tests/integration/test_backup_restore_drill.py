@@ -19,9 +19,7 @@ async def test_backup_restore_full_drill(
     db_session: AsyncSession,
     async_client: AsyncClient,
     admin_user_factory,
-    payment_service,
-    provisioning_service,
-    subscription_service
+    account_factory,
 ):
     """
     1. Create state (admin user, pending payment, active subscription).
@@ -33,7 +31,10 @@ async def test_backup_restore_full_drill(
     """
     # Create an admin user
     admin = await admin_user_factory("driller@example.com", "DrillPass123!")
-    account_id = admin.id
+
+    # Create a customer account
+    account = await account_factory()
+    account_id = account.id
 
     # Create a pending payment
     payment_repo = PaymentRepository(db_session)
@@ -49,14 +50,23 @@ async def test_backup_restore_full_drill(
     )
 
     # 1. Login works
-    resp = await async_client.post("/api/v1/auth/login", json={
-        "email": "driller@example.com",
+    resp = await async_client.post("/api/admin/login", json={
+        "username": "driller@example.com",
         "password": "DrillPass123!"
     })
     assert resp.status_code == 200
     access_token = resp.json()["access_token"]
 
     # 2. Re-instantiate job service (simulating a cold boot of the scheduler)
+    from unittest.mock import AsyncMock
+    from app.services import PaymentService, ProvisioningService, SubscriptionService
+    
+    mock_razorpay = AsyncMock()
+    mock_marzban = AsyncMock()
+    provisioning_service = ProvisioningService(db_session, mock_marzban)
+    subscription_service = SubscriptionService(db_session, provisioning_service)
+    payment_service = PaymentService(db_session, mock_razorpay)
+
     job_service = LifecycleJobService(
         db_session,
         subscription_service,
@@ -73,12 +83,15 @@ async def test_backup_restore_full_drill(
     
     # 4. Create an active subscription and prove expiration scheduler works
     sub_repo = SubscriptionRepository(db_session)
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
     sub = await sub_repo.create(
         account_id=account_id,
-        plan_id=uuid.uuid4(),
+        plan_id="premium",
         status=SubscriptionLifecycleStatus.EXPIRED, # Set to expired so grace period job picks it up
-        data_limit_bytes=1000,
-        provider_subscription_id="sub_123"
+        starts_at=now - timedelta(days=30),
+        expires_at=now - timedelta(days=1),
+        grace_expires_at=now - timedelta(hours=1)
     )
     
     count_expired = await job_service.run_grace_period_expiration_job()

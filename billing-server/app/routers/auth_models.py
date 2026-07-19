@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 from pydantic import BaseModel, Field, SecretStr
 
-from app.models import SubscriptionStatus
+from app.models import AccountStatus
 from app.security import ACCESS_TOKEN_EXPIRE_MINUTES
 
 
@@ -88,7 +88,7 @@ class AccountMeResponse(BaseModel):
     Strictly omits credentials, tokens, hashes, database UUIDs, and internal metadata.
     """
     account_id: str = Field(..., description="Human-readable Account ID (e.g., RT-XXXX-XXXX)")
-    status: SubscriptionStatus = Field(..., description="Current subscription lifecycle status")
+    status: AccountStatus = Field(..., description="Current subscription lifecycle status")
     subscription_expires_at: datetime | None = Field(
         None, description="Subscription expiration timestamp (UTC)"
     )

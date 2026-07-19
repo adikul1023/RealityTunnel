@@ -40,7 +40,7 @@ from datetime import datetime, timezone
 from app.exceptions import RepositoryError
 from app.config import settings
 from app.models.account import Account
-from app.models.base import SubscriptionStatus
+from app.models.base import AccountStatus
 from app.repositories.account_repository import AccountRepository
 from app.security import hash_master_token, verify_master_token, SHA256_HEX_LENGTH
 from app.services.exceptions import AuthenticationServiceError, AccountNotActiveError
@@ -104,19 +104,19 @@ class AuthenticationService:
         """
         account = await self.get_account(account_uuid)
 
-        if account.status == SubscriptionStatus.SUSPENDED:
+        if account.status == AccountStatus.SUSPENDED:
             logger.info("Token validation failed: account suspended")
             raise AccountNotActiveError("Account suspended")
 
-        if account.status == SubscriptionStatus.PENDING:
+        if account.status == AccountStatus.PENDING:
             logger.info("Token validation failed: account pending")
             raise AccountNotActiveError("Account pending")
 
-        if account.status == SubscriptionStatus.EXPIRED:
+        if account.status == AccountStatus.EXPIRED:
             logger.info("Token validation failed: subscription expired")
             raise AccountNotActiveError("Subscription expired")
 
-        if account.status != SubscriptionStatus.ACTIVE:
+        if account.status != AccountStatus.ACTIVE:
             logger.info("Token validation failed: account inactive")
             raise AccountNotActiveError("Account inactive")
 
@@ -192,7 +192,7 @@ class AuthenticationService:
             )
 
         # Step 4: Subscription Status check
-        if account.status == SubscriptionStatus.SUSPENDED:
+        if account.status == AccountStatus.SUSPENDED:
             logger.info("Authentication failed: suspended account")
             return AuthenticationResult(
                 success=False,
@@ -200,7 +200,7 @@ class AuthenticationService:
                 account=account,
             )
 
-        if account.status == SubscriptionStatus.PENDING:
+        if account.status == AccountStatus.PENDING:
             logger.info("Authentication failed: pending subscription")
             return AuthenticationResult(
                 success=False,
@@ -208,7 +208,7 @@ class AuthenticationService:
                 account=account,
             )
 
-        if account.status == SubscriptionStatus.EXPIRED:
+        if account.status == AccountStatus.EXPIRED:
             logger.info("Authentication failed: expired subscription")
             return AuthenticationResult(
                 success=False,
@@ -216,7 +216,7 @@ class AuthenticationService:
                 account=account,
             )
 
-        if account.status != SubscriptionStatus.ACTIVE:
+        if account.status != AccountStatus.ACTIVE:
             logger.info("Authentication failed: expired subscription")
             return AuthenticationResult(
                 success=False,

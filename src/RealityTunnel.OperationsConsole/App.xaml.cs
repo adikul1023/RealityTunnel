@@ -18,6 +18,28 @@ namespace RealityTunnel.OperationsConsole
         {
             base.OnStartup(e);
 
+            this.DispatcherUnhandledException += (s, args) => {
+                var ex = args.Exception;
+                string log = "Dispatcher Exception:\n" + ex.ToString() + "\n";
+                while (ex.InnerException != null) {
+                    ex = ex.InnerException;
+                    log += "\n--- Inner ---\n" + ex.ToString() + "\n";
+                }
+                System.IO.File.WriteAllText(@"D:\My projects\VPN\OverREALITY\crash.log", log);
+                args.Handled = true; // prevent immediate exit
+                Environment.Exit(1);
+            };
+
+            AppDomain.CurrentDomain.UnhandledException += (s, args) => {
+                var ex = args.ExceptionObject as Exception;
+                string log = "AppDomain Exception:\n" + ex?.ToString() + "\n";
+                while (ex?.InnerException != null) {
+                    ex = ex.InnerException;
+                    log += "\n--- Inner ---\n" + ex.ToString() + "\n";
+                }
+                System.IO.File.WriteAllText(@"D:\My projects\VPN\OverREALITY\crash2.log", log);
+            };
+
             var services = new ServiceCollection();
             ConfigureServices(services);
             _serviceProvider = services.BuildServiceProvider();

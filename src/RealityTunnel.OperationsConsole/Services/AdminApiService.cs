@@ -17,6 +17,7 @@ namespace RealityTunnel.OperationsConsole.Services
         Task<ApiResult<T>> PostAsync<T>(string route, CancellationToken cancellationToken = default);
         Task<ApiResult<T>> PatchAsync<T, TBody>(string route, TBody body, CancellationToken cancellationToken = default);
         Task<ApiResult<T>> PatchAsync<T>(string route, CancellationToken cancellationToken = default);
+        Task<ApiResult<T>> PutAsync<T, TBody>(string route, TBody body, CancellationToken cancellationToken = default);
         Task<ApiResult<T>> DeleteAsync<T>(string route, CancellationToken cancellationToken = default);
     }
 
@@ -74,6 +75,9 @@ namespace RealityTunnel.OperationsConsole.Services
 
         public async Task<ApiResult<T>> PatchAsync<T>(string route, CancellationToken cancellationToken = default) =>
             await ExecuteRequestAsync<T>(() => CreateClient().PatchAsync(route, null, cancellationToken), route, cancellationToken);
+
+        public async Task<ApiResult<T>> PutAsync<T, TBody>(string route, TBody body, CancellationToken cancellationToken = default) =>
+            await ExecuteRequestAsync<T>(() => CreateClient().PutAsJsonAsync(route, body, _jsonOptions, cancellationToken), route, cancellationToken);
 
         public async Task<ApiResult<T>> DeleteAsync<T>(string route, CancellationToken cancellationToken = default) =>
             await ExecuteRequestAsync<T>(() => CreateClient().DeleteAsync(route, cancellationToken), route, cancellationToken);

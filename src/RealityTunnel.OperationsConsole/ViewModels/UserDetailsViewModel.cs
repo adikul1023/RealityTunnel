@@ -48,10 +48,10 @@ namespace RealityTunnel.OperationsConsole.ViewModels
         private bool isClientConfigHealthy = false;
 
         [ObservableProperty]
-        private bool canRemoveSingleDevice = false;
+        private bool canRemoveSingleDevice = true;
 
         [ObservableProperty]
-        private string removeDeviceTooltip = "Backend support required (DELETE /api/admin/accounts/{id}/devices/{guid})";
+        private string removeDeviceTooltip = "Remove this device and instantly revoke its VPN access.";
 
         [ObservableProperty]
         private int extendDaysInput = 30;
@@ -380,11 +380,55 @@ namespace RealityTunnel.OperationsConsole.ViewModels
         }
 
         [RelayCommand]
-        private void RemoveSingleDevice(AdminDeviceResponse? device)
+        private async Task RemoveSingleDeviceAsync(AdminDeviceResponse? device)
         {
-            // Disabled per MissingEndpoints.md (Backend support required)
-            _ = _dialogService.ShowInfoAsync("Backend Support Required",
-                "Single-device removal by GUID is not yet exposed by an administrative API (DELETE /api/admin/accounts/{id}/devices/{guid}).\nUse 'Force Logout All Sessions' above to revoke all sessions.");
+            if (device == null || Account == null || !IsSuperAdmin) return;
+
+            bool confirm = await _dialogService.ShowConfirmationAsync("Confirm Remove Device",
+                $"Are you sure you want to forcefully remove and revoke the device '{device.FriendlyName}' (GUID: {device.DeviceGuid})?\n\nThis will instantly terminate its VPN access.");
+            if (!confirm) return;
+
+            IsBusy = true;
+            try
+            {
+                var res = await _apiService.DeleteAsync<DeviceRemovalResponseDTO>(ApiRoutes.Admin.RemoveDevice(Account.Id, device.DeviceGuid));
+                if (res.IsSuccess)
+                {
+                    await _dialogService.ShowInfoAsync("Device Removed", "The device was successfully removed and its sessions revoked.");
+                    Devices.Remove(device);
+                }
+                else
+                {
+                    await _dialogService.ShowErrorAsync("Removal Failed", res.ErrorMessage ?? "Failed to remove the device.");
+                }
+            }
+            finally { IsBusy = false; }
+        }
+
+        [RelayCommand]
+        private async Task DeleteAccountAsync()
+        {
+            if (Account == null || !IsSuperAdmin) return;
+            
+            bool confirm = await _dialogService.ShowConfirmationAsync("Confirm Delete User",
+                $"Are you absolutely sure you want to logically delete the user {Account.AccountId}?\n\nThis will revoke all active VPN sessions, terminate provisioning on the gateway, and hide the user. Billing and audit history will be retained.");
+            if (!confirm) return;
+
+            IsBusy = true;
+            try
+            {
+                var res = await _apiService.DeleteAsync<AdminAccountResponse>(ApiRoutes.Admin.DeleteAccount(Account.Id));
+                if (res.IsSuccess)
+                {
+                    await _dialogService.ShowInfoAsync("User Deleted", "The user account has been successfully deleted.");
+                    _navigationService.NavigateTo("Users");
+                }
+                else
+                {
+                    await _dialogService.ShowErrorAsync("Delete Failed", res.ErrorMessage ?? "Failed to delete user.");
+                }
+            }
+            finally { IsBusy = false; }
         }
     }
 }

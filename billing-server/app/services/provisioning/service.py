@@ -7,13 +7,15 @@ from __future__ import annotations
 
 import logging
 import uuid
+from typing import Any
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import advisory_xact_lock, AsyncSessionLocal
 from app.exceptions import EntityNotFoundError, DatabaseOperationError, DuplicateEntityError
-from app.models import ProvisioningProfile, ProvisioningState, ProvisioningRetryItem, RetryItemStatus
+from app.models import ProvisioningProfile, ProvisioningState
+from app.models.provisioning_retry import ProvisioningRetryItem, RetryItemStatus, ProvisioningAction
 from app.repositories import AccountRepository, ProvisioningRepository, ProvisioningRetryRepository
 from app.services.exceptions import (
     ProvisioningServiceError,
@@ -81,6 +83,7 @@ class ProvisioningService:
         plan_id: str,
         expire_at: datetime | None,
         exc: Exception,
+        action: ProvisioningAction = ProvisioningAction.PROVISION,
     ) -> None:
         """
         Check if an exception represents a transient failure (timeout, 500/502/503/504)
@@ -112,6 +115,7 @@ class ProvisioningService:
                     next_retry_at=now + timedelta(seconds=30),
                     last_error=str(exc)[:499],
                     status=RetryItemStatus.PENDING,
+                    action=action,
                 )
                 # Use a fresh session — caller's session may be in a broken/rolled-back state.
                 async with AsyncSessionLocal() as enqueue_session:
@@ -230,7 +234,7 @@ class ProvisioningService:
             if commit:
                 await self.session.rollback()
             translated_exc = self._translate_exception(exc, "provision_subscription")
-            await self._maybe_enqueue_retry(account_id, plan_id, expire_at, translated_exc)
+            await self._maybe_enqueue_retry(account_id, plan_id, expire_at, translated_exc, ProvisioningAction.PROVISION)
             raise translated_exc from exc
 
     async def extend_subscription(
@@ -311,12 +315,15 @@ class ProvisioningService:
                 await self.session.flush()
             return profile
 
-        except (EntityNotFoundError, DatabaseOperationError, ProvisioningServiceError):
+        except (EntityNotFoundError, DatabaseOperationError):
             raise
         except Exception as exc:
             if commit:
                 await self.session.rollback()
-            raise self._translate_exception(exc, "suspend_subscription") from exc
+            translated_exc = self._translate_exception(exc, "suspend_subscription")
+            # Enqueue retry on transient failure
+            await self._maybe_enqueue_retry(account_id, "unknown", None, translated_exc, ProvisioningAction.SUSPEND)
+            raise translated_exc from exc
 
     async def reactivate_subscription(self, account_id: uuid.UUID, *, commit: bool = True) -> ProvisioningProfile:
         """Reactivate VPN access for a suspended account."""
@@ -389,12 +396,15 @@ class ProvisioningService:
                 await self.session.flush()
             return profile
 
-        except (EntityNotFoundError, DatabaseOperationError, ProvisioningServiceError):
+        except (EntityNotFoundError, DatabaseOperationError):
             raise
         except Exception as exc:
             if commit:
                 await self.session.rollback()
-            raise self._translate_exception(exc, "terminate_subscription") from exc
+            translated_exc = self._translate_exception(exc, "terminate_subscription")
+            # Enqueue retry on transient failure
+            await self._maybe_enqueue_retry(account_id, "unknown", None, translated_exc, ProvisioningAction.TERMINATE)
+            raise translated_exc from exc
 
     async def synchronize(self, account_id: uuid.UUID) -> ProvisioningProfile:
         """

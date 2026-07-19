@@ -79,6 +79,12 @@ namespace RealityTunnel.OperationsConsole.ViewModels
 
         private void OnNavigateToView(string viewKey, object? parameter)
         {
+            // Do not update the title here. We only want to update the title 
+            // if the View resolves successfully to avoid misleading the user if navigation crashes.
+        }
+
+        public void SetViewTitle(string viewKey)
+        {
             CurrentViewTitle = viewKey switch
             {
                 "Dashboard" => "Operational Dashboard",

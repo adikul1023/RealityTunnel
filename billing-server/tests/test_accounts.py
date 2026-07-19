@@ -4,7 +4,7 @@ test_accounts.py — Tests for AccountRepository and Account persistence.
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.exceptions import DuplicateEntityError
-from app.models import SubscriptionStatus
+from app.models import AccountStatus
 from app.repositories import AccountRepository
 
 
@@ -15,11 +15,11 @@ async def test_create_and_retrieve_account(db_session: AsyncSession, account_fac
         account_id="TEST-ACC-01",
         master_token_hash="hash_test_acc_01",
         marzban_username="marz_test_acc_01",
-        status=SubscriptionStatus.ACTIVE,
+        status=AccountStatus.ACTIVE,
     )
     assert acc.id is not None
     assert acc.account_id == "TEST-ACC-01"
-    assert acc.status == SubscriptionStatus.ACTIVE
+    assert acc.status == AccountStatus.ACTIVE
 
     # Retrieve by ID
     by_id = await repo.get_by_id(acc.id)

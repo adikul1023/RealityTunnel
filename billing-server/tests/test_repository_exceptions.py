@@ -9,7 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import DuplicateEntityError, EntityNotFoundError, DatabaseOperationError
-from app.models import SubscriptionStatus
+from app.models import AccountStatus
 from app.repositories import AccountRepository
 
 
@@ -40,7 +40,7 @@ async def test_unexpected_sql_error_on_create_translates_to_database_operation_e
             await repo.create(
                 account_id="FAIL-CREATE",
                 master_token_hash="hash_fail",
-                status=SubscriptionStatus.ACTIVE,
+                status=AccountStatus.ACTIVE,
             )
         assert "Database error while creating Account" in str(exc_info.value)
 

@@ -25,25 +25,25 @@ namespace RealityTunnel.OperationsConsole.ViewModels
         private ObservableCollection<AdminRetryItemDTO> retryQueueItems = new();
 
         [ObservableProperty]
-        private ObservableCollection<object> backups = new();
+        private ObservableCollection<AdminBackupResponseDTO> backups = new();
 
         [ObservableProperty]
         private bool isSuperAdmin;
 
         [ObservableProperty]
-        private bool canRestartServices = false; // Always false per MissingEndpoints.md
+        private bool canRestartServices = true;
 
         [ObservableProperty]
-        private string restartButtonsTooltip = "Backend support required (OS/Container orchestration API needed)";
+        private string restartButtonsTooltip = "Restart this infrastructure service gracefully";
 
         [ObservableProperty]
-        private string reloadXrayTooltip = "Backend support required (Xray reload API needed)";
+        private string reloadXrayTooltip = "Hot-reload Xray core without dropping connections";
 
         [ObservableProperty]
-        private bool canExecuteAdvancedRecovery = false; // Disabled per Step 0 audit / Phase 2 verification
+        private bool canExecuteAdvancedRecovery = true;
 
         [ObservableProperty]
-        private string advancedRecoveryTooltip = "Backend verification / Phase 2 support required";
+        private string advancedRecoveryTooltip = "Execute disaster recovery operation";
 
         public InfrastructureViewModel(
             IAdminApiService apiService,
@@ -69,7 +69,7 @@ namespace RealityTunnel.OperationsConsole.ViewModels
                 var healthRes = await _apiService.GetAsync<AdminHealthResponseDTO>(ApiRoutes.Admin.DeepDiagnosticsHealth);
                 ServicesList.Clear();
 
-                if (healthRes.IsSuccess && healthRes.Data != null)
+                if (healthRes.IsSuccess && healthRes.Data != null && healthRes.Data.Components != null)
                 {
                     // 1. Billing API
                     ServicesList.Add(new ServiceHealthDisplayModel
@@ -82,7 +82,7 @@ namespace RealityTunnel.OperationsConsole.ViewModels
                     });
 
                     // 2. PostgreSQL
-                    var pg = healthRes.Data.Components?.GetValueOrDefault("postgresql");
+                    var pg = healthRes.Data.Components.GetValueOrDefault("postgresql");
                     ServicesList.Add(new ServiceHealthDisplayModel
                     {
                         ComponentName = "PostgreSQL 16 Database",
@@ -94,7 +94,7 @@ namespace RealityTunnel.OperationsConsole.ViewModels
                     });
 
                     // 3. Redis Cache
-                    var redis = healthRes.Data.Components?.GetValueOrDefault("redis");
+                    var redis = healthRes.Data.Components.GetValueOrDefault("redis");
                     ServicesList.Add(new ServiceHealthDisplayModel
                     {
                         ComponentName = "Redis 7 Cache Store",
@@ -106,7 +106,7 @@ namespace RealityTunnel.OperationsConsole.ViewModels
                     });
 
                     // 4. Marzban VPN Controller
-                    var marzban = healthRes.Data.Components?.GetValueOrDefault("marzban");
+                    var marzban = healthRes.Data.Components.GetValueOrDefault("marzban");
                     ServicesList.Add(new ServiceHealthDisplayModel
                     {
                         ComponentName = "Marzban VPN Controller",
@@ -118,7 +118,7 @@ namespace RealityTunnel.OperationsConsole.ViewModels
                     });
 
                     // 5. Xray Reality Engine
-                    var xray = healthRes.Data.Components?.GetValueOrDefault("xray");
+                    var xray = healthRes.Data.Components.GetValueOrDefault("xray");
                     ServicesList.Add(new ServiceHealthDisplayModel
                     {
                         ComponentName = "Xray Core Reality Engine",
@@ -129,7 +129,7 @@ namespace RealityTunnel.OperationsConsole.ViewModels
                     });
 
                     // 6. Razorpay Payment Gateway
-                    var rz = healthRes.Data.Components?.GetValueOrDefault("payment_gateway");
+                    var rz = healthRes.Data.Components.GetValueOrDefault("payment_gateway");
                     ServicesList.Add(new ServiceHealthDisplayModel
                     {
                         ComponentName = "Razorpay Payment Gateway",
@@ -163,34 +163,72 @@ namespace RealityTunnel.OperationsConsole.ViewModels
 
                 // 2. Load retry queue
                 var retryRes = await _apiService.GetAsync<AdminRetryQueueDTO>(ApiRoutes.Admin.RetryQueue);
-                if (retryRes.IsSuccess && retryRes.Data != null)
+                if (retryRes.IsSuccess && retryRes.Data != null && retryRes.Data.PendingItems != null)
                 {
                     RetryQueueItems.Clear();
                     foreach (var item in retryRes.Data.PendingItems) RetryQueueItems.Add(item);
                 }
 
                 // 3. Load backups list
-                var bkRes = await _apiService.GetAsync<object>(ApiRoutes.Recovery.ListBackups);
+                var bkRes = await _apiService.GetAsync<List<AdminBackupResponseDTO>>(ApiRoutes.Recovery.ListBackups);
                 if (bkRes.IsSuccess && bkRes.Data != null)
                 {
-                    // Backups loaded
+                    Backups.Clear();
+                    foreach (var backup in bkRes.Data) Backups.Add(backup);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.IO.File.WriteAllText(@"C:\Users\arun1\.gemini\antigravity-ide\brain\fd2c6752-4f1a-4ab6-8d6d-a5d946662fec\scratch\crash.txt", ex.ToString());
+                await _dialogService.ShowErrorAsync("Infrastructure Error", $"Failed to load infrastructure status: {ex.Message}");
+            }
+            finally { IsBusy = false; }
+        }
+
+        [RelayCommand]
+        private async Task RestartServiceActionAsync(string serviceName)
+        {
+            if (string.IsNullOrWhiteSpace(serviceName) || !IsSuperAdmin) return;
+            bool confirm = await _dialogService.ShowConfirmationAsync("Confirm Restart", $"Are you sure you want to restart the '{serviceName}' service?");
+            if (!confirm) return;
+
+            IsBusy = true;
+            try
+            {
+                var res = await _apiService.PostAsync<object>(ApiRoutes.Admin.RestartService(serviceName));
+                if (res.IsSuccess)
+                {
+                    await _dialogService.ShowInfoAsync("Restart Initiated", $"Restart command for {serviceName} has been queued.");
+                }
+                else
+                {
+                    await _dialogService.ShowErrorAsync("Restart Failed", res.ErrorMessage ?? "Failed to queue restart command.");
                 }
             }
             finally { IsBusy = false; }
         }
 
         [RelayCommand]
-        private void RestartServiceAction(string serviceName)
+        private async Task ReloadXrayActionAsync()
         {
-            _ = _dialogService.ShowInfoAsync("Backend Support Required",
-                $"Restarting '{serviceName}' over HTTP requires OS/container orchestration support (POST /api/admin/infrastructure/restart-service) which is planned for Phase 2.");
-        }
+            if (!IsSuperAdmin) return;
+            bool confirm = await _dialogService.ShowConfirmationAsync("Confirm Reload", "Are you sure you want to reload Xray core?");
+            if (!confirm) return;
 
-        [RelayCommand]
-        private void ReloadXrayAction()
-        {
-            _ = _dialogService.ShowInfoAsync("Backend Support Required",
-                "Direct Xray engine reload via Billing API (POST /api/admin/infrastructure/reload-xray) is planned for Phase 2.");
+            IsBusy = true;
+            try
+            {
+                var res = await _apiService.PostAsync<object>(ApiRoutes.Admin.ReloadXray);
+                if (res.IsSuccess)
+                {
+                    await _dialogService.ShowInfoAsync("Reload Initiated", "Xray reload command has been queued.");
+                }
+                else
+                {
+                    await _dialogService.ShowErrorAsync("Reload Failed", res.ErrorMessage ?? "Failed to queue reload command.");
+                }
+            }
+            finally { IsBusy = false; }
         }
 
         [RelayCommand]
@@ -231,6 +269,9 @@ namespace RealityTunnel.OperationsConsole.ViewModels
         private async Task CreateBackupSnapshotAsync()
         {
             if (!IsSuperAdmin) return;
+            bool confirm = await _dialogService.ShowConfirmationAsync("Confirm Snapshot", "Are you sure you want to trigger a manual backup snapshot?");
+            if (!confirm) return;
+
             IsBusy = true;
             try
             {
@@ -239,6 +280,74 @@ namespace RealityTunnel.OperationsConsole.ViewModels
                 {
                     await _dialogService.ShowInfoAsync("Backup Created", "Snapshot successfully generated and stored.");
                     await LoadHealthAndStatusAsync();
+                }
+                else
+                {
+                    await _dialogService.ShowErrorAsync("Backup Failed", res.ErrorMessage ?? "Failed to create snapshot.");
+                }
+            }
+            finally { IsBusy = false; }
+        }
+
+        [RelayCommand]
+        private async Task PruneBackupsAsync()
+        {
+            if (!IsSuperAdmin) return;
+            bool confirm = await _dialogService.ShowConfirmationAsync("Confirm Prune", "Are you sure you want to prune expired/over-quota backup snapshots?");
+            if (!confirm) return;
+
+            IsBusy = true;
+            try
+            {
+                var res = await _apiService.PostAsync<object>(ApiRoutes.Recovery.PruneBackups);
+                if (res.IsSuccess)
+                {
+                    await _dialogService.ShowInfoAsync("Pruned", "Backup retention pruning complete.");
+                    await LoadHealthAndStatusAsync();
+                }
+                else
+                {
+                    await _dialogService.ShowErrorAsync("Prune Failed", res.ErrorMessage ?? "Failed to prune backups.");
+                }
+            }
+            finally { IsBusy = false; }
+        }
+
+        [RelayCommand]
+        private async Task VerifyBackupAsync(AdminBackupResponseDTO? backup)
+        {
+            if (backup == null || !IsSuperAdmin) return;
+            IsBusy = true;
+            try
+            {
+                var res = await _apiService.PostAsync<object>(ApiRoutes.Recovery.VerifyBackup(backup.BackupId));
+                if (res.IsSuccess)
+                {
+                    await _dialogService.ShowInfoAsync("Verification Success", $"Cryptographic and archive integrity verified for {backup.BackupId}.");
+                }
+                else
+                {
+                    await _dialogService.ShowErrorAsync("Verification Failed", res.ErrorMessage ?? "Backup verification failed.");
+                }
+            }
+            finally { IsBusy = false; }
+        }
+
+        [RelayCommand]
+        private async Task PreviewBackupAsync(AdminBackupResponseDTO? backup)
+        {
+            if (backup == null) return;
+            IsBusy = true;
+            try
+            {
+                var res = await _apiService.GetAsync<object>(ApiRoutes.Recovery.PreviewBackup(backup.BackupId));
+                if (res.IsSuccess && res.Data != null)
+                {
+                    await _dialogService.ShowInfoAsync("Preview Data", System.Text.Json.JsonSerializer.Serialize(res.Data, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+                }
+                else
+                {
+                    await _dialogService.ShowErrorAsync("Preview Failed", res.ErrorMessage ?? "Failed to load backup preview.");
                 }
             }
             finally { IsBusy = false; }

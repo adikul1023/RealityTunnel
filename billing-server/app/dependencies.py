@@ -21,6 +21,7 @@ from app.repositories import (
     ConnectionSignalRepository,
 )
 from app.config import settings
+from app.config import Settings
 from app.security.jwt_service import JWTService
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.admin_user_repository import AdminUserRepository
@@ -61,6 +62,12 @@ from app.services.exceptions import (
 
 
 logger = logging.getLogger(__name__)
+
+
+def get_settings() -> Settings:
+    """Return the application settings singleton."""
+    return settings
+
 
 # Bearer authentication schemes for OpenAPI Swagger documentation
 customer_oauth2_scheme = HTTPBearer(

@@ -16,7 +16,7 @@ import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import SubscriptionStatus
+from app.models import AccountStatus
 
 pytestmark = pytest.mark.asyncio
 
@@ -29,7 +29,7 @@ async def test_admin_operations_complete_e2e_workflow(
     db_session: AsyncSession,
 ):
     # Setup: Create account and register 2 client devices
-    acc = await account_factory(account_id="TEST-E2E-OPS-01", status=SubscriptionStatus.ACTIVE)
+    acc = await account_factory(account_id="TEST-E2E-OPS-01", status=AccountStatus.ACTIVE)
     await device_service.register_device(acc.id, "dev-e2e-keep")
     await device_service.register_device(acc.id, "dev-e2e-remove")
 

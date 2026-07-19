@@ -208,9 +208,9 @@ async def test_health_endpoint_expansion(async_client, admin_auth_headers_factor
     assert data_anon.get("scheduler") is None
     assert data_anon.get("metrics_summary") is None
 
-    # Admin call receives expanded observability fields via /admin/health
+    # Admin call receives expanded observability fields via /api/admin/system-health
     headers, _ = await admin_auth_headers_factory(is_super_admin=False, username="health_admin_obs")
-    resp_admin = await async_client.get("/admin/health", headers=headers)
+    resp_admin = await async_client.get("/api/admin/system-health", headers=headers)
     assert resp_admin.status_code == 200
     data_admin = resp_admin.json()
     assert data_admin.get("fingerprint") is not None

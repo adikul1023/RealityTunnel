@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies import get_device_service, get_jwt_service
 from app.main import app
-from app.models import SubscriptionStatus
+from app.models import AccountStatus
 from app.repositories import AccountRepository, DeviceRepository
 from app.security import hash_master_token
 from app.services import DeviceService
@@ -261,7 +261,7 @@ async def test_deleted_account(async_client: AsyncClient, account_factory, db_se
 async def test_suspended_account(async_client: AsyncClient, account_factory, db_session: AsyncSession):
     """13. Valid JWT for subsequently suspended account returns 401."""
     headers, acc = await get_auth_headers(async_client, account_factory, "RT-SUSP-ACC")
-    acc.status = SubscriptionStatus.SUSPENDED
+    acc.status = AccountStatus.SUSPENDED
     await db_session.commit()
 
     resp = await async_client.get("/api/devices", headers=headers)
@@ -277,7 +277,7 @@ async def test_pending_account(async_client: AsyncClient, account_factory, db_se
     acc = await account_factory(
         account_id="RT-PEND-ACC",
         master_token_hash=hash_master_token(master_token),
-        status=SubscriptionStatus.PENDING,
+        status=AccountStatus.PENDING,
     )
     jwt_service = get_jwt_service()
     token = jwt_service.issue_access_token(acc.id, acc.account_id, "dev-pend")

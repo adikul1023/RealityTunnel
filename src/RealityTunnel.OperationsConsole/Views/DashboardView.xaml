@@ -129,7 +129,7 @@
                         <TextBlock Text="{Binding GraceSubscriptions}" FontSize="26" FontWeight="Bold" Foreground="#34D399" />
                         <TextBlock Text="Pending renewal or expiration" FontSize="11" Foreground="#6B7280" Margin="0,4,0,0"/>
                     </StackPanel>
-                    <ui:SymbolIcon Symbol="ArrowTransfer24" FontSize="32" Foreground="#064E3B" HorizontalAlignment="Right" VerticalAlignment="Top"/>
+                    <ui:SymbolIcon Symbol="Clock24" FontSize="32" Foreground="#064E3B" HorizontalAlignment="Right" VerticalAlignment="Top"/>
                 </Grid>
             </Border>
 
@@ -141,7 +141,7 @@
                         <TextBlock Text="{Binding ActiveAdmins}" FontSize="26" FontWeight="Bold" Foreground="#60A5FA" />
                         <TextBlock Text="System operators" FontSize="11" Foreground="#6B7280" Margin="0,4,0,0"/>
                     </StackPanel>
-                    <ui:SymbolIcon Symbol="DataUsage24" FontSize="32" Foreground="#1E3A8A" HorizontalAlignment="Right" VerticalAlignment="Top"/>
+                    <ui:SymbolIcon Symbol="Shield24" FontSize="32" Foreground="#1E3A8A" HorizontalAlignment="Right" VerticalAlignment="Top"/>
                 </Grid>
             </Border>
         </Grid>

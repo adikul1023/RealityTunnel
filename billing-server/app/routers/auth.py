@@ -46,7 +46,7 @@ from app.config import settings
 from app.observability.logging import extract_client_info
 from app.database import get_db
 from app.models import ExchangeToken
-from app.models.base import SubscriptionStatus
+from app.models.base import AccountStatus
 from app.security import hash_master_token
 from app.rate_limit import require_rate_limit, RateLimiter, get_rate_limiter, KeyType
 from app.routers.auth_models import (
@@ -154,7 +154,7 @@ async def register_account(
         account_id=account_id,
         master_token_hash=master_token_hash,
         plan_id=request.plan_id,
-        status=SubscriptionStatus.ACTIVE,
+        status=AccountStatus.ACTIVE,
     )
     db.add(account)
     await db.commit()

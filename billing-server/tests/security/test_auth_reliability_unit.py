@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 from fastapi import HTTPException, Request
 
 from app.models.account import Account
-from app.models.base import SubscriptionStatus
+from app.models.base import AccountStatus
 from app.services.authentication import AuthenticationService, AuthenticationReason
 from app.security import hash_master_token
 from app.dependencies import get_current_account
@@ -27,7 +27,7 @@ async def test_authentication_service_normalizes_credentials():
         id=uuid.uuid4(),
         account_id=account_id,
         master_token_hash=token_hash,
-        status=SubscriptionStatus.ACTIVE,
+        status=AccountStatus.ACTIVE,
     )
     mock_repo.get_by_account_id.return_value = mock_account
 

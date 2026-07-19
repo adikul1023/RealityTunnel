@@ -72,7 +72,7 @@
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <ui:Button Content="Inspect Detail" Appearance="Secondary" Height="28" Padding="12,2" FontSize="12"
-                                       Command="{Binding DataContext.InspectAccountCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                       Command="{Binding DataContext.InspectAccountCommand, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
                                        CommandParameter="{Binding}"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>

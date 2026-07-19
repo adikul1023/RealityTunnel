@@ -1,9 +1,19 @@
 using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace RealityTunnel.OperationsConsole.Shared
 {
+    public class DeviceRemovalResponseDTO
+    {
+        [JsonPropertyName("success")]
+        public bool Success { get; set; }
+
+        [JsonPropertyName("active_devices_remaining")]
+        public int ActiveDevicesRemaining { get; set; }
+    }
+
     public class AdminLoginRequest
     {
         [JsonPropertyName("username")]
@@ -169,7 +179,7 @@ namespace RealityTunnel.OperationsConsole.Shared
         public int ActiveAdmins { get; set; }
     }
 
-    public class AdminSubscriptionDTO
+    public partial class AdminSubscriptionDTO : ObservableObject
     {
         [JsonPropertyName("id")]
         public string Id { get; set; } = string.Empty;
@@ -191,6 +201,49 @@ namespace RealityTunnel.OperationsConsole.Shared
 
         [JsonPropertyName("expires_at")]
         public DateTime? ExpiresAt { get; set; }
+
+        [ObservableProperty]
+        [JsonIgnore]
+        private string? selectedPlanId;
+        
+        [ObservableProperty]
+        [JsonIgnore]
+        private bool isPlanChanged;
+
+        partial void OnSelectedPlanIdChanged(string? value)
+        {
+            IsPlanChanged = value != null && !value.Equals(Plan, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    public class AdminSubscriptionRevokeRequest
+    {
+        [JsonPropertyName("reason")]
+        public string Reason { get; set; } = string.Empty;
+    }
+
+    public class AdminPlanDTO
+    {
+        [JsonPropertyName("id")]
+        public string Id { get; set; } = string.Empty;
+
+        [JsonPropertyName("name")]
+        public string Name { get; set; } = string.Empty;
+
+        [JsonPropertyName("data_limit_bytes")]
+        public long DataLimitBytes { get; set; }
+
+        [JsonPropertyName("duration_days")]
+        public int DurationDays { get; set; }
+
+        [JsonPropertyName("price_minor_units")]
+        public int PriceMinorUnits { get; set; }
+    }
+
+    public class AdminSubscriptionPlanRequest
+    {
+        [JsonPropertyName("new_plan_id")]
+        public string PlanId { get; set; } = string.Empty;
     }
 
     public class AdminSubscriptionListDTO
@@ -349,10 +402,10 @@ namespace RealityTunnel.OperationsConsole.Shared
 
     public class AdminRetryQueueDTO
     {
-        [JsonPropertyName("pending_items")]
+        [JsonPropertyName("items")]
         public List<AdminRetryItemDTO> PendingItems { get; set; } = new();
 
-        [JsonPropertyName("total")]
+        [JsonPropertyName("pending_count")]
         public int Total { get; set; }
     }
 
@@ -473,5 +526,22 @@ namespace RealityTunnel.OperationsConsole.Shared
 
         [JsonPropertyName("has_more")]
         public bool HasMore { get; set; }
+    }
+    public class AdminBackupResponseDTO
+    {
+        [JsonPropertyName("backup_id")]
+        public string BackupId { get; set; } = string.Empty;
+
+        [JsonPropertyName("created_at")]
+        public DateTime CreatedAt { get; set; }
+
+        [JsonPropertyName("postgres_revision")]
+        public string PostgresRevision { get; set; } = string.Empty;
+
+        [JsonPropertyName("backup_size_bytes")]
+        public long BackupSizeBytes { get; set; }
+        
+        [JsonPropertyName("application_version")]
+        public string ApplicationVersion { get; set; } = string.Empty;
     }
 }

@@ -22,7 +22,7 @@ from sqlalchemy import select
 from app.main import app
 from app.database import get_db
 from unittest.mock import AsyncMock, patch
-from app.models import AdminUser, Account, Device, SubscriptionStatus
+from app.models import AdminUser, Account, Device, AccountStatus
 from app.models.provisioning import ProvisioningProfile, ProvisioningState
 from app.services.provisioning.provider import ProvisionedUserDTO
 from app.dependencies import get_admin_jwt_service
@@ -127,7 +127,7 @@ async def run_verification():
                 id=uuid.uuid4(),
                 account_id=f"TEST-MASK-{int(time.time())}",
                 master_token_hash=f"hash_{int(time.time())}",
-                status=SubscriptionStatus.ACTIVE,
+                status=AccountStatus.ACTIVE,
                 subscription_expires_at=datetime.now(timezone.utc),
             )
             dev_guid = f"mask-verify-dev-{int(time.time())}"

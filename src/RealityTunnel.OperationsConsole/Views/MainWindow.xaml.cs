@@ -35,21 +35,34 @@ namespace RealityTunnel.OperationsConsole.Views
         {
             await Dispatcher.InvokeAsync(async () =>
             {
-                object? viewInstance = viewKey switch
+                object? viewInstance = null;
+                try
                 {
-                    "Dashboard" => _serviceProvider.GetRequiredService<DashboardView>(),
-                    "Users" => _serviceProvider.GetRequiredService<UsersView>(),
-                    "UserDetails" => _serviceProvider.GetRequiredService<UserDetailsPanel>(),
-                    "Subscriptions" => _serviceProvider.GetRequiredService<SubscriptionsView>(),
-                    "Billing" or "Payments" => _serviceProvider.GetRequiredService<PaymentsView>(),
-                    "Infrastructure" => _serviceProvider.GetRequiredService<InfrastructureView>(),
-                    "Logs" => _serviceProvider.GetRequiredService<LogsView>(),
-                    "Settings" => _serviceProvider.GetRequiredService<SettingsView>(),
-                    _ => null
-                };
+                    viewInstance = viewKey switch
+                    {
+                        "Dashboard" => _serviceProvider.GetRequiredService<DashboardView>(),
+                        "Users" => _serviceProvider.GetRequiredService<UsersView>(),
+                        "UserDetails" => _serviceProvider.GetRequiredService<UserDetailsPanel>(),
+                        "Subscriptions" => _serviceProvider.GetRequiredService<SubscriptionsView>(),
+                        "Billing" or "Payments" => _serviceProvider.GetRequiredService<PaymentsView>(),
+                        "Infrastructure" => _serviceProvider.GetRequiredService<InfrastructureView>(),
+                        "Logs" => _serviceProvider.GetRequiredService<LogsView>(),
+                        "Settings" => _serviceProvider.GetRequiredService<SettingsView>(),
+                        _ => null
+                    };
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"NAVIGATION ERROR to {viewKey}: {ex}");
+                    System.Windows.MessageBox.Show($"Failed to load view '{viewKey}'.\n\nError: {ex.Message}", "Navigation Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                    return;
+                }
 
                 if (viewInstance != null)
                 {
+                    // Update Title only on successful resolve
+                    _viewModel.SetViewTitle(viewKey);
+
                     // IMPORTANT: Set the view FIRST so it is always shown,
                     // even if the subsequent async data load fails.
                     _viewModel.CurrentViewContent = viewInstance;
