@@ -87,7 +87,7 @@ namespace RealityTunnel.OperationsConsole.ViewModels
                 IsSuperAdmin = _sessionService.CurrentRole.Equals("super_admin", StringComparison.OrdinalIgnoreCase);
 
                 // 1. Fetch exact account
-                var accRes = await _apiService.GetAsync<AdminAccountResponse>(ApiRoutes.Admin.GetAccount(initialAccount.Id));
+                var accRes = await _apiService.GetAsync<AdminAccountResponse>(ApiRoutes.Admin.GetAccount(initialAccount.AccountId));
                 if (accRes.IsSuccess && accRes.Data != null)
                 {
                     Account.Status = accRes.Data.Status;
@@ -98,10 +98,11 @@ namespace RealityTunnel.OperationsConsole.ViewModels
                 else
                 {
                     IsOracleHealthy = false;
+                    await _dialogService.ShowErrorAsync("Load Error", accRes.ErrorMessage ?? "Failed to fetch exact account details.");
                 }
 
                 // 2. Fetch registered devices
-                var devRes = await _apiService.GetAsync<AdminDeviceListResponse>(ApiRoutes.Admin.GetDevices(initialAccount.Id));
+                var devRes = await _apiService.GetAsync<AdminDeviceListResponse>(ApiRoutes.Admin.GetDevices(initialAccount.AccountId));
                 if (devRes.IsSuccess && devRes.Data != null)
                 {
                     Devices.Clear();
@@ -110,7 +111,7 @@ namespace RealityTunnel.OperationsConsole.ViewModels
                 }
 
                 // 3. Fetch security signals
-                var sigRes = await _apiService.GetAsync<AdminSignalListResponse>(ApiRoutes.Admin.GetSignals(initialAccount.Id));
+                var sigRes = await _apiService.GetAsync<AdminSignalListResponse>(ApiRoutes.Admin.GetSignals(initialAccount.AccountId));
                 if (sigRes.IsSuccess && sigRes.Data != null)
                 {
                     Signals.Clear();
@@ -176,7 +177,7 @@ namespace RealityTunnel.OperationsConsole.ViewModels
             IsBusy = true;
             try
             {
-                var res = await _apiService.PatchAsync<AdminAccountResponse>(ApiRoutes.Admin.SuspendAccount(Account.Id));
+                var res = await _apiService.PatchAsync<AdminAccountResponse>(ApiRoutes.Admin.SuspendAccount(Account.AccountId));
                 if (res.IsSuccess && res.Data != null)
                 {
                     Account.Status = res.Data.Status;
@@ -193,7 +194,7 @@ namespace RealityTunnel.OperationsConsole.ViewModels
             IsBusy = true;
             try
             {
-                var res = await _apiService.PatchAsync<AdminAccountResponse>(ApiRoutes.Admin.ActivateAccount(Account.Id));
+                var res = await _apiService.PatchAsync<AdminAccountResponse>(ApiRoutes.Admin.ActivateAccount(Account.AccountId));
                 if (res.IsSuccess && res.Data != null)
                 {
                     Account.Status = res.Data.Status;
@@ -212,7 +213,7 @@ namespace RealityTunnel.OperationsConsole.ViewModels
             {
                 var req = new ExtendSubscriptionRequest { Days = ExtendDaysInput };
                 var res = await _apiService.PatchAsync<AdminAccountResponse, ExtendSubscriptionRequest>(
-                    ApiRoutes.Admin.ExtendSubscription(Account.Id), req);
+                    ApiRoutes.Admin.ExtendSubscription(Account.AccountId), req);
 
                 if (res.IsSuccess && res.Data != null)
                 {
@@ -247,7 +248,7 @@ namespace RealityTunnel.OperationsConsole.ViewModels
                 };
 
                 var res = await _apiService.PostAsync<AdminGrantSubscriptionResponse, AdminGrantSubscriptionRequest>(
-                    ApiRoutes.Admin.GrantSubscription(Account.Id), req);
+                    ApiRoutes.Admin.GrantSubscription(Account.AccountId), req);
 
                 if (res.IsSuccess && res.Data != null)
                 {
@@ -281,7 +282,7 @@ namespace RealityTunnel.OperationsConsole.ViewModels
             IsBusy = true;
             try
             {
-                var res = await _apiService.PostAsync<AdminLogoutAllResponse>(ApiRoutes.Admin.LogoutAllSessions(Account.Id));
+                var res = await _apiService.PostAsync<AdminLogoutAllResponse>(ApiRoutes.Admin.LogoutAllSessions(Account.AccountId));
                 if (res.IsSuccess && res.Data != null)
                 {
                     await _dialogService.ShowInfoAsync("Sessions Revoked", $"Successfully revoked {res.Data.RevokedCount} active session(s).");
@@ -391,7 +392,7 @@ namespace RealityTunnel.OperationsConsole.ViewModels
             IsBusy = true;
             try
             {
-                var res = await _apiService.DeleteAsync<DeviceRemovalResponseDTO>(ApiRoutes.Admin.RemoveDevice(Account.Id, device.DeviceGuid));
+                var res = await _apiService.DeleteAsync<DeviceRemovalResponseDTO>(ApiRoutes.Admin.RemoveDevice(Account.AccountId, device.DeviceGuid));
                 if (res.IsSuccess)
                 {
                     await _dialogService.ShowInfoAsync("Device Removed", "The device was successfully removed and its sessions revoked.");
@@ -417,7 +418,7 @@ namespace RealityTunnel.OperationsConsole.ViewModels
             IsBusy = true;
             try
             {
-                var res = await _apiService.DeleteAsync<AdminAccountResponse>(ApiRoutes.Admin.DeleteAccount(Account.Id));
+                var res = await _apiService.DeleteAsync<AdminAccountResponse>(ApiRoutes.Admin.DeleteAccount(Account.AccountId));
                 if (res.IsSuccess)
                 {
                     await _dialogService.ShowInfoAsync("User Deleted", "The user account has been successfully deleted.");

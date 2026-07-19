@@ -114,7 +114,8 @@
                     <TextBlock Text="Plan:" Foreground="#D1D5DB" VerticalAlignment="Center" Margin="0,0,6,0"/>
                     <ComboBox SelectedValue="{Binding GrantPlanId}" SelectedValuePath="Content" Width="90" Height="34" Margin="0,0,12,0">
                         <ComboBoxItem Content="standard"/>
-                        <ComboBoxItem Content="pro"/>
+                        <ComboBoxItem Content="basic"/>
+                        <ComboBoxItem Content="quarterly"/>
                         <ComboBoxItem Content="free"/>
                     </ComboBox>
 
