@@ -28,10 +28,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Remove="setup\**" />
-    <Content Remove="setup\**" />
-    <EmbeddedResource Remove="setup\**" />
-    <None Remove="setup\**" />
+    <Compile Remove="setup\**;src\**" />
+    <Content Remove="setup\**;src\**" />
+    <EmbeddedResource Remove="setup\**;src\**" />
+    <None Remove="setup\**;src\**" />
+    <Page Remove="setup\**;src\**" />
   </ItemGroup>
 
   <ItemGroup>

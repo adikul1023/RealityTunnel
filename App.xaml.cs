@@ -43,6 +43,11 @@ public partial class App : Application
         
         // Register legacy controllers that the VpnSessionManager needs
         services.AddSingleton<XrayController>();
+        // IVpnBackend is the seam described in docs/PRIVILEGE_BOUNDARY_DESIGN.md.
+        // InProcessVpnBackend is a behavior-preserving wrapper around XrayController;
+        // a future NamedPipeVpnBackend will implement the same interface against the
+        // privileged helper service without VpnSessionManager needing to change.
+        services.AddSingleton<IVpnBackend, InProcessVpnBackend>();
         services.AddSingleton<VpnSessionManager>();
 
         // Register MainWindow so it can accept injected dependencies if desired

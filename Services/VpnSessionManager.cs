@@ -7,7 +7,7 @@ namespace RealityTunnel.Services;
 
 public class VpnSessionManager
 {
-    private readonly XrayController _xrayController;
+    private readonly IVpnBackend _backend;
     private readonly ConfigurationProvider _configProvider;
     private int _retryCount;
     private CancellationTokenSource? _retryCts;
@@ -17,13 +17,13 @@ public class VpnSessionManager
     public event Action<bool>? OnConnectedChanged;
     public event Action<string>? OnRetryUpdate;
     
-    public VpnSessionManager(XrayController xrayController, ConfigurationProvider configProvider)
+    public VpnSessionManager(IVpnBackend backend, ConfigurationProvider configProvider)
     {
-        _xrayController = xrayController;
+        _backend = backend;
         _configProvider = configProvider;
     }
 
-    public bool IsRunning => _xrayController.IsRunning();
+    public bool IsRunning => _backend.IsRunningAsync().GetAwaiter().GetResult();
 
     public async Task StartSessionAsync()
     {
@@ -52,7 +52,7 @@ public class VpnSessionManager
 
         try
         {
-            await Task.Run(() => _xrayController.Start(profile));
+            await _backend.ConnectAsync(profile);
             OnStateChanged?.Invoke("Connected");
             OnConnectedChanged?.Invoke(true);
             _retryCts = null;
@@ -88,7 +88,7 @@ public class VpnSessionManager
 
             _retryCount++;
             await ConnectInternalAsync(profile);
-            if (_xrayController.IsRunning()) break;
+            if (await _backend.IsRunningAsync()) break;
         }
     }
 
@@ -96,7 +96,7 @@ public class VpnSessionManager
     {
         _userDisconnected = true;
         _retryCts?.Cancel();
-        _xrayController.Stop();
+        _backend.DisconnectAsync().GetAwaiter().GetResult();
         OnStateChanged?.Invoke("Disconnected");
         OnConnectedChanged?.Invoke(false);
     }
