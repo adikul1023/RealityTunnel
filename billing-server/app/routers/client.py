@@ -45,6 +45,10 @@ from app.services.provisioning.service import ProvisioningService
 from app.dependencies import get_provisioning_service
 from app.config import settings
 from app.models.base import AccountStatus
+from app.errors import EntityNotFoundError
+import logging
+
+logger = logging.getLogger(__name__)
 
 @router.get(
     "/config",
@@ -78,8 +82,18 @@ async def get_client_config(
         identity = await provisioning.get_vpn_identity(current_account.id)
         logger.info(f"AUDIT DIAGNOSTIC: get_vpn_identity succeeded for {current_account.account_id}")
     except EntityNotFoundError:
-        logger.warning(f"AUDIT DIAGNOSTIC: get_vpn_identity raised EntityNotFoundError for {current_account.account_id}")
-        raise
+        logger.warning(f"AUDIT DIAGNOSTIC: get_vpn_identity raised EntityNotFoundError for {current_account.account_id}. Attempting auto-provisioning.")
+        try:
+            await provisioning.provision_subscription(
+                account_id=current_account.id,
+                plan_id=current_account.plan_id,
+                commit=True
+            )
+            identity = await provisioning.get_vpn_identity(current_account.id)
+            logger.info(f"AUDIT DIAGNOSTIC: Auto-provisioning succeeded for {current_account.account_id}")
+        except Exception as e:
+            logger.error(f"Auto-provisioning failed for {current_account.account_id}: {e}")
+            raise HTTPException(status_code=404, detail="VPN identity not found and could not be auto-provisioned")
     
     return ClientConfigResponse(
         vpn_profile=VpnProfileDto(
