@@ -9,10 +9,11 @@ using System.Net.Sockets;
 using System.Reflection;
 using System.Threading;
 using RealityTunnel.Models;
+using RealityTunnel.Services;
 
 namespace RealityTunnel;
 
-public class XrayController
+public class XrayController : IXrayController
 {
     private Process? _process;
     private string?  _serverIp;

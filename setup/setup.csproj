@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <PublishAot>true</PublishAot>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <ApplicationIcon>app.ico</ApplicationIcon>
+    <ApplicationIcon>..\app.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

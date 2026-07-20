@@ -28,11 +28,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Remove="setup\**;src\**" />
-    <Content Remove="setup\**;src\**" />
-    <EmbeddedResource Remove="setup\**;src\**" />
-    <None Remove="setup\**;src\**" />
-    <Page Remove="setup\**;src\**" />
+    <Compile Remove="setup\**;src\**;RealityTunnel.Shared\**;RealityTunnel.Helper\**;scratch\**" />
+    <Content Remove="setup\**;src\**;RealityTunnel.Shared\**;RealityTunnel.Helper\**;scratch\**" />
+    <EmbeddedResource Remove="setup\**;src\**;RealityTunnel.Shared\**;RealityTunnel.Helper\**;scratch\**" />
+    <None Remove="setup\**;src\**;RealityTunnel.Shared\**;RealityTunnel.Helper\**;scratch\**" />
+    <Page Remove="setup\**;src\**;RealityTunnel.Shared\**;RealityTunnel.Helper\**;scratch\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="RealityTunnel.Shared\RealityTunnel.Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>

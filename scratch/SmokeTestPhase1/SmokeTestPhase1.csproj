@@ -14,7 +14,10 @@
 
   <ItemGroup>
     <Reference Include="RealityTunnel">
-      <HintPath>..\..\artifacts\latest\RealityTunnel.dll</HintPath>
+      <HintPath>..\..\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\RealityTunnel.dll</HintPath>
+    </Reference>
+    <Reference Include="RealityTunnel.Shared">
+      <HintPath>..\..\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\RealityTunnel.Shared.dll</HintPath>
     </Reference>
   </ItemGroup>
 
