@@ -133,8 +133,7 @@ class AuthenticationService:
         return account
 
     async def authenticate(self, account_id: str, master_token: str) -> AuthenticationResult:
-        logger.info(f"AUDIT DIAGNOSTIC: [AuthenticationService.authenticate] Called with account_id={account_id}")
-        logger.info(f"AUDIT LOGIN: [AuthenticationService.authenticate] account_id received = {account_id}")
+        logger.info(f"AUDIT LOGIN: [AuthenticationService.authenticate] Start. account_id received = {account_id}")
         account_id_clean = account_id.strip().upper() if isinstance(account_id, str) else account_id
         master_token_clean = master_token.strip() if isinstance(master_token, str) else master_token
 
@@ -149,34 +148,36 @@ class AuthenticationService:
         # Step 2: Not Found check with Timing Attack Defense
         if account is None:
             verify_master_token(master_token_clean, DUMMY_MASTER_TOKEN_HASH)
-            logger.info("AUDIT LOGIN: [AuthenticationService.authenticate] Authentication failed: account not found (returning ACCOUNT_NOT_FOUND)")
+            logger.info("AUDIT LOGIN: [AuthenticationService.authenticate] Authentication failed: account not found (returning ACCOUNT_NOT_FOUND). Rejecting because account is None.")
             return AuthenticationResult(success=False, reason=AuthenticationReason.ACCOUNT_NOT_FOUND, account=None)
 
         logger.info(f"AUDIT LOGIN: [AuthenticationService.authenticate] account UUID = {account.id}")
-        logger.info(f"AUDIT LOGIN: [AuthenticationService.authenticate] account status = {account.status}, plan_id = {account.plan_id}, expiry = {account.subscription_expires_at}")
+        logger.info(f"AUDIT LOGIN: [AuthenticationService.authenticate] account status = {account.status}")
+        logger.info(f"AUDIT LOGIN: [AuthenticationService.authenticate] plan_id = {account.plan_id}")
+        logger.info(f"AUDIT LOGIN: [AuthenticationService.authenticate] subscription expiry = {account.subscription_expires_at}")
 
         # Step 3: Verify Master Token
         matched = verify_master_token(master_token_clean, account.master_token_hash)
-        logger.info(f"AUDIT LOGIN: [AuthenticationService.authenticate] Password/token verification complete. Matched: {matched}")
+        logger.info(f"AUDIT LOGIN: [AuthenticationService.authenticate] master token verification result = {matched}")
         if not matched:
-            logger.info("AUDIT LOGIN: [AuthenticationService.authenticate] Authentication failed: invalid token (returning INVALID_MASTER_TOKEN)")
+            logger.info("AUDIT LOGIN: [AuthenticationService.authenticate] Authentication failed: invalid token (returning INVALID_MASTER_TOKEN). Rejecting because verify_master_token returned False.")
             return AuthenticationResult(success=False, reason=AuthenticationReason.INVALID_MASTER_TOKEN, account=None)
 
         # Step 4: Subscription Status check
         if account.status == AccountStatus.SUSPENDED:
-            logger.info("AUDIT LOGIN: [AuthenticationService.authenticate] Authentication failed: account suspended (returning ACCOUNT_SUSPENDED)")
+            logger.info("AUDIT LOGIN: [AuthenticationService.authenticate] Authentication failed: account suspended (returning ACCOUNT_SUSPENDED). Rejecting because status == AccountStatus.SUSPENDED.")
             return AuthenticationResult(success=False, reason=AuthenticationReason.ACCOUNT_SUSPENDED, account=account)
 
         if account.status == AccountStatus.PENDING:
-            logger.info("AUDIT LOGIN: [AuthenticationService.authenticate] Authentication failed: account pending (returning ACCOUNT_PENDING)")
+            logger.info("AUDIT LOGIN: [AuthenticationService.authenticate] Authentication failed: account pending (returning ACCOUNT_PENDING). Rejecting because status == AccountStatus.PENDING.")
             return AuthenticationResult(success=False, reason=AuthenticationReason.ACCOUNT_PENDING, account=account)
 
         if account.status == AccountStatus.EXPIRED:
-            logger.info("AUDIT LOGIN: [AuthenticationService.authenticate] Authentication failed: subscription expired (returning SUBSCRIPTION_EXPIRED)")
+            logger.info("AUDIT LOGIN: [AuthenticationService.authenticate] Authentication failed: subscription expired (returning SUBSCRIPTION_EXPIRED). Rejecting because status == AccountStatus.EXPIRED.")
             return AuthenticationResult(success=False, reason=AuthenticationReason.SUBSCRIPTION_EXPIRED, account=account)
 
         if account.status != AccountStatus.ACTIVE:
-            logger.info(f"AUDIT LOGIN: [AuthenticationService.authenticate] Authentication failed: unexpected account status {account.status}")
+            logger.info(f"AUDIT LOGIN: [AuthenticationService.authenticate] Authentication failed: unexpected account status {account.status}. Rejecting because status != AccountStatus.ACTIVE.")
             return AuthenticationResult(success=False, reason=AuthenticationReason.ACCOUNT_SUSPENDED, account=account)
 
         # Step 5: Subscription Expiry timestamp check
@@ -186,7 +187,7 @@ class AuthenticationService:
             if expires_at.tzinfo is None:
                 expires_at = expires_at.replace(tzinfo=timezone.utc)
             if now >= expires_at:
-                logger.info("AUDIT LOGIN: [AuthenticationService.authenticate] Authentication failed: subscription timestamp expired (returning SUBSCRIPTION_EXPIRED)")
+                logger.info("AUDIT LOGIN: [AuthenticationService.authenticate] Authentication failed: subscription timestamp expired (returning SUBSCRIPTION_EXPIRED). Rejecting because now >= expires_at.")
                 return AuthenticationResult(
                     success=False,
                     reason=AuthenticationReason.SUBSCRIPTION_EXPIRED,
@@ -200,3 +201,4 @@ class AuthenticationService:
             reason=AuthenticationReason.SUCCESS,
             account=account,
         )
+

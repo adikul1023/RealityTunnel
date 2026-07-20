@@ -205,6 +205,7 @@ async def login(
     on the separate POST /api/devices endpoint.
     """
     await limiter.enforce(http_request, "login_account", KeyType.ACCOUNT, key_override=request.account_id)
+    logger.info(f"AUDIT LOGIN: [auth.login] device_guid received from client = {request.device_guid}")
     result = await auth_service.authenticate(
         request.account_id, request.master_token.get_secret_value()
     )
@@ -212,6 +213,8 @@ async def login(
 
     if not result.success:
         logger.info(f"AUDIT DIAGNOSTIC: Authentication failed for {request.account_id} due to {result.reason}")
+        logger.info(f"AUDIT LOGIN: [auth.login] Rejecting with 401 due to result.success=False (Reason: {result.reason})")
+
         # Rate limit penalty applies
         await limiter.backend.increment(
             key=f"ip:{getattr(http_request.state, 'client_ip', 'unknown')}:login_penalty",
