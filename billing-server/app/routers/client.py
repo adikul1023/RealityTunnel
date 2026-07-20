@@ -45,7 +45,7 @@ from app.services.provisioning.service import ProvisioningService
 from app.dependencies import get_provisioning_service
 from app.config import settings
 from app.models.base import AccountStatus
-from app.errors import EntityNotFoundError
+from app.exceptions import EntityNotFoundError
 import logging
 
 logger = logging.getLogger(__name__)
