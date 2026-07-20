@@ -1,6 +1,6 @@
 import httpx, json
 
-BASE = "https://api.stealthy.co.in"
+BASE = "http://127.0.0.1:8000"
 creds = {}
 with open(r"d:\My projects\VPN\OverREALITY\tests\regression\.env.regression") as f:
     for line in f:

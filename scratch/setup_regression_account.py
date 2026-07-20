@@ -20,7 +20,7 @@ import sys
 import os
 import subprocess
 
-BASE_URL             = "https://api.stealthy.co.in"
+BASE_URL             = "http://127.0.0.1:8080"
 REGRESSION_DEVICE_GUID = "st-regression-device-0001-000000000000"
 ORACLE_SSH_KEY       = r"d:\My projects\VPN\AWSKEY\ssh-key-2026-03-01.key"
 ORACLE_HOST          = "ubuntu@144.24.153.180"
@@ -31,23 +31,17 @@ CREDS_FILE  = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "tests", "regressi
 
 
 def run_sql(sql: str) -> str:
-    """Execute SQL on the Oracle Postgres container via SSH."""
+    """Execute SQL on the local Postgres container."""
     sql_file = "/tmp/_regression_setup.sql"
     local_tmp = os.path.join(os.environ.get("TEMP", "/tmp"), "_regression_setup.sql")
     with open(local_tmp, "w") as f:
         f.write(sql)
     subprocess.run(
-        ["scp", "-i", ORACLE_SSH_KEY, local_tmp, f"{ORACLE_HOST}:/tmp/_r.sql"],
-        check=True, capture_output=True
-    )
-    subprocess.run(
-        ["ssh", "-i", ORACLE_SSH_KEY, ORACLE_HOST,
-         f"sudo docker cp /tmp/_r.sql {POSTGRES_CONTAINER}:{sql_file}"],
+        ["docker", "cp", local_tmp, f"billing-server-postgres-1:{sql_file}"],
         check=True, capture_output=True
     )
     result = subprocess.run(
-        ["ssh", "-i", ORACLE_SSH_KEY, ORACLE_HOST,
-         f"sudo docker exec {POSTGRES_CONTAINER} psql -U billing -d billing -f {sql_file}"],
+        ["docker", "exec", "billing-server-postgres-1", "psql", "-U", "billing", "-d", "billing", "-f", sql_file],
         capture_output=True, text=True
     )
     return result.stdout + result.stderr

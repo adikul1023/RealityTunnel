@@ -74,8 +74,12 @@ async def get_client_config(
     if current_account.status != AccountStatus.ACTIVE:
         raise HTTPException(status_code=403, detail="Account requires an active subscription")
 
-    # Retrieve cached VPN identity (lazy-syncing legacy users if needed)
-    identity = await provisioning.get_vpn_identity(current_account.id)
+    try:
+        identity = await provisioning.get_vpn_identity(current_account.id)
+        logger.info(f"AUDIT DIAGNOSTIC: get_vpn_identity succeeded for {current_account.account_id}")
+    except EntityNotFoundError:
+        logger.warning(f"AUDIT DIAGNOSTIC: get_vpn_identity raised EntityNotFoundError for {current_account.account_id}")
+        raise
     
     return ClientConfigResponse(
         vpn_profile=VpnProfileDto(

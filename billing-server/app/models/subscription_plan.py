@@ -43,10 +43,10 @@ FREE: Final[SubscriptionPlan] = SubscriptionPlan(
 BASIC: Final[SubscriptionPlan] = SubscriptionPlan(
     plan_id="basic",
     display_name="Basic Plan",
-    max_devices=5,
-    max_concurrent_ips=5,
-    data_quota_bytes=100 * 1024**3,  # 100 GB
-    price_minor_units=49900,  # 499 INR
+    max_devices=1,
+    max_concurrent_ips=1,
+    data_quota_bytes=40 * 1024**3,  # 40 GB
+    price_minor_units=6900,  # 69 INR
 )
 
 STANDARD: Final[SubscriptionPlan] = SubscriptionPlan(
@@ -55,16 +55,16 @@ STANDARD: Final[SubscriptionPlan] = SubscriptionPlan(
     max_devices=2,
     max_concurrent_ips=2,
     data_quota_bytes=50 * 1024**3,  # 50 GB
-    price_minor_units=19900,  # 199 INR
+    price_minor_units=9900,  # 99 INR
 )
 
 QUARTERLY: Final[SubscriptionPlan] = SubscriptionPlan(
     plan_id="quarterly",
     display_name="Quarterly Plan",
-    max_devices=15,
-    max_concurrent_ips=15,
-    data_quota_bytes=500 * 1024**3,  # 500 GB
-    price_minor_units=99900,  # 999 INR
+    max_devices=1,
+    max_concurrent_ips=1,
+    data_quota_bytes=150 * 1024**3,  # 150 GB
+    price_minor_units=17900,  # 179 INR
 )
 
 

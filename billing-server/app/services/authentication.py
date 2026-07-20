@@ -129,100 +129,55 @@ class AuthenticationService:
                 logger.info("Token validation failed: subscription timestamp expired")
                 raise AccountNotActiveError("Subscription timestamp expired")
 
+        logger.info(f"AUDIT DIAGNOSTIC: get_active_account_by_uuid succeeded for account_id={account.account_id}")
         return account
 
     async def authenticate(self, account_id: str, master_token: str) -> AuthenticationResult:
-        """
-        Authenticate an Account ID and Master Token credential pair against repository state.
-
-        Performs the following sequence:
-        1. Lookup account by Account ID (using repository).
-        2. If account not found -> execute timing attack defense -> return ACCOUNT_NOT_FOUND.
-        3. Verify Master Token against stored SHA-256 hash -> if invalid -> return INVALID_MASTER_TOKEN.
-        4. Check subscription status -> if SUSPENDED or PENDING -> return respective failure reason.
-        5. Check subscription expiry timestamp -> if expired -> return SUBSCRIPTION_EXPIRED.
-        6. Return SUCCESS with authenticated account.
-
-        LOGGING INVARIANT:
-        Never logs Account IDs, Master Tokens, or token hashes. Logs only generic outcome descriptions.
-        """
+        logger.info(f"AUDIT DIAGNOSTIC: [AuthenticationService.authenticate] Called with account_id={account_id}")
+        logger.info(f"AUDIT LOGIN: [AuthenticationService.authenticate] account_id received = {account_id}")
         account_id_clean = account_id.strip().upper() if isinstance(account_id, str) else account_id
         master_token_clean = master_token.strip() if isinstance(master_token, str) else master_token
 
         # Step 1: Find Account via repository
         try:
             account = await self.account_repo.get_by_account_id(account_id_clean)
-        except RepositoryError as e:
-            logger.error("Authentication failed due to repository error")
-            raise AuthenticationServiceError("Database error during authentication lookup") from e
+            logger.info(f"AUDIT LOGIN: [AuthenticationService.authenticate] account found = {account is not None}")
         except Exception as e:
-            logger.error("Authentication failed due to unexpected database error")
+            logger.error("Authentication failed due to unexpected database error", exc_info=True)
             raise AuthenticationServiceError("Unexpected database error during authentication lookup") from e
 
         # Step 2: Not Found check with Timing Attack Defense
         if account is None:
-            # TIMING ATTACK DEFENSE:
-            # Always execute verify_master_token against a dummy hash so that hashing and constant-time
-            # comparison execute even when the account does not exist. This prevents account enumeration
-            # based on response timing differences.
             verify_master_token(master_token_clean, DUMMY_MASTER_TOKEN_HASH)
-            logger.info("Authentication failed: invalid credentials")
-            return AuthenticationResult(
-                success=False,
-                reason=AuthenticationReason.ACCOUNT_NOT_FOUND,
-                account=None,
-            )
+            logger.info("AUDIT LOGIN: [AuthenticationService.authenticate] Authentication failed: account not found (returning ACCOUNT_NOT_FOUND)")
+            return AuthenticationResult(success=False, reason=AuthenticationReason.ACCOUNT_NOT_FOUND, account=None)
+
+        logger.info(f"AUDIT LOGIN: [AuthenticationService.authenticate] account UUID = {account.id}")
+        logger.info(f"AUDIT LOGIN: [AuthenticationService.authenticate] account status = {account.status}, plan_id = {account.plan_id}, expiry = {account.subscription_expires_at}")
 
         # Step 3: Verify Master Token
         matched = verify_master_token(master_token_clean, account.master_token_hash)
-        if settings.environment.lower() != "production":
-            computed_hash = hash_master_token(master_token_clean)
-            logger.debug(
-                "DEV AUDIT [Login]: computed_hash=%s, stored_hash=%s, matched=%s",
-                computed_hash,
-                account.master_token_hash,
-                matched,
-            )
+        logger.info(f"AUDIT LOGIN: [AuthenticationService.authenticate] Password/token verification complete. Matched: {matched}")
         if not matched:
-            logger.info("Authentication failed: invalid credentials")
-            return AuthenticationResult(
-                success=False,
-                reason=AuthenticationReason.INVALID_MASTER_TOKEN,
-                account=None,
-            )
+            logger.info("AUDIT LOGIN: [AuthenticationService.authenticate] Authentication failed: invalid token (returning INVALID_MASTER_TOKEN)")
+            return AuthenticationResult(success=False, reason=AuthenticationReason.INVALID_MASTER_TOKEN, account=None)
 
         # Step 4: Subscription Status check
         if account.status == AccountStatus.SUSPENDED:
-            logger.info("Authentication failed: suspended account")
-            return AuthenticationResult(
-                success=False,
-                reason=AuthenticationReason.ACCOUNT_SUSPENDED,
-                account=account,
-            )
+            logger.info("AUDIT LOGIN: [AuthenticationService.authenticate] Authentication failed: account suspended (returning ACCOUNT_SUSPENDED)")
+            return AuthenticationResult(success=False, reason=AuthenticationReason.ACCOUNT_SUSPENDED, account=account)
 
         if account.status == AccountStatus.PENDING:
-            logger.info("Authentication failed: pending subscription")
-            return AuthenticationResult(
-                success=False,
-                reason=AuthenticationReason.ACCOUNT_PENDING,
-                account=account,
-            )
+            logger.info("AUDIT LOGIN: [AuthenticationService.authenticate] Authentication failed: account pending (returning ACCOUNT_PENDING)")
+            return AuthenticationResult(success=False, reason=AuthenticationReason.ACCOUNT_PENDING, account=account)
 
         if account.status == AccountStatus.EXPIRED:
-            logger.info("Authentication failed: expired subscription")
-            return AuthenticationResult(
-                success=False,
-                reason=AuthenticationReason.SUBSCRIPTION_EXPIRED,
-                account=account,
-            )
+            logger.info("AUDIT LOGIN: [AuthenticationService.authenticate] Authentication failed: subscription expired (returning SUBSCRIPTION_EXPIRED)")
+            return AuthenticationResult(success=False, reason=AuthenticationReason.SUBSCRIPTION_EXPIRED, account=account)
 
         if account.status != AccountStatus.ACTIVE:
-            logger.info("Authentication failed: expired subscription")
-            return AuthenticationResult(
-                success=False,
-                reason=AuthenticationReason.SUBSCRIPTION_EXPIRED,
-                account=account,
-            )
+            logger.info(f"AUDIT LOGIN: [AuthenticationService.authenticate] Authentication failed: unexpected account status {account.status}")
+            return AuthenticationResult(success=False, reason=AuthenticationReason.ACCOUNT_SUSPENDED, account=account)
 
         # Step 5: Subscription Expiry timestamp check
         if account.subscription_expires_at is not None:
@@ -231,7 +186,7 @@ class AuthenticationService:
             if expires_at.tzinfo is None:
                 expires_at = expires_at.replace(tzinfo=timezone.utc)
             if now >= expires_at:
-                logger.info("Authentication failed: expired subscription")
+                logger.info("AUDIT LOGIN: [AuthenticationService.authenticate] Authentication failed: subscription timestamp expired (returning SUBSCRIPTION_EXPIRED)")
                 return AuthenticationResult(
                     success=False,
                     reason=AuthenticationReason.SUBSCRIPTION_EXPIRED,
@@ -239,7 +194,7 @@ class AuthenticationService:
                 )
 
         # Step 6: Authentication Success
-        logger.info("Authentication succeeded")
+        logger.info("AUDIT LOGIN: [AuthenticationService.authenticate] Authentication succeeded (returning SUCCESS)")
         return AuthenticationResult(
             success=True,
             reason=AuthenticationReason.SUCCESS,

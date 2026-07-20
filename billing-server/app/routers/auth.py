@@ -205,10 +205,20 @@ async def login(
     on the separate POST /api/devices endpoint.
     """
     await limiter.enforce(http_request, "login_account", KeyType.ACCOUNT, key_override=request.account_id)
+    result = await auth_service.authenticate(
+        request.account_id, request.master_token.get_secret_value()
+    )
+    logger.info(f"AUDIT DIAGNOSTIC: auth_service.authenticate returned success={result.success}, reason={result.reason}")
 
-    result = await auth_service.authenticate(request.account_id, request.master_token.get_secret_value())
-    if not result.success or result.account is None:
-        logger.info("Login failed")
+    if not result.success:
+        logger.info(f"AUDIT DIAGNOSTIC: Authentication failed for {request.account_id} due to {result.reason}")
+        # Rate limit penalty applies
+        await limiter.backend.increment(
+            key=f"ip:{getattr(http_request.state, 'client_ip', 'unknown')}:login_penalty",
+            window_seconds=60,
+            max_requests=5,
+        )
+        logger.warning("Login failed: invalid credentials or inactive account")
         await safe_record_signal(
             signal_service,
             account_id=result.account.id if result.account else None,
@@ -219,8 +229,9 @@ async def login(
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication failed: invalid credentials or inactive account",
+            detail=f"Authentication failed: invalid credentials or inactive account (Reason: {result.reason})",
         )
+
 
     # ── Two-Factor Authentication check ─────────────────────────────────────
     # This check runs AFTER credential verification so we don't leak whether 2FA is
@@ -305,7 +316,7 @@ async def login(
         # SECURITY: never reveal that this device_guid is registered to a different
         # account — that would leak information about another account's device inventory.
         # Respond identically to an invalid-credentials failure.
-        logger.info("Login failed")
+        logger.info(f"AUDIT LOGIN: [POST /api/auth/login] Login failed. Reason: DeviceOwnershipError for device {request.device_guid}")
         await safe_record_signal(
             signal_service,
             account_id=result.account.id,
@@ -316,7 +327,7 @@ async def login(
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication failed: invalid credentials or inactive account",
+            detail="Authentication failed: invalid credentials or inactive account (Reason: DeviceOwnershipError)",
         )
     except InactiveDeviceError:
         logger.info("Login failed: device deactivated")
