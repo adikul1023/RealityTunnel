@@ -43,11 +43,23 @@ public partial class App : Application
         
         // Register legacy controllers that the VpnSessionManager needs
         services.AddSingleton<XrayController>();
-        // IVpnBackend is the seam described in docs/PRIVILEGE_BOUNDARY_DESIGN.md.
-        // InProcessVpnBackend is a behavior-preserving wrapper around XrayController;
-        // a future NamedPipeVpnBackend will implement the same interface against the
-        // privileged helper service without VpnSessionManager needing to change.
-        services.AddSingleton<IVpnBackend, InProcessVpnBackend>();
+        // Register concrete backends for Phase 3A dual-backend rollout
+        services.AddSingleton<InProcessVpnBackend>();
+        services.AddSingleton<NamedPipeVpnBackend>();
+        services.AddSingleton<IVpnBackend>(sp =>
+        {
+            var envBackend = Environment.GetEnvironmentVariable("REALITYTUNNEL_VPN_BACKEND");
+            var configuredBackend = !string.IsNullOrWhiteSpace(envBackend) ? envBackend : AppSettings.Load().VpnBackend;
+
+            if (string.Equals(configuredBackend, "NamedPipe", StringComparison.OrdinalIgnoreCase))
+            {
+                sp.GetRequiredService<ClientLogger>().Log(LogLevel.INFO, "App", "VpnBackend: Selected NamedPipeVpnBackend (service-backed IPC mode).");
+                return sp.GetRequiredService<NamedPipeVpnBackend>();
+            }
+
+            sp.GetRequiredService<ClientLogger>().Log(LogLevel.INFO, "App", "VpnBackend: Selected InProcessVpnBackend (default dual-backend mode).");
+            return sp.GetRequiredService<InProcessVpnBackend>();
+        });
         services.AddSingleton<VpnSessionManager>();
 
         // Register MainWindow so it can accept injected dependencies if desired

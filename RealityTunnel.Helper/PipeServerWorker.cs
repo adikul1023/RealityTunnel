@@ -23,6 +23,7 @@ public class PipeServerWorker : BackgroundService
     private string _actualState = "Disconnected";
     private DateTimeOffset? _connectedSince = null;
     private string? _lastError = null;
+    private int _activeClientCount = 0;
 
     private readonly SemaphoreSlim _wakeupSignal = new(0);
 
@@ -300,31 +301,53 @@ public class PipeServerWorker : BackgroundService
                 await SendMessageAsync(pipeStream, IpcMessage.Create(IpcMessageTypes.Ack, helloResp, sessionToken, lastSeenSequence, firstMsg.RequestId), stoppingToken);
                 _logger.LogInfo($"Hello handshake completed for PID {clientPid} ({clientIdentity}). Session established.");
 
-                while (!stoppingToken.IsCancellationRequested && pipeStream.IsConnected)
+                Interlocked.Increment(ref _activeClientCount);
+                try
                 {
-                    var msg = await IpcFraming.ReadMessageAsync(pipeStream, stoppingToken);
-                    if (msg == null)
+                    while (!stoppingToken.IsCancellationRequested && pipeStream.IsConnected)
                     {
-                        _logger.LogInfo($"Client PID {clientPid} disconnected cleanly.");
-                        break;
-                    }
+                        var msg = await IpcFraming.ReadMessageAsync(pipeStream, stoppingToken);
+                        if (msg == null)
+                        {
+                            _logger.LogInfo($"Client PID {clientPid} disconnected cleanly.");
+                            break;
+                        }
 
-                    if (msg.SessionToken != sessionToken)
+                        if (msg.SessionToken != sessionToken)
+                        {
+                            _logger.LogWarn($"Client PID {clientPid} sent message with invalid session token. Closing connection.");
+                            await SendErrorAsync(pipeStream, IpcErrorCodes.Unauthorized, "Invalid session token.", msg.RequestId, stoppingToken);
+                            break;
+                        }
+
+                        if (msg.Sequence != lastSeenSequence + 1)
+                        {
+                            _logger.LogWarn($"Client PID {clientPid} sequence mismatch. Expected {lastSeenSequence + 1}, got {msg.Sequence}. Closing connection.");
+                            await SendErrorAsync(pipeStream, IpcErrorCodes.InvalidSequence, $"Expected sequence {lastSeenSequence + 1}, got {msg.Sequence}.", msg.RequestId, stoppingToken);
+                            break;
+                        }
+
+                        lastSeenSequence = msg.Sequence;
+                        await ProcessMessageAsync(pipeStream, msg, stoppingToken);
+                    }
+                }
+                finally
+                {
+                    int remaining = Interlocked.Decrement(ref _activeClientCount);
+                    lock (_stateLock)
                     {
-                        _logger.LogWarn($"Client PID {clientPid} sent message with invalid session token. Closing connection.");
-                        await SendErrorAsync(pipeStream, IpcErrorCodes.Unauthorized, "Invalid session token.", msg.RequestId, stoppingToken);
-                        break;
+                        if (_desiredState == "Connected" && remaining <= 0)
+                        {
+                            _logger.LogInfo($"Last client (PID {clientPid}) disconnected while desired state was Connected. Resetting desired state to Disconnected to prevent orphan session.");
+                            _desiredState = "Disconnected";
+                            _desiredProfile = null;
+                            if (_actualState != "Disconnected")
+                            {
+                                _actualState = "Disconnecting";
+                            }
+                            WakeupReconciliationLoop();
+                        }
                     }
-
-                    if (msg.Sequence != lastSeenSequence + 1)
-                    {
-                        _logger.LogWarn($"Client PID {clientPid} sequence mismatch. Expected {lastSeenSequence + 1}, got {msg.Sequence}. Closing connection.");
-                        await SendErrorAsync(pipeStream, IpcErrorCodes.InvalidSequence, $"Expected sequence {lastSeenSequence + 1}, got {msg.Sequence}.", msg.RequestId, stoppingToken);
-                        break;
-                    }
-
-                    lastSeenSequence = msg.Sequence;
-                    await ProcessMessageAsync(pipeStream, msg, stoppingToken);
                 }
             }
             catch (EndOfStreamException)

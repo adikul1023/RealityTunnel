@@ -16,6 +16,7 @@ public class VpnSessionManager
     public event Action<string>? OnStateChanged;
     public event Action<bool>? OnConnectedChanged;
     public event Action<string>? OnRetryUpdate;
+    public event Action<string>? OnError;
     
     public VpnSessionManager(IVpnBackend backend, ConfigurationProvider configProvider)
     {
@@ -63,6 +64,14 @@ public class VpnSessionManager
         {
             try { System.IO.File.AppendAllText(System.IO.Path.Combine(XrayController.GetAppDirectory(), "runtime_trace.log"), $"\n[ConnectInternalAsync ERROR]\n{ex}\n"); } catch { }
             OnStateChanged?.Invoke("Failed");
+            
+            string errorMsg = ex.Message;
+            if (ex is System.TimeoutException)
+            {
+                errorMsg = "Helper service not responding or missing.";
+            }
+            OnError?.Invoke(errorMsg);
+
             if (!_userDisconnected)
             {
                 _ = AutoRetryAsync(profile);

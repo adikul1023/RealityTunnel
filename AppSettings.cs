@@ -11,6 +11,7 @@ public class AppSettings
     public int? WindowX { get; set; }
     public int? WindowY { get; set; }
     public string Theme { get; set; } = "System";
+    public string VpnBackend { get; set; } = "InProcess";
     private static string FilePath =>
         Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

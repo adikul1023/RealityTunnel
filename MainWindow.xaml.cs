@@ -82,6 +82,7 @@ public sealed partial class MainWindow : Window
         _sessionManager.OnStateChanged += SessionManager_OnStateChanged;
         _sessionManager.OnConnectedChanged += SessionManager_OnConnectedChanged;
         _sessionManager.OnRetryUpdate += SessionManager_OnRetryUpdate;
+        _sessionManager.OnError += SessionManager_OnError;
 
         this.Closed += OnClosed;
         this.SizeChanged += MainWindow_SizeChanged;
@@ -317,6 +318,11 @@ public sealed partial class MainWindow : Window
     private void SessionManager_OnRetryUpdate(string retryText)
     {
         DispatcherQueue.TryEnqueue(() => RetryLabel.Text = retryText);
+    }
+
+    private void SessionManager_OnError(string errorMsg)
+    {
+        DispatcherQueue.TryEnqueue(() => ShowError($"Connection Error: {errorMsg}"));
     }
 
     private async void LoginActionBtn_Click(object sender, RoutedEventArgs e)
