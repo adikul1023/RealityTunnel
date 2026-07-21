@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   Shield,
@@ -100,11 +100,71 @@ function RealDownloadButton({ label, href }: { label: string; href: string }) {
   )
 }
 
+// Plan metadata keyed by plan ID (matches planId in plan-cta.tsx)
+// QR files are assigned to match the actual UPI payment amount:
+//   basic (₹69)     → payment-qr-quarterly.jpg
+//   standard (₹99)  → payment-qr-basic.jpg
+//   quarterly (₹179) → payment-qr-standard.jpg
+const PLAN_INFO: Record<string, { label: string; price: string; qr: string }> = {
+  basic:     { label: 'Basic Monthly',    price: '₹69/month',    qr: '/payment-qr-quarterly.jpg' },
+  standard:  { label: 'Standard Monthly', price: '₹99/month',    qr: '/payment-qr-basic.jpg' },
+  quarterly: { label: 'Quarterly',        price: '₹179/quarter', qr: '/payment-qr-standard.jpg' },
+}
+
 // ─── Tab: My Credits ──────────────────────────────────────────────────────────
 function CreditsTab({ profile }: { profile: AccountMeResponse | null }) {
-  const plan = profile?.plan || 'Free'
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
+  // Auto-open modal and pre-select plan when coming from the plans page
+  const payParam = searchParams.get('pay') || ''
+  const initialPlan = PLAN_INFO[payParam] ? payParam : 'basic'
+
+  const [isModalOpen, setIsModalOpen] = useState(!!payParam)
+  const [selectedPlan] = useState(initialPlan)
+  const [transactionId, setTransactionId] = useState('')
+  const [submittingTx, setSubmittingTx] = useState(false)
+  const [txMessage, setTxMessage] = useState('')
+
+  const currentPlan = profile?.plan || 'Free'
   const expiresAt = profile?.subscription_expires_at
   const status = profile?.status || 'Active'
+  const accountId = profile?.account_id || 'Unknown'
+
+  const planInfo = PLAN_INFO[selectedPlan] || PLAN_INFO.basic
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false)
+    // Remove the ?pay= param from URL cleanly
+    router.replace('/dashboard')
+  }
+
+  const handleSubmitTx = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!transactionId.trim()) return
+
+    setSubmittingTx(true)
+    setTxMessage('')
+    try {
+      const res = await fetch('/api/telegram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactionId,
+          accountId,
+          plan: planInfo.label,
+          price: planInfo.price,
+        }),
+      })
+      if (!res.ok) throw new Error('Failed to submit')
+      setTxMessage(`✅ Transaction submitted! Your ${planInfo.label} plan will be approved within 30 minutes. Approval hours: 6:00 AM – 10:00 PM IST.`)
+      setTransactionId('')
+    } catch (err) {
+      setTxMessage('Failed to submit transaction. Please try again.')
+    } finally {
+      setSubmittingTx(false)
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -112,29 +172,29 @@ function CreditsTab({ profile }: { profile: AccountMeResponse | null }) {
       <div className="rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm text-foreground flex items-center gap-3">
         <Shield className="h-5 w-5 text-primary flex-shrink-0" />
         <div>
-          <strong className="font-semibold">Read-Only Billing Mode:</strong> Online payments and instant plan modifications are disabled during Phase 9.1.
+          <strong className="font-semibold">Manual Payment Active:</strong> Pay via UPI QR code, then submit your Transaction ID for approval.
         </div>
       </div>
 
-      {/* Subscription Status & Usage */}
+      {/* Subscription Status */}
       <div className="rounded-xl border border-border bg-card p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold text-foreground">Subscription Status</h2>
           <span className="text-sm font-medium text-primary">{status}</span>
         </div>
         <p className="text-sm text-muted-foreground">
-          Your account is currently active under the <strong className="text-foreground">{plan} Plan</strong>.
+          Your account is currently on the <strong className="text-foreground">{currentPlan} Plan</strong>.
         </p>
       </div>
 
-      {/* Plan info */}
+      {/* Upgrade / Renew */}
       <div className="rounded-xl border border-border bg-card p-6">
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
             <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Current plan</p>
             <div className="flex items-center gap-2">
               <Shield className="h-4 w-4 text-primary" />
-              <span className="font-semibold text-foreground">{plan} Plan</span>
+              <span className="font-semibold text-foreground">{currentPlan} Plan</span>
             </div>
             <p className="text-sm text-muted-foreground mt-1">
               Expires on {expiresAt ? formatDate(expiresAt) : 'No expiration date'}
@@ -142,18 +202,84 @@ function CreditsTab({ profile }: { profile: AccountMeResponse | null }) {
           </div>
         </div>
         <div className="mt-5">
-          <button
-            type="button"
-            disabled
-            className="rounded-md bg-muted px-4 py-2 text-sm font-semibold text-muted-foreground cursor-not-allowed"
-          >
-            Payments Disabled (Read-Only Mode)
-          </button>
+          <a href="/plans" className="inline-block rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted hover:border-primary transition-colors">
+            View Plans &amp; Pricing
+          </a>
         </div>
       </div>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-lg font-semibold text-foreground">Pay via UPI</h2>
+              <button
+                onClick={handleCloseModal}
+                className="rounded-full p-1 hover:bg-muted text-muted-foreground transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="text-sm text-muted-foreground mb-1">
+              <span className="font-medium text-foreground">{planInfo.label}</span> — {planInfo.price}
+            </p>
+            <p className="text-xs text-muted-foreground mb-4">
+              Scan the QR code with any UPI app (GPay, PhonePe, Paytm, etc.), then paste your Transaction ID below.
+            </p>
+
+            {/* QR Code */}
+            <div className="flex justify-center mb-5 bg-white p-3 rounded-xl border border-border">
+              <img
+                key={selectedPlan}
+                src={planInfo.qr}
+                alt={`${planInfo.label} UPI QR Code`}
+                className="w-52 h-52 object-contain"
+                onError={(e) => {
+                  // Fallback to default if specific QR not found
+                  e.currentTarget.onerror = null
+                  e.currentTarget.src = '/payment-qr-default.jpg'
+                }}
+              />
+            </div>
+
+            <form onSubmit={handleSubmitTx} className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  Transaction ID / UTR Number
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={transactionId}
+                  onChange={(e) => setTransactionId(e.target.value)}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+                  placeholder="e.g. 123456789012"
+                  autoFocus
+                />
+              </div>
+
+              {txMessage && (
+                <p className={`text-sm ${txMessage.includes('submitted') ? 'text-primary' : 'text-destructive'}`}>
+                  {txMessage}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={submittingTx || !transactionId.trim()}
+                className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submittingTx ? 'Submitting…' : 'Submit Transaction'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+
 
 // ─── Tab: My Devices ──────────────────────────────────────────────────────────
 function DevicesTab({

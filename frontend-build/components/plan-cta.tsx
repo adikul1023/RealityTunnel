@@ -23,9 +23,9 @@ export function PlanCta({ planId, label = 'Get started', variant = 'default' }: 
 
   function handleClick() {
     if (isAuthenticated()) {
-      // Payments are not yet enabled. Send authenticated users to their
-      // dashboard rather than back to the registration page.
-      router.push('/dashboard')
+      // Pass the selected plan to the dashboard so the payment modal
+      // can pre-select and show the correct QR code.
+      router.push(`/dashboard?pay=${planId}`)
     } else {
       router.push('/register')
     }

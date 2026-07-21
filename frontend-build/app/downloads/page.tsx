@@ -17,44 +17,26 @@ function DownloadButton({ href, label }: { href: string; label: string }) {
   )
 }
 
-const platforms = [
-  {
-    icon: Monitor,
-    name: 'Windows',
-    version: 'v1.0.0-rc1',
-    requirements: 'Windows 10 or later (64-bit)',
-    size: '~18 MB',
-    steps: [
-      'Download the installer (StealthySetup.exe) and run it.',
-      'Accept the license agreement and complete installation.',
-      'Launch Stealthy from your Start menu or desktop shortcut.',
-      'Enter your 32-character master token when prompted.',
-      'Select a server region and click Connect.',
-    ],
-    downloads: [
-      { label: 'Windows Installer', sublabel: 'StealthySetup.exe (~18 MB)', href: `${config.downloadUrl}/StealthySetup.exe` },
-    ],
-  },
-  {
-    icon: Smartphone,
-    name: 'Android',
-    version: 'v1.0.0-rc1',
-    requirements: 'Android 8.0 (Oreo) or later',
-    size: '~12 MB',
-    steps: [
-      'Download the APK file (Stealthy.apk) to your Android device.',
-      'Enable "Install from unknown sources" in your device settings if prompted.',
-      'Open the downloaded APK and follow the installation prompts.',
-      'Launch Stealthy and enter your 32-character master token.',
-      'Grant VPN permissions when the system dialog appears, then tap Connect.',
-    ],
-    downloads: [
-      { label: 'Android Package', sublabel: 'Stealthy.apk (~12 MB)', href: `${config.downloadUrl}/Stealthy.apk` },
-    ],
-  },
-]
+const windowsPlatform = {
+  icon: Monitor,
+  name: 'Windows',
+  version: 'v1.0.0-rc1',
+  requirements: 'Windows 10 or later (64-bit)',
+  size: '~18 MB',
+  steps: [
+    'Download the installer (StealthySetup.exe) and run it.',
+    'Accept the license agreement and complete installation.',
+    'Launch Stealthy from your Start menu or desktop shortcut.',
+    'Enter your 32-character master token when prompted.',
+    'Select a server region and click Connect.',
+  ],
+  downloads: [
+    { label: 'Windows Installer', sublabel: 'StealthySetup.exe (~18 MB)', href: `${config.downloadUrl}/StealthySetup.exe` },
+  ],
+}
 
 export default function DownloadsPage() {
+  const p = windowsPlatform
   return (
     <div className="flex min-h-screen flex-col">
       <Nav />
@@ -71,78 +53,91 @@ export default function DownloadsPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            {platforms.map((p) => (
-              <div
-                key={p.name}
-                className="rounded-xl border border-border bg-card overflow-hidden flex flex-col"
-              >
-                {/* Header */}
-                <div className="border-b border-border p-6 flex items-center gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-                    <p.icon className="h-6 w-6 text-primary" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="font-semibold text-foreground text-lg">{p.name}</h2>
-                      <span className="text-xs rounded-full border border-border px-2 py-0.5 text-muted-foreground font-mono">
-                        {p.version}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {p.requirements} · {p.size}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Downloads */}
-                <div className="p-6 border-b border-border space-y-3">
-                  {p.downloads.map((dl) => (
-                    <div key={dl.label} className="flex items-center justify-between gap-4">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{dl.label}</p>
-                        <p className="text-xs text-muted-foreground">{dl.sublabel}</p>
-                      </div>
-                        <DownloadButton href={dl.href} label="Download" />
-                    </div>
-                  ))}
-                </div>
-
-                {/* Setup steps */}
-                <div className="p-6 flex-1">
-                  <h3 className="text-sm font-semibold text-foreground mb-3">Setup instructions</h3>
-                  <ol className="space-y-2.5">
-                    {p.steps.map((step, i) => (
-                      <li key={i} className="flex items-start gap-2.5">
-                        <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary/10 mt-0.5">
-                          <span className="text-[10px] font-bold text-primary">{i + 1}</span>
-                        </div>
-                        <p className="text-sm text-muted-foreground leading-relaxed">{step}</p>
-                      </li>
-                    ))}
-                  </ol>
-                </div>
+          {/* Windows — active */}
+          <div className="rounded-xl border border-border bg-card overflow-hidden flex flex-col mb-6">
+            {/* Header */}
+            <div className="border-b border-border p-6 flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+                <p.icon className="h-6 w-6 text-primary" />
               </div>
-            ))}
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-semibold text-foreground text-lg">{p.name}</h2>
+                  <span className="text-xs rounded-full border border-border px-2 py-0.5 text-muted-foreground font-mono">
+                    {p.version}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {p.requirements} · {p.size}
+                </p>
+              </div>
+            </div>
+
+            {/* Downloads */}
+            <div className="p-6 border-b border-border space-y-3">
+              {p.downloads.map((dl) => (
+                <div key={dl.label} className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{dl.label}</p>
+                    <p className="text-xs text-muted-foreground">{dl.sublabel}</p>
+                  </div>
+                  <DownloadButton href={dl.href} label="Download" />
+                </div>
+              ))}
+            </div>
+
+            {/* Setup steps */}
+            <div className="p-6 flex-1">
+              <h3 className="text-sm font-semibold text-foreground mb-3">Setup instructions</h3>
+              <ol className="space-y-2.5">
+                {p.steps.map((step, i) => (
+                  <li key={i} className="flex items-start gap-2.5">
+                    <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary/10 mt-0.5">
+                      <span className="text-[10px] font-bold text-primary">{i + 1}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{step}</p>
+                  </li>
+                ))}
+              </ol>
+            </div>
           </div>
 
-          {/* Linux — coming soon */}
-          <div className="rounded-xl border border-dashed border-border bg-card/50 p-6 flex items-center gap-5 mb-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted flex-shrink-0">
-              <Monitor className="h-6 w-6 text-muted-foreground" />
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <h2 className="font-semibold text-foreground text-lg">Linux</h2>
-                <span className="rounded-full bg-muted border border-border px-2.5 py-0.5 text-xs text-muted-foreground font-medium">
-                  Coming soon
-                </span>
+          {/* Coming Soon: Android & Linux */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            {/* Android — coming soon */}
+            <div className="rounded-xl border border-dashed border-border bg-card/50 p-6 flex items-center gap-5">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted flex-shrink-0">
+                <Smartphone className="h-6 w-6 text-muted-foreground" />
               </div>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                A native Linux client is currently in development. Support for Debian/Ubuntu
-                (apt), Fedora (rpm), and Arch is planned. Check back or watch our release notes
-                for updates.
-              </p>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <h2 className="font-semibold text-foreground text-lg">Android</h2>
+                  <span className="rounded-full bg-muted border border-border px-2.5 py-0.5 text-xs text-muted-foreground font-medium">
+                    Coming soon
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  An Android client is currently in development. Requires Android 8.0 (Oreo) or later. Stay tuned for the release.
+                </p>
+              </div>
+            </div>
+
+            {/* Linux — coming soon */}
+            <div className="rounded-xl border border-dashed border-border bg-card/50 p-6 flex items-center gap-5">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted flex-shrink-0">
+                <Monitor className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <h2 className="font-semibold text-foreground text-lg">Linux</h2>
+                  <span className="rounded-full bg-muted border border-border px-2.5 py-0.5 text-xs text-muted-foreground font-medium">
+                    Coming soon
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  A native Linux client is in development. Support for Debian/Ubuntu, Fedora, and Arch is planned.
+                </p>
+              </div>
             </div>
           </div>
 

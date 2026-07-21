@@ -156,11 +156,19 @@ export default function FaqPage() {
               <div>
                 <p className="font-semibold text-foreground">Still need help?</p>
                 <p className="text-sm text-muted-foreground">
-                  {/* TODO: connect to backend API — replace with real support contact */}
-                  Our support team responds within 24 hours.
+                  Join our Telegram support community — ask questions and get help from our team and other users.
                 </p>
               </div>
             </div>
+            <a
+              href="https://t.me/stealthysupportcare"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-shrink-0 inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              <MessageCircle className="h-4 w-4" />
+              Join Support Group
+            </a>
           </div>
         </div>
       </main>
