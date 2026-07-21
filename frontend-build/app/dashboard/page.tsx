@@ -587,6 +587,9 @@ function DownloadsTab() {
             {/* Setup steps */}
             <div className="p-5 flex-1">
               <h3 className="text-sm font-semibold text-foreground mb-3">Setup instructions</h3>
+              <div className="mb-4 rounded-md border border-primary/20 bg-primary/5 p-3 text-sm text-foreground">
+                <strong>Note:</strong> The application may crash the first time you try to connect. If this happens, open Task Manager, end the "Reality Tunnel" and "Reality Tunnel Helper" tasks, and try again.
+              </div>
               <ol className="space-y-2.5">
                 {p.steps.map((step, i) => (
                   <li key={i} className="flex items-start gap-2.5">
