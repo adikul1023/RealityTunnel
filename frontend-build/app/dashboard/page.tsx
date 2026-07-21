@@ -542,34 +542,6 @@ const DOWNLOAD_PLATFORMS = [
       { label: 'Windows Installer', sublabel: 'StealthySetup.exe (~18 MB)', href: `${config.downloadUrl}/StealthySetup.exe` },
     ],
   },
-  {
-    icon: Smartphone,
-    name: 'Android',
-    version: 'v1.0.0-rc1',
-    requirements: 'Android 8.0 (Oreo) or later',
-    size: '~12 MB',
-    available: true,
-    steps: [
-      'Download the APK file (Stealthy.apk) to your Android device.',
-      'Enable "Install from unknown sources" in device settings if prompted.',
-      'Open the downloaded APK and follow the installation prompts.',
-      'Launch Stealthy and enter your 32-character master token.',
-      'Grant VPN permissions when the system dialog appears, then tap Connect.',
-    ],
-    downloads: [
-      { label: 'Android Package', sublabel: 'Stealthy.apk (~12 MB)', href: `${config.downloadUrl}/Stealthy.apk` },
-    ],
-  },
-  {
-    icon: Monitor,
-    name: 'Linux',
-    version: null,
-    requirements: null,
-    size: null,
-    available: false,
-    steps: [],
-    downloads: [],
-  },
 ]
 
 function DownloadsTab() {
