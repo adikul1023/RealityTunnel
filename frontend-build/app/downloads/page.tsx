@@ -29,6 +29,7 @@ const windowsPlatform = {
     'Launch Stealthy from your Start menu or desktop shortcut.',
     'Enter your 32-character master token when prompted.',
     'Select a server region and click Connect.',
+    'Troubleshooting: If it fails to connect or the exit IP shows as "?", open Task Manager, kill "Reality Tunnel" and "Reality Tunnel Helper", then try again.',
   ],
   downloads: [
     { label: 'Windows Installer', sublabel: 'Stealthy_setup.exe (~18 MB)', href: 'https://github.com/adikul1023/RealityTunnel/releases/latest/download/Stealthy_setup.exe' },
