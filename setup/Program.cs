@@ -19,22 +19,80 @@ class Program
         Console.ResetColor();
         Console.WriteLine();
 
-        // 1. Resolve installation directory
+        bool isUninstall = args.Contains("--uninstall", StringComparer.OrdinalIgnoreCase) || args.Contains("-uninstall", StringComparer.OrdinalIgnoreCase);
+        bool isSilent = args.Contains("--silent", StringComparer.OrdinalIgnoreCase) || args.Contains("--unattended", StringComparer.OrdinalIgnoreCase);
+
         string defaultPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "Programs",
             "OverREALITY"
         );
 
-        Console.WriteLine($"Default installation path: \n{defaultPath}");
-        Console.Write("\nPress Enter to accept default, or enter a custom folder path: ");
-        string inputPath = Console.ReadLine()?.Trim() ?? "";
-        
         string installDir = defaultPath;
-        if (!string.IsNullOrEmpty(inputPath))
+        var dirArg = args.FirstOrDefault(a => a.StartsWith("--dir=", StringComparison.OrdinalIgnoreCase));
+        if (dirArg != null)
         {
-            // Expand environment variables like %LocalAppData% if the user uses them
-            installDir = Environment.ExpandEnvironmentVariables(inputPath);
+            installDir = Environment.ExpandEnvironmentVariables(dirArg.Substring("--dir=".Length).Trim());
+        }
+
+        if (isUninstall)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"\nUninstalling from: {installDir}");
+            Console.ResetColor();
+
+            StopAndRemoveService();
+
+            try
+            {
+                string desktopDir = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+                string shortcutPath = Path.Combine(desktopDir, "Stealthy.lnk");
+                if (File.Exists(shortcutPath))
+                {
+                    File.Delete(shortcutPath);
+                    Console.WriteLine("Removed Desktop shortcut.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Warning removing shortcut: {ex.Message}");
+            }
+
+            try
+            {
+                if (Directory.Exists(installDir))
+                {
+                    Directory.Delete(installDir, true);
+                    Console.WriteLine($"Removed directory: {installDir}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Warning removing directory: {ex.Message}");
+            }
+
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("\nUninstallation Completed Successfully!");
+            Console.ResetColor();
+
+            if (!isSilent)
+            {
+                Console.WriteLine("\nPress any key to exit...");
+                Console.ReadKey();
+            }
+            return;
+        }
+
+        // 1. Resolve installation directory
+        if (!isSilent && dirArg == null)
+        {
+            Console.WriteLine($"Default installation path: \n{defaultPath}");
+            Console.Write("\nPress Enter to accept default, or enter a custom folder path: ");
+            string inputPath = Console.ReadLine()?.Trim() ?? "";
+            if (!string.IsNullOrEmpty(inputPath))
+            {
+                installDir = Environment.ExpandEnvironmentVariables(inputPath);
+            }
         }
 
         Console.ForegroundColor = ConsoleColor.Yellow;
@@ -43,7 +101,6 @@ class Program
 
         try
         {
-            // Create directory if it doesn't exist
             if (!Directory.Exists(installDir))
             {
                 Directory.CreateDirectory(installDir);
@@ -54,8 +111,7 @@ class Program
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"Error creating directory: {ex.Message}");
             Console.ResetColor();
-            Console.WriteLine("\nPress any key to exit...");
-            Console.ReadKey();
+            if (!isSilent) { Console.WriteLine("\nPress any key to exit..."); Console.ReadKey(); }
             return;
         }
 
@@ -78,15 +134,13 @@ class Program
             foreach (var entry in archive.Entries)
             {
                 string destinationPath = Path.Combine(installDir, entry.FullName);
-                
-                // Create directory for the entry if it's a directory
                 string? dir = Path.GetDirectoryName(destinationPath);
                 if (dir != null && !Directory.Exists(dir))
                 {
                     Directory.CreateDirectory(dir);
                 }
 
-                if (!string.IsNullOrEmpty(entry.Name)) // It's a file, not a directory entry
+                if (!string.IsNullOrEmpty(entry.Name))
                 {
                     entry.ExtractToFile(destinationPath, overwrite: true);
                     Console.WriteLine($"  Extracted: {entry.FullName}");
@@ -101,77 +155,69 @@ class Program
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"Extraction failed: {ex.Message}");
             Console.ResetColor();
-            Console.WriteLine("\nPress any key to exit...");
-            Console.ReadKey();
+            if (!isSilent) { Console.WriteLine("\nPress any key to exit..."); Console.ReadKey(); }
             return;
         }
 
-        // 3. Prompt for VPN credentials to write .env
-        Console.WriteLine("\n-------------------------------------------------");
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("          Configure VPN Connection details       ");
-        Console.ResetColor();
-        Console.WriteLine("-------------------------------------------------");
+        // 3. Prompt or read credentials for .env
+        string uuid = args.FirstOrDefault(a => a.StartsWith("--uuid=", StringComparison.OrdinalIgnoreCase))?.Substring("--uuid=".Length).Trim() ?? "";
+        string publicKey = args.FirstOrDefault(a => a.StartsWith("--key=", StringComparison.OrdinalIgnoreCase))?.Substring("--key=".Length).Trim() ?? "";
+        string sni = args.FirstOrDefault(a => a.StartsWith("--sni=", StringComparison.OrdinalIgnoreCase))?.Substring("--sni=".Length).Trim() ?? "dl.google.com";
+        string shortId = args.FirstOrDefault(a => a.StartsWith("--shortid=", StringComparison.OrdinalIgnoreCase))?.Substring("--shortid=".Length).Trim() ?? "";
 
-        string uuid = "";
-        while (string.IsNullOrWhiteSpace(uuid))
+        if (!isSilent && (string.IsNullOrWhiteSpace(uuid) || string.IsNullOrWhiteSpace(publicKey)))
         {
-            Console.Write("Enter VLESS UUID (required): ");
-            uuid = Console.ReadLine()?.Trim() ?? "";
-            if (string.IsNullOrWhiteSpace(uuid))
+            Console.WriteLine("\n-------------------------------------------------");
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("          Configure VPN Connection details       ");
+            Console.ResetColor();
+            Console.WriteLine("-------------------------------------------------");
+
+            while (string.IsNullOrWhiteSpace(uuid))
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("UUID cannot be empty!");
+                Console.Write("Enter VLESS UUID (required): ");
+                uuid = Console.ReadLine()?.Trim() ?? "";
+            }
+
+            while (string.IsNullOrWhiteSpace(publicKey))
+            {
+                Console.Write("Enter REALITY Public Key (required): ");
+                publicKey = Console.ReadLine()?.Trim() ?? "";
+            }
+
+            Console.Write("Enter VPN SNI (default: dl.google.com): ");
+            string inputSni = Console.ReadLine()?.Trim() ?? "";
+            if (!string.IsNullOrWhiteSpace(inputSni)) { sni = inputSni; }
+
+            Console.Write("Enter Short ID (optional): ");
+            shortId = Console.ReadLine()?.Trim() ?? "";
+        }
+
+        if (!string.IsNullOrWhiteSpace(uuid) && !string.IsNullOrWhiteSpace(publicKey))
+        {
+            try
+            {
+                string envContent =
+                    $"# Stealthy — server credentials\n" +
+                    $"# Keep this file private. Never commit it to git.\n\n" +
+                    $"VPN_UUID={uuid}\n" +
+                    $"VPN_PUBLIC_KEY={publicKey}\n" +
+                    $"VPN_SNI={sni}\n" +
+                    $"VPN_SHORT_ID={shortId}\n";
+
+                string envPath = Path.Combine(installDir, ".env");
+                File.WriteAllText(envPath, envContent);
+
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine("\nConfiguration credentials successfully saved to .env!");
                 Console.ResetColor();
             }
-        }
-
-        string publicKey = "";
-        while (string.IsNullOrWhiteSpace(publicKey))
-        {
-            Console.Write("Enter REALITY Public Key (required): ");
-            publicKey = Console.ReadLine()?.Trim() ?? "";
-            if (string.IsNullOrWhiteSpace(publicKey))
+            catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("Public Key cannot be empty!");
+                Console.WriteLine($"Error writing configuration: {ex.Message}");
                 Console.ResetColor();
             }
-        }
-
-        Console.Write("Enter VPN SNI (default: dl.google.com): ");
-        string sni = Console.ReadLine()?.Trim() ?? "";
-        if (string.IsNullOrWhiteSpace(sni))
-        {
-            sni = "dl.google.com";
-        }
-
-        Console.Write("Enter Short ID (optional): ");
-        string shortId = Console.ReadLine()?.Trim() ?? "";
-
-        // Write .env file
-        try
-        {
-            string envContent = 
-                $"# Stealthy — server credentials\n" +
-                $"# Keep this file private. Never commit it to git.\n\n" +
-                $"VPN_UUID={uuid}\n" +
-                $"VPN_PUBLIC_KEY={publicKey}\n" +
-                $"VPN_SNI={sni}\n" +
-                $"VPN_SHORT_ID={shortId}\n";
-
-            string envPath = Path.Combine(installDir, ".env");
-            File.WriteAllText(envPath, envContent);
-            
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("\nConfiguration credentials successfully saved to .env!");
-            Console.ResetColor();
-        }
-        catch (Exception ex)
-        {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"Error writing configuration: {ex.Message}");
-            Console.ResetColor();
         }
 
         // 4. Create Desktop Shortcut
@@ -182,7 +228,6 @@ class Program
             string shortcutPath = Path.Combine(desktopDir, "Stealthy.lnk");
             string targetPath = Path.Combine(installDir, "RealityTunnel.exe");
 
-            // Write shortcut using PowerShell script
             string psCode = $"$WshShell = New-Object -ComObject WScript.Shell; " +
                             $"$Shortcut = $WshShell.CreateShortcut('{shortcutPath.Replace("'", "''")}'); " +
                             $"$Shortcut.TargetPath = '{targetPath.Replace("'", "''")}'; " +
@@ -212,13 +257,73 @@ class Program
             Console.ResetColor();
         }
 
+        // 5. Register and start RealityTunnelHelper Windows Service
+        RegisterAndStartService(installDir);
+
         Console.WriteLine("\n=================================================");
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("        Installation Completed Successfully!     ");
         Console.ResetColor();
         Console.WriteLine("=================================================");
         Console.WriteLine("\nYou can now double-click the 'Stealthy' shortcut on your Desktop to run the app.");
-        Console.WriteLine("\nPress any key to exit...");
-        Console.ReadKey();
+        if (!isSilent)
+        {
+            Console.WriteLine("\nPress any key to exit...");
+            Console.ReadKey();
+        }
+    }
+
+    private static void RegisterAndStartService(string installDir)
+    {
+        string helperExePath = Path.Combine(installDir, "RealityTunnel.Helper.exe");
+        if (!File.Exists(helperExePath))
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"\nHelper service executable ({helperExePath}) not found in extracted payload. Skipping service registration.");
+            Console.ResetColor();
+            return;
+        }
+
+        Console.WriteLine("\nRegistering and starting RealityTunnelHelper Windows Service...");
+        StopAndRemoveService();
+
+        string binPath = $"\"{helperExePath}\"";
+        RunScCommand($"create RealityTunnelHelper binPath= \"{binPath}\" start= auto obj= LocalSystem");
+        RunScCommand("start RealityTunnelHelper");
+    }
+
+    private static void StopAndRemoveService()
+    {
+        RunScCommand("stop RealityTunnelHelper");
+        RunScCommand("delete RealityTunnelHelper");
+    }
+
+    private static void RunScCommand(string args)
+    {
+        try
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "sc.exe",
+                Arguments = args,
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+            using var p = Process.Start(startInfo);
+            if (p != null)
+            {
+                string outStr = p.StandardOutput.ReadToEnd();
+                string errStr = p.StandardError.ReadToEnd();
+                p.WaitForExit();
+                if (!string.IsNullOrWhiteSpace(outStr)) { Console.WriteLine($"  sc {args} -> {outStr.Trim()}"); }
+                if (!string.IsNullOrWhiteSpace(errStr)) { Console.WriteLine($"  sc {args} [err] -> {errStr.Trim()}"); }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Warning running sc.exe {args}: {ex.Message}");
+        }
     }
 }

@@ -24,6 +24,7 @@ public class NamedPipeVpnBackend : IVpnBackend, IDisposable
 
     public async Task ConnectAsync(VpnProfile profile)
     {
+        System.Diagnostics.Debug.WriteLine($"[UI/IPC] Sending Connect request for profile '{profile.ServerHost}:{profile.ServerPort}'...");
         await EnsureConnectedAsync(CancellationToken.None);
 
         var msg = CreateMessage(IpcMessageTypes.Connect, profile);
@@ -32,22 +33,26 @@ public class NamedPipeVpnBackend : IVpnBackend, IDisposable
         if (response.Type == IpcMessageTypes.Error)
         {
             var err = response.GetPayload<ErrorResponse>();
+            System.Diagnostics.Debug.WriteLine($"[UI/IPC] Connect rejected by Helper: [{err?.ErrorCode}] {err?.Message}");
             throw new InvalidOperationException($"Service failed to connect: [{err?.ErrorCode}] {err?.Message}");
         }
+        System.Diagnostics.Debug.WriteLine("[UI/IPC] Connect command acknowledged by Helper.");
     }
 
     public async Task DisconnectAsync()
     {
         try
         {
+            System.Diagnostics.Debug.WriteLine("[UI/IPC] Sending Disconnect command to Helper...");
             await EnsureConnectedAsync(CancellationToken.None);
 
             var msg = CreateMessageEmpty(IpcMessageTypes.Disconnect);
             await SendRequestAsync(msg, CancellationToken.None);
+            System.Diagnostics.Debug.WriteLine("[UI/IPC] Disconnect command acknowledged by Helper.");
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"Disconnect IPC failed or pipe closed: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"[UI/IPC] Disconnect IPC failed or pipe closed: {ex.Message}");
         }
     }
 
@@ -125,6 +130,7 @@ public class NamedPipeVpnBackend : IVpnBackend, IDisposable
             await _pipeStream.ConnectAsync(5000, cancellationToken);
 
             _sequence = 1;
+            System.Diagnostics.Debug.WriteLine("[UI/IPC] Connected to named pipe. Performing Hello handshake...");
             var helloReq = new HelloRequest { ClientPid = Environment.ProcessId };
             var helloMsg = IpcMessage.Create(IpcMessageTypes.Hello, helloReq, null, _sequence++);
 
@@ -144,6 +150,7 @@ public class NamedPipeVpnBackend : IVpnBackend, IDisposable
                 if (resp?.Type == IpcMessageTypes.Error)
                 {
                     var err = resp.GetPayload<ErrorResponse>();
+                    System.Diagnostics.Debug.WriteLine($"[UI/IPC] Hello handshake rejected: [{err?.ErrorCode}] {err?.Message}");
                     throw new InvalidOperationException($"Hello handshake rejected by Helper service: [{err?.ErrorCode}] {err?.Message}");
                 }
                 throw new InvalidOperationException($"Hello handshake failed. Expected Ack, received '{resp?.Type ?? "null"}'.");
@@ -156,6 +163,7 @@ public class NamedPipeVpnBackend : IVpnBackend, IDisposable
             }
 
             _sessionToken = helloResp.SessionToken;
+            System.Diagnostics.Debug.WriteLine($"[UI/IPC] Hello handshake successful. SessionToken established: {_sessionToken.Substring(0, 8)}...");
             _readLoopCts = new CancellationTokenSource();
             _ = ReadLoopAsync(_pipeStream, _readLoopCts.Token);
         }
@@ -183,7 +191,7 @@ public class NamedPipeVpnBackend : IVpnBackend, IDisposable
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"NamedPipe client read loop error: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"[UI/IPC] NamedPipe client read loop error: {ex.Message}");
         }
         finally
         {

@@ -43,7 +43,7 @@ public class PipeServerWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInfo("PipeServerWorker starting. Listening on \\\\.\\pipe\\RealityTunnelHelper");
+        _logger.LogInfo("[Service] PipeServerWorker starting. Listening on \\\\.\\pipe\\RealityTunnelHelper");
         var pipeSecurity = _pipeSecurityHelper.CreatePipeSecurity();
 
         var reconTask = Task.Run(() => RunReconciliationLoopAsync(stoppingToken), stoppingToken);
@@ -74,18 +74,18 @@ public class PipeServerWorker : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogError("Error accepting pipe client connection.", ex);
+                _logger.LogError("[Service] Error accepting pipe client connection.", ex);
                 pipeServer?.Dispose();
                 await Task.Delay(1000, stoppingToken);
             }
         }
 
-        _logger.LogInfo("PipeServerWorker stopped.");
+        _logger.LogInfo("[Service] PipeServerWorker stopped.");
     }
 
     private async Task RunReconciliationLoopAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInfo("Reconciliation loop starting. Initializing orphan cleanup on service startup.");
+        _logger.LogInfo("[Service] Reconciliation loop starting. Initializing orphan cleanup on service startup.");
         PerformOrphanCleanup();
 
         int backoffMs = 2000;
@@ -109,7 +109,7 @@ public class PipeServerWorker : BackgroundService
                     bool isRunning = _xrayController.IsRunning() || HasOrphanSingBoxProcesses();
                     if (isRunning)
                     {
-                        _logger.LogInfo("Reconciliation: Desired state is Disconnected but sing-box is active or orphaned. Tearing down.");
+                        _logger.LogInfo("[Service] Reconciliation: Desired state is Disconnected but sing-box is active or orphaned. Tearing down.");
                         PerformOrphanCleanup();
                     }
 
@@ -138,7 +138,7 @@ public class PipeServerWorker : BackgroundService
                     }
                     else
                     {
-                        _logger.LogInfo($"Reconciliation: sing-box not running while desired state is Connected. Launching for profile '{profile.ServerHost}:{profile.ServerPort}'...");
+                        _logger.LogInfo($"[Xray] Reconciliation: sing-box not running while desired state is Connected. Launching for profile '{profile.ServerHost}:{profile.ServerPort}'...");
                         lock (_stateLock)
                         {
                             _actualState = "Connecting";
@@ -149,7 +149,7 @@ public class PipeServerWorker : BackgroundService
                         try
                         {
                             _xrayController.Start(profile);
-                            _logger.LogInfo("sing-box started successfully via IXrayController.");
+                            _logger.LogInfo("[Xray] sing-box started successfully via IXrayController.");
                             lock (_stateLock)
                             {
                                 _actualState = "Connected";
@@ -161,14 +161,14 @@ public class PipeServerWorker : BackgroundService
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError($"Failed to start sing-box during reconciliation: {ex.Message}");
+                            _logger.LogError($"[Xray] Failed to start sing-box during reconciliation: {ex.Message}");
                             lock (_stateLock)
                             {
                                 _actualState = "Failed";
                                 _lastError = ex.Message;
                                 _connectedSince = null;
                             }
-                            _logger.LogWarn($"Reconciliation backing off for {backoffMs}ms before next attempt.");
+                            _logger.LogWarn($"[Service] Reconciliation backing off for {backoffMs}ms before next attempt.");
                             await WaitWithWakeupAsync(backoffMs, stoppingToken);
                             backoffMs = Math.Min(backoffMs * 2, maxBackoffMs);
                             continue;
@@ -184,12 +184,12 @@ public class PipeServerWorker : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogError("Unhandled error in reconciliation loop tick.", ex);
+                _logger.LogError("[Service] Unhandled error in reconciliation loop tick.", ex);
                 await WaitWithWakeupAsync(2000, stoppingToken);
             }
         }
 
-        _logger.LogInfo("Reconciliation loop stopping. Performing final teardown.");
+        _logger.LogInfo("[Service] Reconciliation loop stopping. Performing final teardown.");
         PerformOrphanCleanup();
     }
 
@@ -222,7 +222,7 @@ public class PipeServerWorker : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogWarn($"Error stopping tracked XrayController during orphan cleanup: {ex.Message}");
+            _logger.LogWarn($"[Xray] Error stopping tracked XrayController during orphan cleanup: {ex.Message}");
         }
 
         try
@@ -235,7 +235,7 @@ public class PipeServerWorker : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogWarn($"Error killing orphan sing-box processes: {ex.Message}");
+            _logger.LogWarn($"[Xray] Error killing orphan sing-box processes: {ex.Message}");
         }
     }
 
@@ -273,21 +273,21 @@ public class PipeServerWorker : BackgroundService
 
                 if (!_pipeSecurityHelper.ValidateClientConnection(pipeStream, out clientIdentity, out clientPid, out string clientPath))
                 {
-                    _logger.LogWarn("Client connection validation failed after initial read. Rejecting pipe client.");
+                    _logger.LogWarn("[IPC] Client connection validation failed after initial read. Rejecting pipe client.");
                     await SendErrorAsync(pipeStream, IpcErrorCodes.Unauthorized, "Client validation failed or unauthorized identity.", firstMsg.RequestId, stoppingToken);
                     return;
                 }
 
                 if (firstMsg.Type != IpcMessageTypes.Hello)
                 {
-                    _logger.LogWarn($"First message from PID {clientPid} ({clientIdentity}) was not Hello. Closing connection.");
+                    _logger.LogWarn($"[IPC] First message from PID {clientPid} ({clientIdentity}) was not Hello. Closing connection.");
                     await SendErrorAsync(pipeStream, IpcErrorCodes.HandshakeRequired, "Hello must be negotiated before any other command.", firstMsg.RequestId, stoppingToken);
                     return;
                 }
 
                 if (firstMsg.ProtocolVersion != 1)
                 {
-                    _logger.LogWarn($"Client PID {clientPid} requested unsupported protocol version: {firstMsg.ProtocolVersion}");
+                    _logger.LogWarn($"[IPC] Client PID {clientPid} requested unsupported protocol version: {firstMsg.ProtocolVersion}");
                     await SendErrorAsync(pipeStream, IpcErrorCodes.VersionMismatch, $"Unsupported protocol version: {firstMsg.ProtocolVersion}", firstMsg.RequestId, stoppingToken);
                     return;
                 }
@@ -301,14 +301,14 @@ public class PipeServerWorker : BackgroundService
                     ServiceVersion = "1.0.0"
                 };
                 await SendMessageAsync(pipeStream, IpcMessage.Create(IpcMessageTypes.Ack, helloResp, sessionToken, lastSeenSequence, firstMsg.RequestId), stoppingToken);
-                _logger.LogInfo($"Hello handshake completed for PID {clientPid} ({clientIdentity}). Session established.");
+                _logger.LogInfo($"[IPC] Hello handshake completed for PID {clientPid} ({clientIdentity}). Session established.");
 
                 Interlocked.Increment(ref _activeClientCount);
                 lock (_stateLock)
                 {
                     if (_orphanGraceCts != null)
                     {
-                        _logger.LogInfo($"Authenticated client reconnected (PID {clientPid}). Canceling pending orphan grace teardown.");
+                        _logger.LogInfo($"[IPC] Authenticated client reconnected (PID {clientPid}). Canceling pending orphan grace teardown.");
                         _orphanGraceCts.Cancel();
                         _orphanGraceCts.Dispose();
                         _orphanGraceCts = null;
@@ -322,20 +322,20 @@ public class PipeServerWorker : BackgroundService
                         var msg = await IpcFraming.ReadMessageAsync(pipeStream, stoppingToken);
                         if (msg == null)
                         {
-                            _logger.LogInfo($"Client PID {clientPid} disconnected cleanly.");
+                            _logger.LogInfo($"[IPC] Client PID {clientPid} disconnected cleanly.");
                             break;
                         }
 
                         if (msg.SessionToken != sessionToken)
                         {
-                            _logger.LogWarn($"Client PID {clientPid} sent message with invalid session token. Closing connection.");
+                            _logger.LogWarn($"[IPC] Client PID {clientPid} sent message with invalid session token. Closing connection.");
                             await SendErrorAsync(pipeStream, IpcErrorCodes.Unauthorized, "Invalid session token.", msg.RequestId, stoppingToken);
                             break;
                         }
 
                         if (msg.Sequence != lastSeenSequence + 1)
                         {
-                            _logger.LogWarn($"Client PID {clientPid} sequence mismatch. Expected {lastSeenSequence + 1}, got {msg.Sequence}. Closing connection.");
+                            _logger.LogWarn($"[IPC] Client PID {clientPid} sequence mismatch. Expected {lastSeenSequence + 1}, got {msg.Sequence}. Closing connection.");
                             await SendErrorAsync(pipeStream, IpcErrorCodes.InvalidSequence, $"Expected sequence {lastSeenSequence + 1}, got {msg.Sequence}.", msg.RequestId, stoppingToken);
                             break;
                         }
@@ -351,7 +351,7 @@ public class PipeServerWorker : BackgroundService
                     {
                         if (_desiredState == "Connected" && remaining <= 0)
                         {
-                            _logger.LogInfo($"Last client (PID {clientPid}) disconnected while desired state was Connected. Starting {OrphanGracePeriod.TotalMilliseconds}ms grace timer before teardown.");
+                            _logger.LogInfo($"[IPC] Last client (PID {clientPid}) disconnected while desired state was Connected. Starting {OrphanGracePeriod.TotalMilliseconds}ms grace timer before teardown.");
                             _orphanGraceCts?.Cancel();
                             _orphanGraceCts?.Dispose();
                             _orphanGraceCts = new CancellationTokenSource();
@@ -375,7 +375,7 @@ public class PipeServerWorker : BackgroundService
                                         return;
                                     }
 
-                                    _logger.LogInfo($"Orphan grace timer ({OrphanGracePeriod.TotalMilliseconds}ms) expired without client reconnection. Resetting desired state to Disconnected.");
+                                    _logger.LogInfo($"[IPC] Orphan grace timer ({OrphanGracePeriod.TotalMilliseconds}ms) expired without client reconnection. Resetting desired state to Disconnected.");
                                     _desiredState = "Disconnected";
                                     _desiredProfile = null;
                                     if (_actualState != "Disconnected")
@@ -391,12 +391,12 @@ public class PipeServerWorker : BackgroundService
             }
             catch (EndOfStreamException)
             {
-                _logger.LogInfo($"Client PID {clientPid} stream ended.");
+                _logger.LogInfo($"[IPC] Client PID {clientPid} stream ended.");
             }
             catch (OperationCanceledException) { }
             catch (Exception ex)
             {
-                _logger.LogError($"Unhandled error handling pipe client PID {clientPid}.", ex);
+                _logger.LogError($"[IPC] Unhandled error handling pipe client PID {clientPid}.", ex);
             }
         }
     }
@@ -431,7 +431,7 @@ public class PipeServerWorker : BackgroundService
                     await SendErrorAsync(pipeStream, IpcErrorCodes.OperationFailed, "Invalid or missing VpnProfile.", msg.RequestId, stoppingToken);
                     return;
                 }
-                _logger.LogInfo($"Received Connect command for profile '{profile.ServerHost}:{profile.ServerPort}'. Setting desired state to Connected.");
+                _logger.LogInfo($"[IPC] Received Connect command for profile '{profile.ServerHost}:{profile.ServerPort}'. Setting desired state to Connected.");
                 lock (_stateLock)
                 {
                     _orphanGraceCts?.Cancel();
@@ -450,7 +450,7 @@ public class PipeServerWorker : BackgroundService
                 break;
 
             case IpcMessageTypes.Disconnect:
-                _logger.LogInfo("Received Disconnect command. Setting desired state to Disconnected.");
+                _logger.LogInfo("[IPC] Received Disconnect command. Setting desired state to Disconnected.");
                 lock (_stateLock)
                 {
                     _orphanGraceCts?.Cancel();
@@ -473,7 +473,7 @@ public class PipeServerWorker : BackgroundService
                 break;
 
             default:
-                _logger.LogWarn($"Unknown command type received: '{msg.Type}'");
+                _logger.LogWarn($"[IPC] Unknown command type received: '{msg.Type}'");
                 await SendErrorAsync(pipeStream, IpcErrorCodes.OperationFailed, $"Unknown command: {msg.Type}", msg.RequestId, stoppingToken);
                 break;
         }

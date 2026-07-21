@@ -22,15 +22,24 @@ $requiredFiles = @(
     "geosite.dat",
     "libcronet.dll",
     "RealityTunnel.exe",
+    "RealityTunnel.Helper.exe",
     "sing-box.exe",
     "wintun.dll"
 )
 
-Write-Host "Verifying files in $publishDir..." -ForegroundColor Gray
+$helperPublishDir = Join-Path $rootDir "RealityTunnel.Helper\bin\Release\net8.0-windows10.0.19041.0\win-x64\publish"
+if (-not (Test-Path $helperPublishDir)) {
+    $helperPublishDir = Join-Path $rootDir "RealityTunnel.Helper\bin\x64\Release\net8.0-windows10.0.19041.0\win-x64\publish"
+}
+
+Write-Host "Verifying files..." -ForegroundColor Gray
 foreach ($file in $requiredFiles) {
     $filePath = Join-Path $publishDir $file
     if (-not (Test-Path $filePath)) {
-        Write-Error "Required file missing: $filePath. Please run publish first."
+        $helperPath = Join-Path $helperPublishDir $file
+        if (-not (Test-Path $helperPath)) {
+            Write-Error "Required file missing: $file across both publish directories. Please run publish first."
+        }
     }
 }
 Write-Host "All required files found!" -ForegroundColor Green
@@ -42,9 +51,10 @@ if (Test-Path $tempPayloadDir) {
 New-Item -Path $tempPayloadDir -ItemType Directory | Out-Null
 
 # 3. Copy files to temp folder
-Write-Host "Packaging client files..." -ForegroundColor Gray
-foreach ($file in $requiredFiles) {
-    Copy-Item (Join-Path $publishDir $file) (Join-Path $tempPayloadDir $file) -Force
+Write-Host "Packaging client and helper files..." -ForegroundColor Gray
+Copy-Item (Join-Path $publishDir "*") $tempPayloadDir -Recurse -Force
+if (Test-Path $helperPublishDir) {
+    Copy-Item (Join-Path $helperPublishDir "*") $tempPayloadDir -Recurse -Force
 }
 
 # 4. Zip the payload folder
