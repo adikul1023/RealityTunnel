@@ -31,7 +31,7 @@ const windowsPlatform = {
     'Select a server region and click Connect.',
   ],
   downloads: [
-    { label: 'Windows Installer', sublabel: 'StealthySetup.exe (~18 MB)', href: `${config.downloadUrl}/StealthySetup.exe` },
+    { label: 'Windows Installer', sublabel: 'Stealthy_setup.exe (~18 MB)', href: 'https://github.com/adikul1023/RealityTunnel/releases/latest/download/Stealthy_setup.exe' },
   ],
 }
 
