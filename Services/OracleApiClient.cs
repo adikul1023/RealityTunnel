@@ -38,11 +38,27 @@ public class OracleApiClient
             TwoFaCode = totpCode
         };
         
+        string fullUrl = $"{_httpClient.BaseAddress}api/auth/login";
+        string redactedMaster = masterToken.Length > 8 ? masterToken.Substring(0, 8) + "..." : "***";
+        StartupLogger.LogAuth($"[OracleApiClient] POST {fullUrl}");
+        StartupLogger.LogAuth($"[OracleApiClient] Payload: account_id='{request.AccountId}', master_token='{redactedMaster}', device_guid='{request.DeviceGuid}', two_fa_code='{request.TwoFaCode ?? "null"}'");
+        foreach (var header in _httpClient.DefaultRequestHeaders)
+        {
+            StartupLogger.LogAuth($"[OracleApiClient] DefaultHeader: {header.Key} = {string.Join(", ", header.Value)}");
+        }
+        
         var response = await _httpClient.PostAsJsonAsync("/api/auth/login", request);
+        string responseBody = await response.Content.ReadAsStringAsync();
+        StartupLogger.LogAuth($"[OracleApiClient] Response Status: {(int)response.StatusCode} ({response.StatusCode})");
+        StartupLogger.LogAuth($"[OracleApiClient] Response Body: {responseBody}");
+        foreach (var header in response.Headers)
+        {
+            StartupLogger.LogAuth($"[OracleApiClient] ResponseHeader: {header.Key} = {string.Join(", ", header.Value)}");
+        }
         
         if (response.IsSuccessStatusCode)
         {
-            var dto = await response.Content.ReadFromJsonAsync<TokenResponseDto>();
+            var dto = System.Text.Json.JsonSerializer.Deserialize<TokenResponseDto>(responseBody);
             JwtTokens? tokens = null;
             if (dto != null)
             {
@@ -51,6 +67,11 @@ public class OracleApiClient
                     dto.RefreshToken,
                     DateTimeOffset.UtcNow.AddSeconds(dto.ExpiresIn)
                 );
+                StartupLogger.LogAuth($"[OracleApiClient] Login success. Parsed AccessToken (len={dto.AccessToken.Length}), ExpiresIn={dto.ExpiresIn}");
+            }
+            else
+            {
+                StartupLogger.LogAuth("[OracleApiClient] Login success status code, but TokenResponseDto deserialized to null");
             }
             
             return new LoginResult
@@ -60,28 +81,52 @@ public class OracleApiClient
             };
         }
         
-        if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        ApiErrorResponse? errorBody = null;
+        try
         {
-            return new LoginResult { Status = LoginStatus.ReplayDetected };
+            errorBody = System.Text.Json.JsonSerializer.Deserialize<ApiErrorResponse>(responseBody, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         }
-        
-        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        catch { /* Ignore JSON parse errors on non-JSON response bodies */ }
+
+        if (errorBody?.Code != null)
         {
-            var errorBody = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
-            if (errorBody?.Requires2Fa == true)
+            StartupLogger.LogAuth($"[OracleApiClient] Structured Error Code received: '{errorBody.Code}', Detail: '{errorBody.Detail}'");
+            switch (errorBody.Code.ToUpperInvariant())
             {
-                return new LoginResult 
-                { 
-                    Status = LoginStatus.Requires2FA 
-                };
+                case "DEVICE_LIMIT_EXCEEDED":
+                    return new LoginResult 
+                    { 
+                        Status = LoginStatus.DeviceLimitExceeded,
+                        ErrorCode = errorBody.Code,
+                        ErrorMessage = errorBody.Detail,
+                        DeviceLimitDetails = new DeviceLimitDetails
+                        {
+                            CurrentDevices = errorBody.CurrentDevices ?? 0,
+                            MaxDevices = errorBody.MaxDevices ?? 0,
+                            ManageDevicesUrl = errorBody.ManageDevicesUrl ?? ""
+                        }
+                    };
+                case "DEVICE_OWNERSHIP_ERROR":
+                    return new LoginResult { Status = LoginStatus.DeviceOwnershipError, ErrorCode = errorBody.Code, ErrorMessage = errorBody.Detail };
+                case "DEVICE_DEACTIVATED":
+                    return new LoginResult { Status = LoginStatus.DeviceDeactivated, ErrorCode = errorBody.Code, ErrorMessage = errorBody.Detail };
+                case "ACCOUNT_DISABLED":
+                    return new LoginResult { Status = LoginStatus.AccountDisabled, ErrorCode = errorBody.Code, ErrorMessage = errorBody.Detail };
+                case "INVALID_MASTER_TOKEN":
+                case "INVALID_CREDENTIALS":
+                    return new LoginResult { Status = LoginStatus.InvalidMasterToken, ErrorCode = errorBody.Code, ErrorMessage = errorBody.Detail };
+                case "REQUIRES_2FA":
+                    return new LoginResult { Status = LoginStatus.Requires2FA, ErrorCode = errorBody.Code, ErrorMessage = errorBody.Detail };
+                case "REPLAY_DETECTED":
+                    return new LoginResult { Status = LoginStatus.ReplayDetected, ErrorCode = errorBody.Code, ErrorMessage = errorBody.Detail };
             }
         }
-        
+
         if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
         {
-            var errorBody = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
             if (errorBody?.CurrentDevices != null)
             {
+                StartupLogger.LogAuth($"[OracleApiClient] Forbidden fallback -> DeviceLimitExceeded: CurrentDevices={errorBody.CurrentDevices}, MaxDevices={errorBody.MaxDevices}");
                 return new LoginResult 
                 { 
                     Status = LoginStatus.DeviceLimitExceeded,
@@ -93,9 +138,24 @@ public class OracleApiClient
                     }
                 };
             }
+            StartupLogger.LogAuth("[OracleApiClient] Forbidden fallback -> ReplayDetected");
+            return new LoginResult { Status = LoginStatus.ReplayDetected };
         }
         
-        return new LoginResult { Status = LoginStatus.Error, ErrorMessage = response.ReasonPhrase };
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            StartupLogger.LogAuth($"[OracleApiClient] Unauthorized (401) fallback. Parsed Detail='{errorBody?.Detail}', Requires2Fa={errorBody?.Requires2Fa}");
+            if (errorBody?.Requires2Fa == true)
+            {
+                return new LoginResult 
+                { 
+                    Status = LoginStatus.Requires2FA 
+                };
+            }
+        }
+        
+        StartupLogger.LogAuth($"[OracleApiClient] Returning LoginStatus.Error. ReasonPhrase='{response.ReasonPhrase}', Detail='{errorBody?.Detail}'");
+        return new LoginResult { Status = LoginStatus.Error, ErrorCode = errorBody?.Code, ErrorMessage = errorBody?.Detail ?? response.ReasonPhrase };
     }
 
 
@@ -107,10 +167,14 @@ public class OracleApiClient
             ExchangeToken = exchangeToken,
             DeviceGuid = deviceGuid
         };
+        string fullUrl = $"{_httpClient.BaseAddress}api/auth/exchange";
+        StartupLogger.LogAuth($"[OracleApiClient] POST {fullUrl}. device_guid='{deviceGuid}'");
         var response = await _httpClient.PostAsJsonAsync("/api/auth/exchange", request);
+        string responseBody = await response.Content.ReadAsStringAsync();
+        StartupLogger.LogAuth($"[OracleApiClient] Exchange Response Status: {(int)response.StatusCode} ({response.StatusCode}), Body: {responseBody}");
         if (response.IsSuccessStatusCode)
         {
-            var dto = await response.Content.ReadFromJsonAsync<ExchangeResponseDto>();
+            var dto = System.Text.Json.JsonSerializer.Deserialize<ExchangeResponseDto>(responseBody);
             if (dto != null)
             {
                 var tokens = new JwtTokens(
@@ -171,11 +235,15 @@ public class OracleApiClient
         
         var request = new HttpRequestMessage(HttpMethod.Get, "/api/client/config");
         request.Headers.Add("X-Device-ID", deviceGuid);
+        string fullUrl = $"{_httpClient.BaseAddress}api/client/config";
+        StartupLogger.LogAuth($"[OracleApiClient] GET {fullUrl} with X-Device-ID='{deviceGuid}'");
         
         var response = await _httpClient.SendAsync(request);
+        string responseBody = await response.Content.ReadAsStringAsync();
+        StartupLogger.LogAuth($"[OracleApiClient] FetchClientConfig Status: {(int)response.StatusCode} ({response.StatusCode}), Body: {responseBody}");
         if (response.IsSuccessStatusCode)
         {
-            return await response.Content.ReadFromJsonAsync<ClientConfigResponse>();
+            return System.Text.Json.JsonSerializer.Deserialize<ClientConfigResponse>(responseBody, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         }
         return null;
     }

@@ -114,7 +114,13 @@ class DeviceServiceError(ServiceError):
 
 class DeviceOwnershipError(DeviceServiceError):
     """Raised when attempting to register or manipulate a device GUID owned by another account."""
-    pass
+    def __init__(self, message: str = "This device is already registered to another account."):
+        detail = {
+            "detail": message,
+            "code": "DEVICE_OWNERSHIP_ERROR",
+            "message": message,
+        }
+        super().__init__(message, detail=detail)
 
 
 class DeviceNotFoundError(DeviceServiceError):
@@ -124,7 +130,16 @@ class DeviceNotFoundError(DeviceServiceError):
 
 class InactiveDeviceError(DeviceServiceError):
     """Raised when attempting an operation on a deactivated device or deactivating an already inactive device."""
-    pass
+    def __init__(self, message: str = "Device is deactivated", device_guid: str | None = None):
+        detail_msg = message
+        if device_guid and message in ("Device is deactivated", "Device is deactivated."):
+            detail_msg = f"Device is deactivated. To reactivate this device, send POST /api/devices/{device_guid}/reactivate"
+        detail = {
+            "detail": detail_msg,
+            "code": "DEVICE_DEACTIVATED",
+            "message": detail_msg,
+        }
+        super().__init__(message, detail=detail)
 
 
 class SubscriptionServiceError(ServiceError):
@@ -165,6 +180,8 @@ class DeviceLimitExceededError(DeviceServiceError):
         message = f"Device limit reached for plan '{plan_id}': {current_device_count}/{max_devices} devices registered."
         detail = {
             "detail": "Device limit reached",
+            "code": "DEVICE_LIMIT_EXCEEDED",
+            "message": message,
             "plan": plan_id,
             "current_devices": current_device_count,
             "max_devices": max_devices,

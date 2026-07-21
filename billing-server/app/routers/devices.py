@@ -475,3 +475,105 @@ async def reactivate_device(
         details={"action": "reactivate_device"},
     )
     return DeviceResponse.model_validate(device)
+
+
+@router.delete(
+    "/id/{device_id}",
+    summary="Permanently delete/unbind a device by its database ID",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {"description": "Authentication failed or token invalid"},
+        404: {"description": "Device not found or owned by another account"},
+        500: {"description": "Unexpected service or database error"},
+    },
+)
+async def delete_device_by_id(
+    device_id: uuid.UUID,
+    http_request: Request,
+    current_account: Account = Depends(get_current_account),
+    device_service: DeviceService = Depends(get_device_service),
+    signal_service: ConnectionSignalService = Depends(get_signal_service),
+) -> SuccessResponse:
+    """Permanently delete a device record from the account."""
+    try:
+        await device_service.delete_device(current_account.id, device_id)
+    except Exception:
+        logger.info("Delete device failed")
+        await safe_record_signal(
+            signal_service,
+            account_id=current_account.id,
+            event_type=ConnectionEventType.DEVICE_DELETE,
+            success=False,
+            device_guid=str(device_id),
+            http_request=http_request,
+        )
+        raise
+
+    logger.info("Delete device succeeded")
+    await safe_record_signal(
+        signal_service,
+        account_id=current_account.id,
+        event_type=ConnectionEventType.DEVICE_DELETE,
+        success=True,
+        device_guid=str(device_id),
+        http_request=http_request,
+    )
+    await audit_service.record_event(
+        event_type="device_delete",
+        actor_id=str(current_account.id),
+        target_id=str(device_id),
+        details={"action": "delete_device"},
+    )
+    return SuccessResponse(success=True, message="Device deleted successfully")
+
+
+@router.delete(
+    "/{device_guid}/unbind",
+    summary="Permanently delete/unbind a device by its GUID",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {"description": "Authentication failed or token invalid"},
+        404: {"description": "Device not found or owned by another account"},
+        500: {"description": "Unexpected service or database error"},
+    },
+)
+async def unbind_device_by_guid(
+    device_guid: str,
+    http_request: Request,
+    current_account: Account = Depends(get_current_account),
+    device_service: DeviceService = Depends(get_device_service),
+    signal_service: ConnectionSignalService = Depends(get_signal_service),
+) -> SuccessResponse:
+    """Permanently delete a device record by device GUID."""
+    try:
+        await device_service.delete_device_by_guid(current_account.id, device_guid)
+    except Exception:
+        logger.info("Unbind device failed")
+        await safe_record_signal(
+            signal_service,
+            account_id=current_account.id,
+            event_type=ConnectionEventType.DEVICE_DELETE,
+            success=False,
+            device_guid=device_guid,
+            http_request=http_request,
+        )
+        raise
+
+    logger.info("Unbind device succeeded")
+    await safe_record_signal(
+        signal_service,
+        account_id=current_account.id,
+        event_type=ConnectionEventType.DEVICE_DELETE,
+        success=True,
+        device_guid=device_guid,
+        http_request=http_request,
+    )
+    await audit_service.record_event(
+        event_type="device_delete",
+        actor_id=str(current_account.id),
+        target_id=device_guid,
+        details={"action": "unbind_device"},
+    )
+    return SuccessResponse(success=True, message="Device unbound successfully")

@@ -22,6 +22,10 @@ class LoginRequest(BaseModel):
         json_schema_extra={"writeOnly": True},
     )
     device_guid: str = Field(..., description="Unique hardware or installation identifier")
+    client_type: str | None = Field(
+        default=None,
+        description="Type of client initiating login ('desktop', 'web', 'android', 'ios', 'linux')",
+    )
     two_fa_code: str | None = Field(
         default=None,
         description="Optional 6-digit TOTP code or backup code, required when Two-Factor Authentication is enabled",
@@ -115,6 +119,10 @@ class ExchangeRequest(BaseModel):
     """Payload for POST /api/auth/exchange."""
     exchange_token: str = Field(..., description="Single-use exchange token from web redirect")
     device_guid: str = Field(..., description="Unique hardware or installation identifier")
+    client_type: str | None = Field(
+        default=None,
+        description="Type of client initiating login ('desktop', 'web', 'android', 'ios', 'linux')",
+    )
 
 
 class ExchangeResponse(BaseModel):

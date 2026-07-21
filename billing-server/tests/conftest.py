@@ -11,6 +11,35 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import os
+import tempfile
+import socket
+from pydantic import SecretStr
+from app.config import settings
+
+def _is_postgres_available(host: str, port: int) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=1.0):
+            return True
+    except OSError:
+        return False
+
+if os.environ.get("TEST_USE_SQLITE", "0") == "1" or not _is_postgres_available(settings.postgres_host, settings.postgres_port):
+    db_path = os.path.join(tempfile.gettempdir(), "test_billing_pytest.db")
+    settings.database_url = SecretStr(f"sqlite+aiosqlite:///{db_path}")
+    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+    import app.database
+    app.database.engine = create_async_engine(
+        settings.database_url.get_secret_value(),
+        echo=settings.debug,
+        pool_pre_ping=True,
+    )
+    app.database.AsyncSessionLocal = async_sessionmaker(
+        bind=app.database.engine,
+        expire_on_commit=False,
+        class_=AsyncSession,
+    )
+
 from app.database import AsyncSessionLocal
 from app.models import Account, AccountStatus
 from app.repositories import AccountRepository
@@ -18,11 +47,20 @@ from app.repositories import AccountRepository
 
 @pytest_asyncio.fixture(scope="function", autouse=True)
 async def dispose_engine() -> AsyncGenerator[None, None]:
-    """Ensure async database engine is cleanly disposed after each test to avoid event loop reuse errors."""
+    """Ensure async database engine creates schema (if sqlite) and is cleanly disposed after each test."""
     from app.observability.metrics import metrics_registry
     from app.rate_limit.storage import get_rate_limit_backend
     metrics_registry.reset()
     await get_rate_limit_backend().clear()
+    if "sqlite" in settings.database_url.get_secret_value():
+        from app.database import engine, Base
+        import app.models
+        for table in Base.metadata.tables.values():
+            for col in table.columns:
+                if col.server_default and "gen_random_uuid()" in str(col.server_default.arg):
+                    col.server_default = None
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
     yield
     from app.database import engine
     await engine.dispose()
@@ -32,8 +70,17 @@ async def dispose_engine() -> AsyncGenerator[None, None]:
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Yield an isolated async database session."""
     from sqlalchemy import text
-    async with AsyncSessionLocal() as session:
-        await session.execute(text("TRUNCATE TABLE accounts, connection_signals, admin_users, audit_events CASCADE"))
+    from app.database import AsyncSessionLocal as CurrentAsyncSessionLocal
+    is_sqlite = "sqlite" in settings.database_url.get_secret_value()
+    async with CurrentAsyncSessionLocal() as session:
+        if is_sqlite:
+            for table in ("audit_events", "connection_signals", "admin_users", "refresh_tokens", "devices", "subscriptions", "exchange_tokens", "provisioning_profiles", "payments", "provisioning_retry_queue", "system_health", "accounts"):
+                try:
+                    await session.execute(text(f"DELETE FROM {table}"))
+                except Exception:
+                    pass
+        else:
+            await session.execute(text("TRUNCATE TABLE accounts, connection_signals, admin_users, audit_events CASCADE"))
         await session.commit()
         yield session
         await session.close()

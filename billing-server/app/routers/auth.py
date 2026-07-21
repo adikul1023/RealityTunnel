@@ -114,6 +114,15 @@ async def safe_record_signal(
         logger.error("Failed to record connection signal: %s", exc)
 
 
+def is_web_client(request: Any) -> bool:
+    """Check if the request originates from a web browser session where device registration should be skipped."""
+    if getattr(request, "client_type", None) == "web":
+        return True
+    if not getattr(request, "client_type", None) and getattr(request, "device_guid", "").upper().startswith("WEB-"):
+        return True
+    return False
+
+
 @router.post(
     "/register",
     summary="Create a new customer account and return one-time credentials",
@@ -294,75 +303,80 @@ async def login(
                 detail="Authentication failed: invalid two-factor authentication code",
             )
 
-    try:
-        await device_service.register_device(
-            account_id=result.account.id,
-            device_guid=request.device_guid,
-            friendly_name=None,
-        )
-    except DeviceLimitExceededError:
-        logger.info("Login failed: device limit reached")
-        await safe_record_signal(
-            signal_service,
-            account_id=result.account.id,
-            event_type=ConnectionEventType.LOGIN,
-            success=False,
-            device_guid=request.device_guid,
-            http_request=http_request,
-        )
-        # Re-raised as-is: the globally registered DeviceLimitExceededError handler
-        # (app/main.py) already produces the exact structured 403 body
-        # ({"detail": ..., "plan": ..., "current_devices": ..., "max_devices": ...}) used by
-        # POST /api/devices today. Reuse it rather than duplicating that response shape here.
-        raise
-    except DeviceOwnershipError:
-        # SECURITY: never reveal that this device_guid is registered to a different
-        # account — that would leak information about another account's device inventory.
-        # Respond identically to an invalid-credentials failure.
-        logger.info(f"AUDIT LOGIN: [POST /api/auth/login] Login failed. Reason: DeviceOwnershipError for device {request.device_guid}")
-        await safe_record_signal(
-            signal_service,
-            account_id=result.account.id,
-            event_type=ConnectionEventType.LOGIN,
-            success=False,
-            device_guid=request.device_guid,
-            http_request=http_request,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication failed: invalid credentials or inactive account (Reason: DeviceOwnershipError)",
-        )
-    except InactiveDeviceError:
-        logger.info("Login failed: device deactivated")
-        await safe_record_signal(
-            signal_service,
-            account_id=result.account.id,
-            event_type=ConnectionEventType.LOGIN,
-            success=False,
-            device_guid=request.device_guid,
-            http_request=http_request,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "This device has been deactivated. Reactivate it via "
-                f"/api/devices/{request.device_guid}/reactivate or register a new device."
-            ),
-        )
-    except DeviceServiceError:
-        logger.error("Login failed due to device registration error")
-        await safe_record_signal(
-            signal_service,
-            account_id=result.account.id,
-            event_type=ConnectionEventType.LOGIN,
-            success=False,
-            device_guid=request.device_guid,
-            http_request=http_request,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unexpected service or database error",
-        )
+    if not is_web_client(request):
+        try:
+            await device_service.register_device(
+                account_id=result.account.id,
+                device_guid=request.device_guid,
+                friendly_name=None,
+            )
+        except DeviceLimitExceededError:
+            logger.info("Login failed: device limit reached")
+            await safe_record_signal(
+                signal_service,
+                account_id=result.account.id,
+                event_type=ConnectionEventType.LOGIN,
+                success=False,
+                device_guid=request.device_guid,
+                http_request=http_request,
+            )
+            # Re-raised as-is: the globally registered DeviceLimitExceededError handler
+            # (app/main.py) already produces the exact structured 403 body
+            raise
+        except DeviceOwnershipError as exc:
+            logger.info(f"AUDIT LOGIN: [POST /api/auth/login] Login failed. Reason: DeviceOwnershipError for device {request.device_guid}")
+            await safe_record_signal(
+                signal_service,
+                account_id=result.account.id,
+                event_type=ConnectionEventType.LOGIN,
+                success=False,
+                device_guid=request.device_guid,
+                http_request=http_request,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=exc.detail if isinstance(getattr(exc, "detail", None), dict) else {
+                    "detail": "This device is already registered to another account.",
+                    "code": "DEVICE_OWNERSHIP_ERROR",
+                    "message": "This device is already registered to another account."
+                },
+            )
+        except InactiveDeviceError as exc:
+            logger.info("Login failed: device deactivated")
+            await safe_record_signal(
+                signal_service,
+                account_id=result.account.id,
+                event_type=ConnectionEventType.LOGIN,
+                success=False,
+                device_guid=request.device_guid,
+                http_request=http_request,
+            )
+            detail = exc.detail if isinstance(getattr(exc, "detail", None), dict) else {
+                "detail": f"Device is deactivated. To reactivate this device, send POST /api/devices/{request.device_guid}/reactivate",
+                "code": "DEVICE_DEACTIVATED",
+                "message": f"Device is deactivated. To reactivate this device, send POST /api/devices/{request.device_guid}/reactivate"
+            }
+            if isinstance(detail, dict) and "/api/devices/" not in str(detail.get("detail", "")) and request.device_guid:
+                detail["detail"] = f"{detail.get('detail', 'Device is deactivated')}. To reactivate this device, send POST /api/devices/{request.device_guid}/reactivate"
+                detail["message"] = detail["detail"]
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=detail,
+            )
+        except DeviceServiceError:
+            logger.error("Login failed due to device registration error")
+            await safe_record_signal(
+                signal_service,
+                account_id=result.account.id,
+                event_type=ConnectionEventType.LOGIN,
+                success=False,
+                device_guid=request.device_guid,
+                http_request=http_request,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Unexpected service or database error",
+            )
 
     access_token = jwt_service.issue_access_token(
         account_uuid=result.account.id,
@@ -439,12 +453,12 @@ async def refresh(
         if isinstance(exc, DeviceRevokedError):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail={"code": "DEVICE_REVOKED", "message": str(exc)},
+                detail={"detail": str(exc), "code": "DEVICE_DEACTIVATED", "message": str(exc)},
             )
         if isinstance(exc, RefreshTokenReplayError):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail={"code": "REPLAY_DETECTED", "message": str(exc)},
+                detail={"detail": str(exc), "code": "REPLAY_DETECTED", "message": str(exc)},
             )
         raise
 
@@ -635,15 +649,16 @@ async def exchange_token(
     is_initial = token_entry.is_initial_provisioning
 
     # Register device and issue tokens
-    try:
-        await device_service.register_device(
-            account_id=account_id,
-            device_guid=request.device_guid,
-            friendly_name=None,
-            client_ip=getattr(http_request.state, "client_ip", "unknown"),
-        )
-    except Exception as exc:
-        logger.error("Device registration during exchange failed: %s", exc)
+    if not is_web_client(request):
+        try:
+            await device_service.register_device(
+                account_id=account_id,
+                device_guid=request.device_guid,
+                friendly_name=None,
+                client_ip=getattr(http_request.state, "client_ip", "unknown"),
+            )
+        except Exception as exc:
+            logger.error("Device registration during exchange failed: %s", exc)
 
     access_token = jwt_service.create_access_token(account_id=account_id, role="user")
     refresh_token = await refresh_service.issue_refresh_token(

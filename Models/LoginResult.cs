@@ -7,6 +7,10 @@ public enum LoginStatus
 {
     Success,
     DeviceLimitExceeded,
+    DeviceOwnershipError,
+    DeviceDeactivated,
+    AccountDisabled,
+    InvalidMasterToken,
     ReplayDetected,
     Requires2FA,
     SubscriptionExpired,
@@ -36,6 +40,7 @@ public class LoginResult
     public int? RetryAfterSeconds { get; set; }
     
     public string? ErrorMessage { get; set; }
+    public string? ErrorCode { get; set; }
 }
 
 public class DeviceLimitDetails
@@ -53,6 +58,9 @@ public class DeviceLimitDetails
 
 public class ApiErrorResponse
 {
+    [JsonPropertyName("code")]
+    public string? Code { get; set; }
+
     [JsonPropertyName("detail")]
     public string? Detail { get; set; }
 

@@ -57,7 +57,10 @@ public sealed partial class MainWindow : Window
         OracleApiClient oracleClient,
         DeviceHeartbeatService heartbeatService)
     {
+        StartupLogger.Log("[8] MainWindow constructor entered");
+        StartupLogger.Log("[9] Before InitializeComponent()");
         InitializeComponent();
+        StartupLogger.Log("[10] After InitializeComponent()");
         _sessionManager = sessionManager;
         _authService = authService;
         _configProvider = configProvider;
@@ -328,6 +331,7 @@ public sealed partial class MainWindow : Window
     private async void LoginActionBtn_Click(object sender, RoutedEventArgs e)
     {
         string credential = CredentialBox.Password.Trim();
+        StartupLogger.LogAuth($"[UI] Login button clicked. Credential length={credential.Length}");
 
         if (string.IsNullOrEmpty(credential))
         {
@@ -340,11 +344,14 @@ public sealed partial class MainWindow : Window
         _logger.Log(LogLevel.INFO, "AUTH", "Manual login attempt initiated");
         try
         {
+            StartupLogger.LogAuth("[UI] Calling _authService.LoginAsync(credential)...");
             var result = await _authService.LoginAsync(credential);
+            StartupLogger.LogAuth($"[UI] _authService.LoginAsync returned Status={result.Status}, ErrorMessage={result.ErrorMessage}");
             HandleLoginResult(result);
         }
         catch (Exception ex)
         {
+            StartupLogger.LogAuth($"[UI] Exception in LoginActionBtn_Click: {ex}");
             _logger.Log(LogLevel.ERROR, "AUTH", $"Connection error: {ex.Message}");
             ShowError("Connection error: " + ex.Message);
         }
@@ -358,6 +365,7 @@ public sealed partial class MainWindow : Window
     {
         string credential = CredentialBox.Password.Trim();
         string totp = TotpBox.Text.Trim();
+        StartupLogger.LogAuth($"[UI] Verify 2FA button clicked. Credential length={credential.Length}, TOTP length={totp.Length}");
 
         if (string.IsNullOrEmpty(totp))
         {
@@ -369,11 +377,14 @@ public sealed partial class MainWindow : Window
         GlobalErrorBanner.IsOpen = false;
         try
         {
+            StartupLogger.LogAuth("[UI] Calling _authService.LoginAsync(credential, totp)...");
             var result = await _authService.LoginAsync(credential, totp);
+            StartupLogger.LogAuth($"[UI] _authService.LoginAsync(totp) returned Status={result.Status}, ErrorMessage={result.ErrorMessage}");
             HandleLoginResult(result);
         }
         catch (Exception ex)
         {
+            StartupLogger.LogAuth($"[UI] Exception in Verify2FaBtn_Click: {ex}");
             _logger.Log(LogLevel.ERROR, "AUTH", $"2FA error: {ex.Message}");
             ShowError("Connection error: " + ex.Message);
         }
@@ -439,6 +450,26 @@ public sealed partial class MainWindow : Window
                 : "You have reached your device limit. Please remove a device to continue.";
             ShowError(msg);
             _ = Windows.System.Launcher.LaunchUriAsync(new Uri(details?.ManageDevicesUrl ?? "https://stealthy.co.in/account"));
+        }
+        else if (result.Status == LoginStatus.DeviceOwnershipError)
+        {
+            _logger.Log(LogLevel.ERROR, "AUTH", "Device ownership conflict");
+            ShowError(result.ErrorMessage ?? "This device is already registered to another account.");
+        }
+        else if (result.Status == LoginStatus.DeviceDeactivated)
+        {
+            _logger.Log(LogLevel.ERROR, "AUTH", "Device deactivated");
+            ShowError(result.ErrorMessage ?? "This device has been deactivated. Please reactivate or remove it in your account portal.");
+        }
+        else if (result.Status == LoginStatus.AccountDisabled)
+        {
+            _logger.Log(LogLevel.ERROR, "AUTH", "Account disabled");
+            ShowError(result.ErrorMessage ?? "Your account has been disabled or is inactive.");
+        }
+        else if (result.Status == LoginStatus.InvalidMasterToken)
+        {
+            _logger.Log(LogLevel.ERROR, "AUTH", "Invalid credentials");
+            ShowError(result.ErrorMessage ?? "Invalid Account ID or Master Token.");
         }
         else if (result.Status == LoginStatus.ReplayDetected)
         {

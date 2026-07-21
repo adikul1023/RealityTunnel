@@ -49,7 +49,7 @@ import secrets
 async def get_auth_headers(async_client: AsyncClient, account_factory, account_id: str = "RT-DEV-001") -> tuple[dict[str, str], any]:
     """Helper to create account, login, and return authorization header + account object."""
     master_token = secrets.token_hex(32)
-    acc = await account_factory(account_id=account_id, master_token_hash=hash_master_token(master_token))
+    acc = await account_factory(account_id=account_id, master_token_hash=hash_master_token(master_token), plan_id="standard")
     login_resp = await async_client.post(
         "/api/auth/login",
         json={"account_id": account_id, "master_token": master_token, "device_guid": f"dev-{account_id}"},
@@ -114,7 +114,8 @@ async def test_get_other_account_device_404(async_client: AsyncClient, account_f
     # Account 2 attempts to get Account 1's device
     resp = await async_client.get("/api/devices/guid-secret-acc1", headers=headers2)
     assert resp.status_code == 404, resp.text
-    assert resp.json() == {"detail": "Device not found"}
+    assert resp.json()["detail"] == "Device not found"
+    assert resp.json()["code"] == "DEVICE_NOT_FOUND"
 
 
 # ── 4. Rename Device ─────────────────────────────────────────────────────────
@@ -181,7 +182,8 @@ async def test_rename_inactive_device_400(async_client: AsyncClient, account_fac
         headers=headers,
     )
     assert resp.status_code == 400, resp.text
-    assert resp.json() == {"detail": "Device is deactivated"}
+    assert resp.json()["detail"] == "Device is deactivated"
+    assert resp.json()["code"] == "DEVICE_DEACTIVATED"
 
 
 # ── 8. Missing JWT ───────────────────────────────────────────────────────────
@@ -326,7 +328,8 @@ async def test_no_idor_enumeration(async_client: AsyncClient, account_factory, d
     # Attempt GET
     get_resp = await async_client.get("/api/devices/guid-idor-target", headers=headers2)
     assert get_resp.status_code == 404, get_resp.text
-    assert get_resp.json() == {"detail": "Device not found"}
+    assert get_resp.json()["detail"] == "Device not found"
+    assert get_resp.json()["code"] == "DEVICE_NOT_FOUND"
 
     # Attempt PATCH
     patch_resp = await async_client.patch(
@@ -335,17 +338,20 @@ async def test_no_idor_enumeration(async_client: AsyncClient, account_factory, d
         headers=headers2,
     )
     assert patch_resp.status_code == 404, patch_resp.text
-    assert patch_resp.json() == {"detail": "Device not found"}
+    assert patch_resp.json()["detail"] == "Device not found"
+    assert patch_resp.json()["code"] == "DEVICE_NOT_FOUND"
 
     # Attempt DELETE
     del_resp = await async_client.delete("/api/devices/guid-idor-target", headers=headers2)
     assert del_resp.status_code == 404, del_resp.text
-    assert del_resp.json() == {"detail": "Device not found"}
+    assert del_resp.json()["detail"] == "Device not found"
+    assert del_resp.json()["code"] == "DEVICE_NOT_FOUND"
 
     # Attempt REACTIVATE
     react_resp = await async_client.post("/api/devices/guid-idor-target/reactivate", headers=headers2)
     assert react_resp.status_code == 404, react_resp.text
-    assert react_resp.json() == {"detail": "Device not found"}
+    assert react_resp.json()["detail"] == "Device not found"
+    assert react_resp.json()["code"] == "DEVICE_NOT_FOUND"
 
 
 # ── 18. Reactivate Idempotency (2x Calls) ────────────────────────────────────

@@ -218,8 +218,8 @@ async def test_login_same_device_guid_no_duplicate_row(
     assert len(matching) == 1, "Second login must not create a duplicate device row"
 
     device_after_second = matching[0]
-    assert device_after_second.first_seen_at == first_seen_at
-    assert device_after_second.last_seen_at > first_seen_at
+    assert device_after_second.first_seen_at.replace(tzinfo=None) == first_seen_at.replace(tzinfo=None)
+    assert device_after_second.last_seen_at.replace(tzinfo=None) > first_seen_at.replace(tzinfo=None)
 
 
 @pytest.mark.asyncio
@@ -236,25 +236,23 @@ async def test_login_device_limit_exceeded_returns_403(
     account = await account_factory(
         account_id="RT-DEVLIMIT-001", master_token_hash=master_token_hash
     )
-    assert account.plan_id == "free"  # free plan max_devices == 2
+    assert account.plan_id == "free"  # free plan max_devices == 1
 
     await device_service.register_device(account.id, "limit-device-1", "Laptop")
-    await device_service.register_device(account.id, "limit-device-2", "Phone")
 
     payload = {
         "account_id": "RT-DEVLIMIT-001",
         "master_token": master_token,
-        "device_guid": "limit-device-3-new",
+        "device_guid": "limit-device-2-new",
     }
     resp = await async_client.post("/api/auth/login", json=payload)
     assert resp.status_code == 403, resp.text
     data = resp.json()
-    assert data == {
-        "detail": "Device limit reached",
-        "plan": "free",
-        "current_devices": 2,
-        "max_devices": 2,
-    }
+    assert data["detail"] == "Device limit reached"
+    assert data["plan"] == "free"
+    assert data["current_devices"] == 1
+    assert data["max_devices"] == 1
+    assert data["code"] == "DEVICE_LIMIT_EXCEEDED"
     assert "access_token" not in resp.text
     assert "refresh_token" not in resp.text
 
@@ -264,9 +262,8 @@ async def test_login_device_owned_by_different_account_returns_generic_401(
     async_client: AsyncClient, account_factory, device_service: DeviceService
 ):
     """
-    Login with a device_guid already registered to a different account returns a generic
-    401 authentication failure — never a message revealing the device belongs to someone
-    else (Finding H-7 information-leak prevention).
+    Login with a device_guid already registered to a different account returns a structured
+    DEVICE_OWNERSHIP_ERROR authentication failure without leaking target account IDs.
     """
     master_token_a = "a" * 64
     master_token_b = "b" * 64
@@ -291,11 +288,10 @@ async def test_login_device_owned_by_different_account_returns_generic_401(
     resp = await async_client.post("/api/auth/login", json=payload)
     assert resp.status_code == 401, resp.text
     data = resp.json()
-    assert data == {
-        "detail": "Authentication failed: invalid credentials or inactive account"
-    }
-    # Must not leak that the conflict is device-ownership related, nor mention account_a.
-    assert "device" not in resp.text.lower()
+    detail = data["detail"] if isinstance(data["detail"], dict) else data
+    assert detail["code"] == "DEVICE_OWNERSHIP_ERROR"
+    assert "another account" in detail["message"].lower()
+    # Must not leak target account ID.
     assert "RT-DEVOWN-A" not in resp.text
 
 
@@ -331,9 +327,10 @@ async def test_login_deactivated_device_returns_403_with_reactivation_message(
 
     second_login = await async_client.post("/api/auth/login", json=login_payload)
     assert second_login.status_code == 403, second_login.text
-    detail = second_login.json()["detail"]
-    assert "deactivated" in detail.lower()
-    assert "/api/devices/deactivate-me-device/reactivate" in detail
+    detail_data = second_login.json()["detail"]
+    full_str = str(detail_data)
+    assert "deactivated" in full_str.lower()
+    assert "/api/devices/deactivate-me-device/reactivate" in full_str
     assert "access_token" not in second_login.text
     assert "refresh_token" not in second_login.text
 
@@ -544,7 +541,7 @@ async def test_logout_all_revokes_every_session(
     master_token = "3" * 64
     master_token_hash = hash_master_token(master_token)
     await account_factory(
-        account_id="RT-LOGOUTALL-01", master_token_hash=master_token_hash
+        account_id="RT-LOGOUTALL-01", master_token_hash=master_token_hash, plan_id="standard"
     )
 
     # Login on device 1

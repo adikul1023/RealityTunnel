@@ -11,12 +11,25 @@ class Program
 {
     static void Main(string[] args)
     {
-        Console.Title = "Stealthy Client Setup";
+        Console.Title = "RealityTunnel Installer";
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine("=================================================");
-        Console.WriteLine("          Stealthy VPN Client Setup           ");
+        Console.WriteLine("             RealityTunnel Installer             ");
         Console.WriteLine("=================================================");
         Console.ResetColor();
+
+        var assembly = Assembly.GetExecutingAssembly();
+        string version = assembly.GetName().Version?.ToString(3) ?? "1.0.0";
+        var metadata = assembly.GetCustomAttributes<AssemblyMetadataAttribute>();
+        string commit = metadata.FirstOrDefault(a => a.Key == "GitCommit")?.Value ?? "unknown";
+        if (string.IsNullOrWhiteSpace(commit)) commit = "unknown";
+        string built = metadata.FirstOrDefault(a => a.Key == "BuildDate")?.Value ?? "unknown";
+        if (string.IsNullOrWhiteSpace(built)) built = DateTime.Now.ToString("yyyy-MM-dd");
+
+        Console.WriteLine($"Version: {version}");
+        Console.WriteLine($"Commit:  {commit}");
+        Console.WriteLine($"Built:   {built}");
+        Console.WriteLine("=================================================");
         Console.WriteLine();
 
         bool isUninstall = args.Contains("--uninstall", StringComparer.OrdinalIgnoreCase) || args.Contains("-uninstall", StringComparer.OrdinalIgnoreCase);
@@ -119,12 +132,12 @@ class Program
         Console.WriteLine("\nExtracting client files...");
         try
         {
-            var assembly = Assembly.GetExecutingAssembly();
-            string resourceName = assembly.GetManifestResourceNames()
+            var execAssembly = Assembly.GetExecutingAssembly();
+            string resourceName = execAssembly.GetManifestResourceNames()
                 .FirstOrDefault(n => n.EndsWith("payload.zip"))
                 ?? throw new InvalidOperationException("Embedded payload.zip resource not found.");
 
-            using Stream? zipStream = assembly.GetManifestResourceStream(resourceName);
+            using Stream? zipStream = execAssembly.GetManifestResourceStream(resourceName);
             if (zipStream == null)
             {
                 throw new InvalidOperationException("Failed to open embedded payload stream.");
@@ -159,68 +172,7 @@ class Program
             return;
         }
 
-        // 3. Prompt or read credentials for .env
-        string uuid = args.FirstOrDefault(a => a.StartsWith("--uuid=", StringComparison.OrdinalIgnoreCase))?.Substring("--uuid=".Length).Trim() ?? "";
-        string publicKey = args.FirstOrDefault(a => a.StartsWith("--key=", StringComparison.OrdinalIgnoreCase))?.Substring("--key=".Length).Trim() ?? "";
-        string sni = args.FirstOrDefault(a => a.StartsWith("--sni=", StringComparison.OrdinalIgnoreCase))?.Substring("--sni=".Length).Trim() ?? "dl.google.com";
-        string shortId = args.FirstOrDefault(a => a.StartsWith("--shortid=", StringComparison.OrdinalIgnoreCase))?.Substring("--shortid=".Length).Trim() ?? "";
-
-        if (!isSilent && (string.IsNullOrWhiteSpace(uuid) || string.IsNullOrWhiteSpace(publicKey)))
-        {
-            Console.WriteLine("\n-------------------------------------------------");
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine("          Configure VPN Connection details       ");
-            Console.ResetColor();
-            Console.WriteLine("-------------------------------------------------");
-
-            while (string.IsNullOrWhiteSpace(uuid))
-            {
-                Console.Write("Enter VLESS UUID (required): ");
-                uuid = Console.ReadLine()?.Trim() ?? "";
-            }
-
-            while (string.IsNullOrWhiteSpace(publicKey))
-            {
-                Console.Write("Enter REALITY Public Key (required): ");
-                publicKey = Console.ReadLine()?.Trim() ?? "";
-            }
-
-            Console.Write("Enter VPN SNI (default: dl.google.com): ");
-            string inputSni = Console.ReadLine()?.Trim() ?? "";
-            if (!string.IsNullOrWhiteSpace(inputSni)) { sni = inputSni; }
-
-            Console.Write("Enter Short ID (optional): ");
-            shortId = Console.ReadLine()?.Trim() ?? "";
-        }
-
-        if (!string.IsNullOrWhiteSpace(uuid) && !string.IsNullOrWhiteSpace(publicKey))
-        {
-            try
-            {
-                string envContent =
-                    $"# Stealthy — server credentials\n" +
-                    $"# Keep this file private. Never commit it to git.\n\n" +
-                    $"VPN_UUID={uuid}\n" +
-                    $"VPN_PUBLIC_KEY={publicKey}\n" +
-                    $"VPN_SNI={sni}\n" +
-                    $"VPN_SHORT_ID={shortId}\n";
-
-                string envPath = Path.Combine(installDir, ".env");
-                File.WriteAllText(envPath, envContent);
-
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("\nConfiguration credentials successfully saved to .env!");
-                Console.ResetColor();
-            }
-            catch (Exception ex)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Error writing configuration: {ex.Message}");
-                Console.ResetColor();
-            }
-        }
-
-        // 4. Create Desktop Shortcut
+        // 3. Create Desktop Shortcut
         Console.WriteLine("\nCreating Desktop shortcut...");
         try
         {
@@ -257,8 +209,23 @@ class Program
             Console.ResetColor();
         }
 
-        // 5. Register and start RealityTunnelHelper Windows Service
-        RegisterAndStartService(installDir);
+        // 4. Register and start RealityTunnelHelper Windows Service
+        if (!RegisterAndStartService(installDir))
+        {
+            Console.WriteLine("\n=================================================");
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("              Installation Failed                ");
+            Console.ResetColor();
+            Console.WriteLine("=================================================");
+            Console.WriteLine("\nRealityTunnelHelper could not be started as a Windows Service.");
+            if (!isSilent)
+            {
+                Console.WriteLine("\nPress any key to exit...");
+                Console.ReadKey();
+            }
+            Environment.Exit(1);
+            return;
+        }
 
         Console.WriteLine("\n=================================================");
         Console.ForegroundColor = ConsoleColor.Green;
@@ -273,7 +240,7 @@ class Program
         }
     }
 
-    private static void RegisterAndStartService(string installDir)
+    private static bool RegisterAndStartService(string installDir)
     {
         string helperExePath = Path.Combine(installDir, "RealityTunnel.Helper.exe");
         if (!File.Exists(helperExePath))
@@ -281,24 +248,41 @@ class Program
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"\nHelper service executable ({helperExePath}) not found in extracted payload. Skipping service registration.");
             Console.ResetColor();
-            return;
+            return false;
         }
 
         Console.WriteLine("\nRegistering and starting RealityTunnelHelper Windows Service...");
         StopAndRemoveService();
 
         string binPath = $"\"{helperExePath}\"";
-        RunScCommand($"create RealityTunnelHelper binPath= \"{binPath}\" start= auto obj= LocalSystem");
-        RunScCommand("start RealityTunnelHelper");
+        bool createSuccess = RunScCommand($"create RealityTunnelHelper binPath= \"{binPath}\" start= auto obj= LocalSystem");
+        if (!createSuccess)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("  sc create RealityTunnelHelper failed.");
+            Console.ResetColor();
+            return false;
+        }
+
+        bool startSuccess = RunScCommand("start RealityTunnelHelper");
+        if (!startSuccess)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("  sc start RealityTunnelHelper failed.");
+            Console.ResetColor();
+            return false;
+        }
+
+        return true;
     }
 
     private static void StopAndRemoveService()
     {
-        RunScCommand("stop RealityTunnelHelper");
-        RunScCommand("delete RealityTunnelHelper");
+        RunScCommand("stop RealityTunnelHelper", ignoreError: true);
+        RunScCommand("delete RealityTunnelHelper", ignoreError: true);
     }
 
-    private static void RunScCommand(string args)
+    private static bool RunScCommand(string args, bool ignoreError = false)
     {
         try
         {
@@ -319,11 +303,21 @@ class Program
                 p.WaitForExit();
                 if (!string.IsNullOrWhiteSpace(outStr)) { Console.WriteLine($"  sc {args} -> {outStr.Trim()}"); }
                 if (!string.IsNullOrWhiteSpace(errStr)) { Console.WriteLine($"  sc {args} [err] -> {errStr.Trim()}"); }
+
+                if (p.ExitCode != 0 || outStr.Contains("FAILED", StringComparison.OrdinalIgnoreCase) || errStr.Contains("FAILED", StringComparison.OrdinalIgnoreCase))
+                {
+                    return ignoreError;
+                }
+                return true;
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Warning running sc.exe {args}: {ex.Message}");
+            if (!ignoreError)
+            {
+                Console.WriteLine($"Warning running sc.exe {args}: {ex.Message}");
+            }
         }
+        return false;
     }
 }

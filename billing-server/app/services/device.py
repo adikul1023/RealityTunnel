@@ -149,7 +149,7 @@ class DeviceService:
 
             if not device.is_active:
                 logger.info("Attempted registration/update on deactivated device")
-                raise InactiveDeviceError("Device is deactivated")
+                raise InactiveDeviceError("Device is deactivated", device_guid=device.device_guid)
 
             device = self._normalize_device_timestamps(device)
             device.last_seen_at = now
@@ -386,3 +386,47 @@ class DeviceService:
         except RepositoryError as exc:
             logger.error("Repository error querying devices for account")
             raise DeviceServiceError("Database error querying devices for account") from exc
+
+    async def delete_device(self, account_id: uuid.UUID, device_id: uuid.UUID) -> bool:
+        """
+        Permanently delete/unbind a device record by internal DB UUID.
+        Must verify ownership (device.account_id == account_id).
+        Revokes active refresh tokens associated with the device.
+        """
+        try:
+            device = await self.device_repo.get_by_id(device_id, for_update=True)
+        except RepositoryError as exc:
+            logger.error("Repository error querying device in delete_device")
+            raise DeviceServiceError("Database error querying device") from exc
+
+        if device is None:
+            raise DeviceNotFoundError("Device not found")
+        if device.account_id != account_id:
+            logger.warning("Ownership violation during device deletion attempt")
+            raise DeviceOwnershipError("Device is registered to another account")
+
+        device_guid = device.device_guid
+        try:
+            deleted = await self.device_repo.delete(device)
+            if deleted and self.refresh_service:
+                await self.refresh_service.revoke_all_for_device(account_id, device_guid, "DEVICE_UNBOUND")
+            return deleted
+        except RepositoryError as exc:
+            logger.error("Repository error deleting device in delete_device")
+            raise DeviceServiceError("Database error deleting device") from exc
+
+    async def delete_device_by_guid(self, account_id: uuid.UUID, device_guid: str) -> bool:
+        """
+        Permanently delete/unbind a device record by device GUID.
+        Must verify ownership (device.account_id == account_id).
+        Revokes active refresh tokens associated with the device.
+        """
+        device = await self._get_and_verify_ownership(account_id, device_guid, for_update=True)
+        try:
+            deleted = await self.device_repo.delete(device)
+            if deleted and self.refresh_service:
+                await self.refresh_service.revoke_all_for_device(account_id, device_guid, "DEVICE_UNBOUND")
+            return deleted
+        except RepositoryError as exc:
+            logger.error("Repository error deleting device in delete_device_by_guid")
+            raise DeviceServiceError("Database error deleting device") from exc

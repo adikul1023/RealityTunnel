@@ -146,22 +146,35 @@ def _record_exc(request: Request, exc: Exception, status_code: int) -> None:
 
 async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
     _record_exc(request, exc, exc.status_code)
-    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+    content = exc.detail if isinstance(exc.detail, dict) else {"detail": exc.detail}
+    return JSONResponse(status_code=exc.status_code, content=content)
 
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     _record_exc(request, exc, status.HTTP_400_BAD_REQUEST)
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
-        content={"detail": "Validation error"},
+        content={"detail": "Validation error", "code": "VALIDATION_ERROR"},
     )
 
 
 async def auth_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     _record_exc(request, exc, status.HTTP_401_UNAUTHORIZED)
+    from app.services.exceptions import RefreshTokenReplayError, AccountNotActiveError
+    code = getattr(exc, "code", None)
+    if not code:
+        if isinstance(exc, RefreshTokenReplayError):
+            code = "REPLAY_DETECTED"
+        elif isinstance(exc, AccountNotActiveError):
+            code = "ACCOUNT_DISABLED"
+        else:
+            code = "AUTH_ERROR"
+    detail_msg = getattr(exc, "detail", None)
+    if not detail_msg or not isinstance(detail_msg, str):
+        detail_msg = str(exc) if str(exc) else "Authentication failed or token invalid"
     return JSONResponse(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        content={"detail": "Authentication failed or token invalid"},
+        content={"detail": detail_msg, "code": code},
     )
 
 
@@ -169,7 +182,7 @@ async def duplicate_exception_handler(request: Request, exc: DuplicateEntityErro
     _record_exc(request, exc, status.HTTP_409_CONFLICT)
     return JSONResponse(
         status_code=status.HTTP_409_CONFLICT,
-        content={"detail": "Duplicate entity"},
+        content={"detail": "Duplicate entity", "code": "DUPLICATE_ENTITY"},
     )
 
 
@@ -177,7 +190,7 @@ async def device_not_found_exception_handler(request: Request, exc: Exception) -
     _record_exc(request, exc, status.HTTP_404_NOT_FOUND)
     return JSONResponse(
         status_code=status.HTTP_404_NOT_FOUND,
-        content={"detail": "Device not found"},
+        content={"detail": "Device not found", "code": "DEVICE_NOT_FOUND"},
     )
 
 
@@ -185,16 +198,17 @@ async def payment_not_found_exception_handler(request: Request, exc: Exception) 
     _record_exc(request, exc, status.HTTP_404_NOT_FOUND)
     return JSONResponse(
         status_code=status.HTTP_404_NOT_FOUND,
-        content={"detail": "Payment not found"},
+        content={"detail": "Payment not found", "code": "PAYMENT_NOT_FOUND"},
     )
 
 
 
 async def device_inactive_exception_handler(request: Request, exc: InactiveDeviceError) -> JSONResponse:
     _record_exc(request, exc, status.HTTP_400_BAD_REQUEST)
+    content = getattr(exc, "detail", None) if isinstance(getattr(exc, "detail", None), dict) else {"detail": "Device is deactivated", "code": "DEVICE_DEACTIVATED"}
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
-        content={"detail": "Device is deactivated"},
+        content=content,
     )
 
 

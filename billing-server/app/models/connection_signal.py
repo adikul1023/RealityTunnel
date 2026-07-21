@@ -32,6 +32,7 @@ class ConnectionEventType(str, enum.Enum):
     DEVICE_RENAME = "DEVICE_RENAME"
     DEVICE_DEACTIVATE = "DEVICE_DEACTIVATE"
     DEVICE_REACTIVATE = "DEVICE_REACTIVATE"
+    DEVICE_DELETE = "DEVICE_DELETE"
 
 
 class ConnectionSignal(Base):

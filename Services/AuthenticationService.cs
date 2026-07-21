@@ -30,6 +30,7 @@ public class AuthenticationService
 
     public async Task<LoginResult> LoginAsync(string stealthyCredential, string? totpCode = null)
     {
+        StartupLogger.LogAuth($"[AuthService] LoginAsync entered. Credential length={stealthyCredential?.Length ?? 0}, TOTP={totpCode != null}");
         if (string.IsNullOrWhiteSpace(stealthyCredential))
         {
             return new LoginResult { Status = LoginStatus.Error, ErrorMessage = "Credential cannot be empty." };
@@ -48,7 +49,10 @@ public class AuthenticationService
         var osVersion = Environment.OSVersion.Version.ToString();
         var clientVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0";
         var device = new DeviceRegistration(deviceId, Environment.MachineName, "windows", clientVersion, osVersion);
+        
+        StartupLogger.LogAuth($"[AuthService] Prepared login for AccountId='{accountId}', DeviceId='{deviceId}', ClientVersion='{clientVersion}', OSVersion='{osVersion}'");
         var result = await _apiClient.LoginAsync(accountId, masterToken, device, totpCode);
+        StartupLogger.LogAuth($"[AuthService] _apiClient.LoginAsync returned Status={result.Status}, ErrorMessage={result.ErrorMessage}, TokensPresent={result.Tokens != null}");
 
         if (result.Status == LoginStatus.Success && result.Tokens != null)
         {

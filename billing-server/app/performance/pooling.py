@@ -17,6 +17,10 @@ def get_engine_pool_kwargs(environment: str | None = None) -> dict[str, Any]:
     Returns optimal SQLAlchemy engine pool configuration keyword arguments
     tailored to the deployment environment.
     """
+    if "sqlite" in settings.database_url.get_secret_value():
+        from sqlalchemy.pool import StaticPool
+        return {"poolclass": StaticPool}
+
     env = (environment or settings.environment).lower()
 
     if env == "testing":

@@ -13,8 +13,17 @@ public partial class App : Application
 
     public App()
     {
+        StartupLogger.Log("[4] Construct App() entered");
         this.InitializeComponent();
+        this.UnhandledException += (s, e) =>
+        {
+            StartupLogger.Log($"[App.UnhandledException] {e.Exception}");
+            try { System.IO.File.AppendAllText(@"D:\My projects\VPN\OverREALITY\startup_error.txt", $"{DateTime.Now}: XAML Unhandled: {e.Exception}\nMessage: {e.Message}\n"); } catch { }
+            e.Handled = true;
+        };
+        StartupLogger.Log("[4b] Before ConfigureServices()");
         Services = ConfigureServices();
+        StartupLogger.Log("[6] Host.Build() / ConfigureServices completed");
     }
 
     private static IServiceProvider ConfigureServices()
@@ -58,9 +67,14 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        StartupLogger.Log("[5] OnLaunched() entered");
+        StartupLogger.Log("[7] Resolving MainWindow from DI");
         var mainWindow = Services.GetRequiredService<MainWindow>();
+        StartupLogger.Log("[7b] After resolving MainWindow from DI");
         m_window = mainWindow;
+        StartupLogger.Log("[11] Before Activate()");
         m_window.Activate();
+        StartupLogger.Log("[12] After Activate()");
 
         if (!string.IsNullOrWhiteSpace(args.Arguments) && args.Arguments.Contains("exchange_token="))
         {

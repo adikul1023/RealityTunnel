@@ -16,14 +16,14 @@ Write-Host "4. Restoring and publishing RealityTunnel..."
 dotnet restore RealityTunnel.csproj -p:Platform=x64
 dotnet build RealityTunnel.csproj -c Release -p:Platform=x64
 if ($LASTEXITCODE -ne 0) { throw "RealityTunnel build failed" }
-dotnet publish RealityTunnel.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained true --no-build
+dotnet publish RealityTunnel.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained true
 if ($LASTEXITCODE -ne 0) { throw "RealityTunnel build failed" }
 
 Write-Host "4b. Restoring and publishing RealityTunnel.Helper..."
 dotnet restore RealityTunnel.Helper\RealityTunnel.Helper.csproj
 dotnet build RealityTunnel.Helper\RealityTunnel.Helper.csproj -c Release
 if ($LASTEXITCODE -ne 0) { throw "RealityTunnel.Helper build failed" }
-dotnet publish RealityTunnel.Helper\RealityTunnel.Helper.csproj -c Release -r win-x64 --self-contained true --no-build
+dotnet publish RealityTunnel.Helper\RealityTunnel.Helper.csproj -c Release -r win-x64 --self-contained true
 if ($LASTEXITCODE -ne 0) { throw "RealityTunnel.Helper build failed" }
 
 Write-Host "5. Copying RealityTunnel and Helper artifacts..."
@@ -39,12 +39,20 @@ if (-Not (Test-Path $helperPublishDir)) {
 }
 Copy-Item -Path "$helperPublishDir\*" -Destination $latestDir -Recurse -Force
 
+if (Test-Path "D:\Downloads\publish\sing-box.exe") {
+    Copy-Item -Path "D:\Downloads\publish\sing-box.exe", "D:\Downloads\publish\wintun.dll", "D:\Downloads\publish\config.template.json", "D:\Downloads\publish\geoip.dat", "D:\Downloads\publish\geosite.dat" -Destination $latestDir -Force -ErrorAction SilentlyContinue
+}
+
 Write-Host "Creating payload.zip for installer..."
+if (Test-Path "$latestDir\.env") { Remove-Item -Force "$latestDir\.env" }
 if (Test-Path "setup\payload.zip") { Remove-Item -Force "setup\payload.zip" }
 Compress-Archive -Path "$latestDir\*" -DestinationPath "setup\payload.zip" -Force
 
 Write-Host "6. Building and publishing Installer..."
-dotnet publish setup\setup.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained true
+$gitCommit = git rev-parse --short HEAD 2>$null
+if (-not $gitCommit) { $gitCommit = "unknown" }
+$buildDate = Get-Date -Format 'yyyy-MM-dd'
+dotnet publish setup\setup.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained true -p:GitCommit=$gitCommit -p:BuildDate=$buildDate
 if ($LASTEXITCODE -ne 0) { throw "Setup build failed" }
 
 Write-Host "7. Copying Installer artifacts..."
