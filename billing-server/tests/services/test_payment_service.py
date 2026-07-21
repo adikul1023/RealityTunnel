@@ -54,7 +54,7 @@ async def test_account(db_session: AsyncSession) -> Account:
     return await repo.create(
         account_id="PAY-TEST-001",
         master_token_hash="payhash" * 8,
-        plan_id="pro",
+        plan_id="standard",
     )
 
 
@@ -207,7 +207,7 @@ async def test_create_payment_success_and_idempotency(
 ):
     key = f"idem_{uuid.uuid4().hex}"
     payment1 = await service.create_payment(
-        test_account.id, 99900, "INR", key, plan_id="pro"
+        test_account.id, 99900, "INR", key, plan_id="standard"
     )
 
     assert payment1.account_id == test_account.id
@@ -217,7 +217,7 @@ async def test_create_payment_success_and_idempotency(
 
     # Second call with same idempotency key returns existing payment without creating order again
     payment2 = await service.create_payment(
-        test_account.id, 99900, "INR", key, plan_id="pro"
+        test_account.id, 99900, "INR", key, plan_id="standard"
     )
     assert payment2.id == payment1.id
     assert mock_provider.create_order.call_count == 1
@@ -229,14 +229,14 @@ async def test_confirm_payment_activates_new_subscription(
 ):
     key = f"idem_{uuid.uuid4().hex}"
     payment = await service.create_payment(
-        test_account.id, 99900, "INR", key, plan_id="pro"
+        test_account.id, 99900, "INR", key, plan_id="standard"
     )
     assert payment.subscription_id is None
 
     confirmed = await service.confirm_payment(
         provider_order_id="order_test_123456",
         provider_payment_id="pay_test_789012",
-        plan_id="pro",
+        plan_id="standard",
     )
     assert confirmed.status == PaymentStatus.PAID
     assert confirmed.paid_at is not None
@@ -248,7 +248,7 @@ async def test_confirm_payment_activates_new_subscription(
     assert sub is not None
     assert sub.account_id == test_account.id
     assert sub.status == SubscriptionLifecycleStatus.ACTIVE
-    assert sub.plan_id == "pro"
+    assert sub.plan_id == "standard"
 
 
 @pytest.mark.asyncio
@@ -268,7 +268,7 @@ async def test_confirm_payment_rejects_captured_amount_mismatch(
     """
     key = f"idem_{uuid.uuid4().hex}"
     payment = await service.create_payment(
-        test_account.id, 99900, "INR", key, plan_id="pro"
+        test_account.id, 99900, "INR", key, plan_id="standard"
     )
     assert payment.subscription_id is None
 
@@ -287,7 +287,7 @@ async def test_confirm_payment_rejects_captured_amount_mismatch(
         await service.confirm_payment(
             provider_order_id="order_test_123456",
             provider_payment_id="pay_test_789012",
-            plan_id="pro",
+            plan_id="standard",
         )
 
     await db_session.refresh(payment)
@@ -305,7 +305,7 @@ async def test_confirm_payment_rejects_refunded_payment(
 ):
     key = f"idem_{uuid.uuid4().hex}"
     payment = await service.create_payment(
-        test_account.id, 99900, "INR", key, plan_id="pro"
+        test_account.id, 99900, "INR", key, plan_id="standard"
     )
     payment.status = PaymentStatus.REFUNDED
     await service.payment_repo.update(payment, commit=True)
@@ -325,7 +325,7 @@ async def test_confirm_payment_rejects_refunded_payment(
         await service.confirm_payment(
             provider_order_id="order_test_123456",
             provider_payment_id="pay_test_789012",
-            plan_id="pro",
+            plan_id="standard",
         )
 
     await db_session.refresh(payment)
@@ -342,19 +342,19 @@ async def test_confirm_payment_renews_existing_subscription(
     old_expires = now + timedelta(days=5)
     existing_sub = await sub_repo.create(
         account_id=test_account.id,
-        plan_id="pro",
+        plan_id="standard",
         status=SubscriptionLifecycleStatus.ACTIVE,
         starts_at=now - timedelta(days=25),
         expires_at=old_expires,
     )
 
     key = f"idem_{uuid.uuid4().hex}"
-    await service.create_payment(test_account.id, 99900, "INR", key, plan_id="pro")
+    await service.create_payment(test_account.id, 99900, "INR", key, plan_id="standard")
 
     confirmed = await service.confirm_payment(
         provider_order_id="order_test_123456",
         provider_payment_id="pay_test_789012",
-        plan_id="pro",
+        plan_id="standard",
     )
     assert confirmed.subscription_id == existing_sub.id
 
@@ -367,7 +367,7 @@ async def test_confirm_payment_idempotency_10_webhooks(
     service: PaymentService, test_account: Account, mock_provider: AsyncMock
 ):
     key = f"idem_{uuid.uuid4().hex}"
-    await service.create_payment(test_account.id, 99900, "INR", key, plan_id="pro")
+    await service.create_payment(test_account.id, 99900, "INR", key, plan_id="standard")
 
     # Simulate delivering the same webhook / confirming payment 10 times
     first_confirm = await service.confirm_payment(
@@ -385,7 +385,7 @@ async def test_confirm_payment_idempotency_10_webhooks(
 @pytest.mark.asyncio
 async def test_concurrency_row_locking(service: PaymentService, test_account: Account):
     key = f"idem_{uuid.uuid4().hex}"
-    await service.create_payment(test_account.id, 99900, "INR", key, plan_id="pro")
+    await service.create_payment(test_account.id, 99900, "INR", key, plan_id="standard")
 
     with patch.object(
         service.payment_repo,
@@ -401,7 +401,7 @@ async def test_fail_and_refund_payment(
     service: PaymentService, test_account: Account, mock_provider: AsyncMock
 ):
     key1 = f"idem_{uuid.uuid4().hex}"
-    await service.create_payment(test_account.id, 99900, "INR", key1, plan_id="pro")
+    await service.create_payment(test_account.id, 99900, "INR", key1, plan_id="standard")
     failed = await service.fail_payment("order_test_123456", reason="Card declined")
     assert failed.status == PaymentStatus.FAILED
 
@@ -411,7 +411,7 @@ async def test_fail_and_refund_payment(
     )
     key2 = f"idem_{uuid.uuid4().hex}"
     payment = await service.create_payment(
-        test_account.id, 99900, "INR", key2, plan_id="pro"
+        test_account.id, 99900, "INR", key2, plan_id="standard"
     )
     await service.confirm_payment("order_refund_999", "pay_refund_888")
 

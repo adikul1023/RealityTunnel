@@ -35,7 +35,7 @@ async def setup_chain_account(db_session: AsyncSession) -> Account:
     return await repo.create(
         account_id="CHAIN-ACC-001",
         master_token_hash="hash" * 8,
-        plan_id="pro",
+        plan_id="standard",
     )
 
 
@@ -134,7 +134,7 @@ async def test_full_event_chain_payment_captured_activates_all(
         amount_minor_units=99900,
         currency="INR",
         idempotency_key="idem_chain_1",
-        plan_id="pro",
+        plan_id="standard",
     )
     assert payment.status == PaymentStatus.CREATED
 
@@ -151,7 +151,7 @@ async def test_full_event_chain_payment_captured_activates_all(
     sub = await sub_repo.get_by_id(processed_payment.subscription_id)
     assert sub is not None
     assert sub.status == SubscriptionLifecycleStatus.ACTIVE
-    assert sub.plan_id == "pro"
+    assert sub.plan_id == "standard"
 
     # 4. Verify Provisioning profile state
     prov_repo = ProvisioningRepository(db_session)
@@ -187,7 +187,7 @@ async def test_full_event_chain_refund_terminates_all(
         amount_minor_units=99900,
         currency="INR",
         idempotency_key="idem_chain_2",
-        plan_id="pro",
+        plan_id="standard",
     )
     captured = await webhook_svc.process_event(
         b'{"event":"payment.captured"}', "valid_sig"

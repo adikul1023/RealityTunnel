@@ -256,7 +256,7 @@ async def test_admin_subscriptions_list_and_get(
     acc2 = await account_factory(account_id="RT-ADM-SUB-2")
 
     sub1 = await _create_sample_subscription(
-        db_session, acc1.id, SubscriptionLifecycleStatus.ACTIVE, plan_id="pro"
+        db_session, acc1.id, SubscriptionLifecycleStatus.ACTIVE, plan_id="standard"
     )
     sub2 = await _create_sample_subscription(
         db_session, acc2.id, SubscriptionLifecycleStatus.EXPIRED, plan_id="basic"
@@ -291,7 +291,7 @@ async def test_admin_subscriptions_list_and_get(
     assert resp_single.status_code == 200
     body_single = resp_single.json()
     assert body_single["id"] == str(sub1.id)
-    assert body_single["plan_id"] == "pro"
+    assert body_single["plan_id"] == "standard"
 
     # Get unknown subscription
     resp_unknown = await async_client.get(
@@ -430,7 +430,7 @@ async def test_admin_provisioning_endpoints(
     async_client, account_factory, admin_auth_headers_factory, db_session
 ):
     """Test listing provisioning profiles and executing administrative actions."""
-    acc = await account_factory(account_id="RT-ADM-PROV-1")
+    acc = await account_factory(account_id="RT-ADM-STANDARDV-1")
     prov = await _create_sample_provisioning(
         db_session, acc.id, ProvisioningState.ACTIVE
     )
@@ -531,7 +531,7 @@ async def test_admin_billing_customer_jwt_rejected(async_client, account_factory
         json={
             "account_id": "RT-CUST-ISOLATE",
             "master_token": master_token,
-            "device_guid": "dev-isolate-001",
+            "device_guid": "dev-isolate-001", "client_type": "desktop",
         },
     )
     assert login_resp.status_code == 200

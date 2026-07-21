@@ -15,7 +15,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import AsyncSessionLocal
+from app.database import AsyncSessionLocal, engine
 from app.models import Account, ProvisioningProfile, ProvisioningState
 from app.repositories import AccountRepository, ProvisioningRepository
 
@@ -69,6 +69,7 @@ async def _cleanup_test_accounts(session: AsyncSession, account_id_prefixes: lis
 # Test 1: SKIP LOCKED — two concurrent workers get non-overlapping rows
 # ---------------------------------------------------------------------------
 
+@pytest.mark.skipif(engine.dialect.name == "sqlite", reason="SQLite does not support SKIP LOCKED")
 @pytest.mark.asyncio
 async def test_skip_locked_prevents_overlap_between_concurrent_workers():
     """

@@ -58,7 +58,7 @@ async def test_login_success(async_client: AsyncClient, account_factory):
     payload = {
         "account_id": "RT-VALID-0001",
         "master_token": master_token,
-        "device_guid": "dev-guid-001",
+        "device_guid": "dev-guid-001", "client_type": "desktop",
     }
     resp = await async_client.post("/api/auth/login", json=payload)
     assert resp.status_code == 200, resp.text
@@ -82,7 +82,7 @@ async def test_login_invalid_account_id(async_client: AsyncClient, account_facto
     payload = {
         "account_id": "RT-FAKE-9999",
         "master_token": master_token,
-        "device_guid": "dev-guid-001",
+        "device_guid": "dev-guid-001", "client_type": "desktop",
     }
     resp = await async_client.post("/api/auth/login", json=payload)
     assert resp.status_code == 401
@@ -101,7 +101,7 @@ async def test_login_invalid_master_token(async_client: AsyncClient, account_fac
     payload = {
         "account_id": "RT-VALID-0002",
         "master_token": "f" * 64,
-        "device_guid": "dev-guid-001",
+        "device_guid": "dev-guid-001", "client_type": "desktop",
     }
     resp = await async_client.post("/api/auth/login", json=payload)
     assert resp.status_code == 401
@@ -123,7 +123,7 @@ async def test_login_expired_subscription(async_client: AsyncClient, account_fac
     payload = {
         "account_id": "RT-EXPIRED-001",
         "master_token": master_token,
-        "device_guid": "dev-guid-001",
+        "device_guid": "dev-guid-001", "client_type": "desktop",
     }
     resp = await async_client.post("/api/auth/login", json=payload)
     assert resp.status_code == 401
@@ -143,7 +143,7 @@ async def test_login_suspended_account(async_client: AsyncClient, account_factor
     payload = {
         "account_id": "RT-SUSPEND-001",
         "master_token": master_token,
-        "device_guid": "dev-guid-001",
+        "device_guid": "dev-guid-001", "client_type": "desktop",
     }
     resp = await async_client.post("/api/auth/login", json=payload)
     assert resp.status_code == 401
@@ -169,7 +169,7 @@ async def test_login_registers_new_device(
     payload = {
         "account_id": "RT-DEVREG-001",
         "master_token": master_token,
-        "device_guid": "new-device-guid-001",
+        "device_guid": "new-device-guid-001", "client_type": "desktop",
     }
     resp = await async_client.post("/api/auth/login", json=payload)
     assert resp.status_code == 200, resp.text
@@ -198,7 +198,7 @@ async def test_login_same_device_guid_no_duplicate_row(
     payload = {
         "account_id": "RT-DEVREG-002",
         "master_token": master_token,
-        "device_guid": "repeat-device-guid",
+        "device_guid": "repeat-device-guid", "client_type": "desktop",
     }
     resp1 = await async_client.post("/api/auth/login", json=payload)
     assert resp1.status_code == 200, resp1.text
@@ -234,7 +234,7 @@ async def test_login_device_limit_exceeded_returns_403(
     master_token = "a" * 64
     master_token_hash = hash_master_token(master_token)
     account = await account_factory(
-        account_id="RT-DEVLIMIT-001", master_token_hash=master_token_hash
+        account_id="RT-DEVLIMIT-001", master_token_hash=master_token_hash, plan_id="free"
     )
     assert account.plan_id == "free"  # free plan max_devices == 1
 
@@ -243,7 +243,7 @@ async def test_login_device_limit_exceeded_returns_403(
     payload = {
         "account_id": "RT-DEVLIMIT-001",
         "master_token": master_token,
-        "device_guid": "limit-device-2-new",
+        "device_guid": "limit-device-2-new", "client_type": "desktop",
     }
     resp = await async_client.post("/api/auth/login", json=payload)
     assert resp.status_code == 403, resp.text
@@ -283,7 +283,7 @@ async def test_login_device_owned_by_different_account_returns_generic_401(
     payload = {
         "account_id": "RT-DEVOWN-B",
         "master_token": master_token_b,
-        "device_guid": "shared-device-guid",
+        "device_guid": "shared-device-guid", "client_type": "desktop",
     }
     resp = await async_client.post("/api/auth/login", json=payload)
     assert resp.status_code == 401, resp.text
@@ -313,7 +313,7 @@ async def test_login_deactivated_device_returns_403_with_reactivation_message(
     login_payload = {
         "account_id": "RT-DEVINACTIVE-001",
         "master_token": master_token,
-        "device_guid": "deactivate-me-device",
+        "device_guid": "deactivate-me-device", "client_type": "desktop",
     }
     first_login = await async_client.post("/api/auth/login", json=login_payload)
     assert first_login.status_code == 200, first_login.text
@@ -353,7 +353,7 @@ async def test_refresh_success(async_client: AsyncClient, account_factory):
         json={
             "account_id": "RT-REFRESH-001",
             "master_token": master_token,
-            "device_guid": "dev-01",
+            "device_guid": "dev-01", "client_type": "desktop",
         },
     )
     old_refresh = login_resp.json()["refresh_token"]
@@ -385,7 +385,7 @@ async def test_refresh_replay_attack(async_client: AsyncClient, account_factory)
         json={
             "account_id": "RT-REPLAY-001",
             "master_token": master_token,
-            "device_guid": "dev-01",
+            "device_guid": "dev-01", "client_type": "desktop",
         },
     )
     old_refresh = login_resp.json()["refresh_token"]
@@ -426,7 +426,7 @@ async def test_refresh_expired_token(
         json={
             "account_id": "RT-EXP-REF-01",
             "master_token": master_token,
-            "device_guid": "dev-01",
+            "device_guid": "dev-01", "client_type": "desktop",
         },
     )
     refresh_token = login_resp.json()["refresh_token"]
@@ -470,7 +470,7 @@ async def test_logout_success(async_client: AsyncClient, account_factory):
         json={
             "account_id": "RT-LOGOUT-001",
             "master_token": master_token,
-            "device_guid": "dev-01",
+            "device_guid": "dev-01", "client_type": "desktop",
         },
     )
     refresh_token = login_resp.json()["refresh_token"]
@@ -503,7 +503,7 @@ async def test_logout_already_revoked_token(async_client: AsyncClient, account_f
         json={
             "account_id": "RT-LOGOUT-002",
             "master_token": master_token,
-            "device_guid": "dev-01",
+            "device_guid": "dev-01", "client_type": "desktop",
         },
     )
     refresh_token = login_resp.json()["refresh_token"]
@@ -550,7 +550,7 @@ async def test_logout_all_revokes_every_session(
         json={
             "account_id": "RT-LOGOUTALL-01",
             "master_token": master_token,
-            "device_guid": "dev-01",
+            "device_guid": "dev-01", "client_type": "desktop",
         },
     )
     token_dev1 = resp1.json()["refresh_token"]
@@ -561,7 +561,7 @@ async def test_logout_all_revokes_every_session(
         json={
             "account_id": "RT-LOGOUTALL-01",
             "master_token": master_token,
-            "device_guid": "dev-02",
+            "device_guid": "dev-02", "client_type": "desktop",
         },
     )
     token_dev2 = resp2.json()["refresh_token"]
@@ -602,7 +602,7 @@ async def test_logout_all_other_accounts_unaffected(
         json={
             "account_id": "RT-ACCA-0001",
             "master_token": token_a,
-            "device_guid": "dev-a",
+            "device_guid": "dev-a", "client_type": "desktop",
         },
     )
     ref_a = resp_a.json()["refresh_token"]
@@ -612,7 +612,7 @@ async def test_logout_all_other_accounts_unaffected(
         json={
             "account_id": "RT-ACCB-0001",
             "master_token": token_b,
-            "device_guid": "dev-b",
+            "device_guid": "dev-b", "client_type": "desktop",
         },
     )
     ref_b = resp_b.json()["refresh_token"]
@@ -651,7 +651,7 @@ async def test_get_me_success_with_valid_bearer_token(
         json={
             "account_id": "RT-ME-SUCCESS",
             "master_token": master_token,
-            "device_guid": "dev-me",
+            "device_guid": "dev-me", "client_type": "desktop",
         },
     )
     access_token = login_resp.json()["access_token"]
@@ -747,7 +747,7 @@ async def test_get_me_tampered_jwt(async_client: AsyncClient, account_factory):
         json={
             "account_id": "RT-ME-TAMPER",
             "master_token": master_token,
-            "device_guid": "dev-me",
+            "device_guid": "dev-me", "client_type": "desktop",
         },
     )
     access_token = login_resp.json()["access_token"]
@@ -825,7 +825,7 @@ async def test_get_me_deleted_account(
         json={
             "account_id": "RT-ME-DEL",
             "master_token": master_token,
-            "device_guid": "dev-me",
+            "device_guid": "dev-me", "client_type": "desktop",
         },
     )
     access_token = login_resp.json()["access_token"]
@@ -855,7 +855,7 @@ async def test_get_me_suspended_account(
         json={
             "account_id": "RT-ME-SUSP",
             "master_token": master_token,
-            "device_guid": "dev-me",
+            "device_guid": "dev-me", "client_type": "desktop",
         },
     )
     access_token = login_resp.json()["access_token"]
@@ -885,7 +885,7 @@ async def test_get_me_expired_subscription(
         json={
             "account_id": "RT-ME-SUBEXP",
             "master_token": master_token,
-            "device_guid": "dev-me",
+            "device_guid": "dev-me", "client_type": "desktop",
         },
     )
     access_token = login_resp.json()["access_token"]
@@ -918,7 +918,7 @@ async def test_refresh_rejects_suspended_account(
         json={
             "account_id": "RT-SUSP-REFRESH",
             "master_token": master_token,
-            "device_guid": "dev-01",
+            "device_guid": "dev-01", "client_type": "desktop",
         },
     )
     assert login_resp.status_code == 200
@@ -949,7 +949,7 @@ async def test_refresh_rejects_expired_subscription(
         json={
             "account_id": "RT-EXP-REFRESH",
             "master_token": master_token,
-            "device_guid": "dev-01",
+            "device_guid": "dev-01", "client_type": "desktop",
         },
     )
     assert login_resp.status_code == 200

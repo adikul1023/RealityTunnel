@@ -6,7 +6,8 @@ from app.performance.pooling import get_engine_pool_kwargs, get_pool_status
 from app.config import settings
 
 
-def test_engine_pool_kwargs_environment_defaults():
+def test_engine_pool_kwargs_environment_defaults(monkeypatch):
+    monkeypatch.setattr(settings.database_url, "get_secret_value", lambda: "postgresql+asyncpg://user:pass@localhost/db")
     test_kwargs = get_engine_pool_kwargs("testing")
     assert test_kwargs["pool_size"] == 2
     assert test_kwargs["max_overflow"] == 4

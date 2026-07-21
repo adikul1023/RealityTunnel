@@ -21,16 +21,15 @@ async def test_register_device_limit_reached_returns_403(
     2. Returns the exact structured JSON response with detail, plan, current_devices, and max_devices.
     3. Leaks no database UUIDs or internal IDs.
     """
-    headers, account = await auth_headers_factory("LIMIT-ROUTER-1")
+    headers, account = await auth_headers_factory("LIMIT-ROUTER-1", plan_id="free")
     assert account.plan_id == "free"
 
-    # Login auto-registered 1 device. Register 1 more allowed device via domain service to reach the limit of 2:
-    await device_service.register_device(account.id, "device-guid-1", "Laptop")
+    # Login auto-registered 1 device.
 
-    # Attempt to register a 3rd device via HTTP REST API
+    # Attempt to register a 2nd device via HTTP REST API
     response = await async_client.post(
         "/api/devices",
-        json={"device_guid": "device-guid-3", "friendly_name": "Tablet"},
+        json={"device_guid": "device-guid-2", "friendly_name": "Tablet"},
         headers=headers,
     )
 
@@ -40,8 +39,10 @@ async def test_register_device_limit_reached_returns_403(
     assert data == {
         "detail": "Device limit reached",
         "plan": "free",
-        "current_devices": 2,
-        "max_devices": 2,
+        "current_devices": 1,
+        "max_devices": 1,
+        "code": "DEVICE_LIMIT_EXCEEDED",
+        "message": "Device limit reached for plan 'free': 1/1 devices registered.",
     }
     # Ensure no internal database UUID or account ID is leaked in the error payload
     response_text = response.text

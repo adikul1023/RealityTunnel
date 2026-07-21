@@ -18,7 +18,7 @@ async def test_logout_revokes_token(db_session: AsyncSession, async_client: Asyn
     
     login_resp = await async_client.post(
         "/api/auth/login",
-        json={"account_id": "RT-LOG-1", "master_token": master_token, "device_guid": "dev-1"},
+        json={"account_id": "RT-LOG-1", "master_token": master_token, "device_guid": "dev-1", "client_type": "desktop"},
     )
     assert login_resp.status_code == 200
     refresh_token = login_resp.json()["refresh_token"]
@@ -38,7 +38,7 @@ async def test_logout_revokes_token(db_session: AsyncSession, async_client: Asyn
         json={"refresh_token": refresh_token},
     )
     assert refresh_resp.status_code == 401
-    assert refresh_resp.json()["detail"]["code"] == "REPLAY_DETECTED"
+    assert refresh_resp.json()["code"] == "REPLAY_DETECTED"
 
 
 @pytest.mark.asyncio
@@ -52,7 +52,7 @@ async def test_suspended_account_cannot_refresh(db_session: AsyncSession, async_
     
     login_resp = await async_client.post(
         "/api/auth/login",
-        json={"account_id": "RT-SUSP-1", "master_token": master_token, "device_guid": "dev-1"},
+        json={"account_id": "RT-SUSP-1", "master_token": master_token, "device_guid": "dev-1", "client_type": "desktop"},
     )
     assert login_resp.status_code == 200
     refresh_token = login_resp.json()["refresh_token"]

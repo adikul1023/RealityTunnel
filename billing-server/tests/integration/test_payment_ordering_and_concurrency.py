@@ -18,13 +18,13 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone, timedelta
 from unittest.mock import AsyncMock, patch
 
+import httpx
 import pytest
+from app.database import AsyncSessionLocal, engine
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.database import AsyncSessionLocal
 from app.models import PaymentStatus, SubscriptionLifecycleStatus
 from app.repositories import PaymentRepository, SubscriptionRepository
 from app.services.payment.provider import (
@@ -200,6 +200,7 @@ async def test_out_of_order_captured_refunded_captured(
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+@pytest.mark.skipif(engine.dialect.name == "sqlite", reason="SQLite does not support the concurrency controls being tested here (e.g., advisory locks or real row-level locking that blocks writers).")
 @pytest.mark.asyncio
 async def test_concurrent_renewal_cannot_renew_subscription_twice(
     db_session: AsyncSession,

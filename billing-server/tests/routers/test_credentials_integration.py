@@ -61,7 +61,7 @@ async def get_auth_headers(async_client: AsyncClient, account_factory, account_i
     acc = await account_factory(account_id=account_id, master_token_hash=hash_master_token(master_token))
     login_resp = await async_client.post(
         "/api/auth/login",
-        json={"account_id": account_id, "master_token": master_token, "device_guid": f"dev-{account_id}"},
+        json={"account_id": account_id, "master_token": master_token, "device_guid": f"dev-{account_id}", "client_type": "desktop"},
     )
     assert login_resp.status_code == 200, login_resp.text
     token = login_resp.json()["access_token"]

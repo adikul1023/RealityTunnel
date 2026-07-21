@@ -130,7 +130,7 @@ class PaymentService:
         provider_payment_id: str,
         signature: str | None = None,
         raw_payload: bytes | str | None = None,
-        plan_id: str = "pro",
+        plan_id: str = "standard",
     ) -> Payment:
         """
         Confirm a payment upon gateway webhook or redirect verification.

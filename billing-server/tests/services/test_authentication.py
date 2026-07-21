@@ -180,7 +180,7 @@ async def test_authenticate_repository_failure(db_session: AsyncSession):
     with patch.object(repo, "get_by_account_id", side_effect=RepositoryError("Database unavailable")):
         with pytest.raises(AuthenticationServiceError) as exc_info:
             await service.authenticate("RT-ANY-ID-001", "some_token")
-        assert "Database error during authentication lookup" in str(exc_info.value)
+        assert "database error during authentication lookup" in str(exc_info.value).lower()
         # detail field is intentionally not propagated (FINDING-03 remediation)
         assert exc_info.value.detail is None
 

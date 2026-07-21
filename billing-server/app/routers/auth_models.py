@@ -7,10 +7,20 @@ Enforces clean OpenAPI documentation without exposing internal dataclasses or cr
 from __future__ import annotations
 
 from datetime import datetime
+from enum import Enum
 from pydantic import BaseModel, Field, SecretStr
 
 from app.models import AccountStatus
 from app.security import ACCESS_TOKEN_EXPIRE_MINUTES
+
+
+class ClientType(str, Enum):
+    """Type of client initiating authentication or exchange requests."""
+    DESKTOP = "desktop"
+    WEB = "web"
+    ANDROID = "android"
+    IOS = "ios"
+    LINUX = "linux"
 
 
 class LoginRequest(BaseModel):
@@ -22,8 +32,8 @@ class LoginRequest(BaseModel):
         json_schema_extra={"writeOnly": True},
     )
     device_guid: str = Field(..., description="Unique hardware or installation identifier")
-    client_type: str | None = Field(
-        default=None,
+    client_type: ClientType = Field(
+        ...,
         description="Type of client initiating login ('desktop', 'web', 'android', 'ios', 'linux')",
     )
     two_fa_code: str | None = Field(
@@ -119,8 +129,8 @@ class ExchangeRequest(BaseModel):
     """Payload for POST /api/auth/exchange."""
     exchange_token: str = Field(..., description="Single-use exchange token from web redirect")
     device_guid: str = Field(..., description="Unique hardware or installation identifier")
-    client_type: str | None = Field(
-        default=None,
+    client_type: ClientType = Field(
+        ...,
         description="Type of client initiating login ('desktop', 'web', 'android', 'ios', 'linux')",
     )
 

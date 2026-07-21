@@ -8,6 +8,9 @@ on:
       - 'billing-server/**'
       - '.github/workflows/deploy.yml'
 
+permissions:
+  contents: read
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}

@@ -34,7 +34,8 @@ def test_auth_model_secret_str():
     req = LoginRequest(
         account_id="RT-1234",
         master_token="THIS_IS_THE_MASTER_TOKEN",
-        device_guid="DEVICE-123"
+        device_guid="DEVICE-123",
+        client_type="desktop"
     )
     req_repr = repr(req)
     assert "**********" in req_repr

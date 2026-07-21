@@ -48,7 +48,8 @@ class OracleApiClient {
             {
                 "account_id": "$accountId",
                 "master_token": "$masterToken",
-                "device_guid": "${device.deviceGuid}"
+                "device_guid": "${device.deviceGuid}",
+                "client_type": "android"
             }
         """.trimIndent()
         

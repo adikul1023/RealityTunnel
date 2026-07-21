@@ -18,7 +18,7 @@ from app.rate_limit.storage import get_rate_limit_backend
 async def test_auth_login_rate_limit_enforcement(async_client: AsyncClient):
     """Verify customer login endpoint enforces 10/minute rate limit and returns 429 on 11th request."""
     url = "/api/auth/login"
-    payload = {"account_id": "ACC-1234-5678", "master_token": "mt_secret_token", "device_guid": "dev-1"}
+    payload = {"account_id": "ACC-1234-5678", "master_token": "mt_secret_token", "device_guid": "dev-1", "client_type": "desktop"}
 
     # Make 10 requests within limit
     for i in range(10):
@@ -64,7 +64,7 @@ async def test_router_fail_closed_on_storage_backend_error_critical(async_client
     """Verify that if the rate limit storage backend fails, traffic fails closed with 429 for critical rules."""
     backend = get_rate_limit_backend()
     url = "/api/auth/login"
-    payload = {"account_id": "ACC-9999-8888", "master_token": "mt_secret_token", "device_guid": "dev-2"}
+    payload = {"account_id": "ACC-9999-8888", "master_token": "mt_secret_token", "device_guid": "dev-2", "client_type": "desktop"}
 
     with patch.object(backend, "increment", new_callable=AsyncMock) as mock_inc:
         mock_inc.side_effect = RuntimeError("Redis cluster outage simulated")

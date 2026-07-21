@@ -277,7 +277,7 @@ async def test_logout_all_super_admin(async_client, account_factory, admin_auth_
     for i in range(2):
         r = await async_client.post(
             "/api/auth/login",
-            json={"account_id": acc.account_id, "master_token": master_token, "device_guid": f"dev-{i}"},
+            json={"account_id": acc.account_id, "master_token": master_token, "device_guid": f"dev-{i}", "client_type": "desktop"},
         )
         assert r.status_code == 200
 

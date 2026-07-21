@@ -139,7 +139,7 @@ async def test_provisioning_a_marzban_succeeds_db_commit_fails_retry_reconciles(
     async with AsyncSessionLocal() as crash_session:
         prov_svc_crash = ProvisioningService(crash_session, mock_marzban)
         with pytest.raises(ProvisioningTimeoutError):
-            await prov_svc_crash.provision_subscription(account.id, "pro")
+            await prov_svc_crash.provision_subscription(account.id, "standard")
 
     # Code path: create_user was called once, raised ProvisioningTimeoutError
     assert mock_marzban.create_user.call_count == 1
@@ -277,7 +277,7 @@ async def test_provisioning_b_db_succeeds_marzban_timeout_scheduler_crash_retry_
         remote_user_id=remote_uid, status="active", links=["vless://link"]
     )
     prov_svc = ProvisioningService(db_session, mock_marzban)
-    profile = await prov_svc.provision_subscription(account.id, "pro")
+    profile = await prov_svc.provision_subscription(account.id, "standard")
     assert profile.provisioning_state == ProvisioningState.ACTIVE
 
     # Code path: create_user called once; profile committed
@@ -317,7 +317,7 @@ async def test_provisioning_b_db_succeeds_marzban_timeout_scheduler_crash_retry_
     retry_repo = ProvisioningRetryRepository(db_session)
     retry_item = ProvisioningRetryItem(
         account_id=account.id,
-        plan_id="pro",
+        plan_id="standard",
         expires_at=new_expiry,
         attempt_count=0,
         next_retry_at=now - timedelta(minutes=1),  # eligible immediately

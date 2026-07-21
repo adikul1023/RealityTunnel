@@ -77,9 +77,9 @@ async def test_edit_plan_valid(db_session: AsyncSession):
     service.subscription_repo.get_by_id = AsyncMock(return_value=sub)
     service.subscription_repo.update = AsyncMock(return_value=sub)
 
-    await service.edit_plan(str(sub_id), "pro")
+    await service.edit_plan(str(sub_id), "standard")
 
-    assert sub.plan_id == "pro"
+    assert sub.plan_id == "standard"
     service.subscription_repo.update.assert_awaited_once_with(sub)
 
 

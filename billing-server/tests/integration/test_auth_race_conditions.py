@@ -9,7 +9,9 @@ from app.services.exceptions import RefreshTokenReplayError, RefreshTokenService
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.device_repository import DeviceRepository
 from app.config import settings
+from app.database import engine
 
+@pytest.mark.skipif(engine.dialect.name == "sqlite", reason="SQLite does not support the concurrency controls being tested here (e.g., advisory locks or real row-level locking that blocks writers).")
 @pytest.mark.asyncio
 async def test_concurrent_refresh_token_rotation_service_layer(db_session: AsyncSession, account_factory):
     """

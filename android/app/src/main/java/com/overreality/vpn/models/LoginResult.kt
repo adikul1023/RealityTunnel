@@ -39,7 +39,8 @@ data class ApiErrorResponse(
 
 data class ExchangeRequestDto(
     @SerializedName("exchange_token") val exchangeToken: String,
-    @SerializedName("device_guid") val deviceGuid: String
+    @SerializedName("device_guid") val deviceGuid: String,
+    @SerializedName("client_type") val clientType: String = "android"
 )
 
 data class ExchangeResponseDto(

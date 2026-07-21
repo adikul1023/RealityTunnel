@@ -17,7 +17,7 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from app.database import AsyncSessionLocal
+from app.database import AsyncSessionLocal, engine
 from app.models import (
     Account,
     ProvisioningRetryItem,
@@ -51,11 +51,12 @@ async def _create_test_account() -> Account:
         account = await repo.create(
             account_id=f"CONC-{uuid.uuid4().hex[:8].upper()}",
             master_token_hash=f"hash_{uuid.uuid4().hex}",
-            plan_id="pro",
+            plan_id="standard",
         )
         return account
 
 
+@pytest.mark.skipif(engine.dialect.name == "sqlite", reason="SQLite does not support the concurrency controls being tested here (e.g., advisory locks or real row-level locking that blocks writers).")
 @pytest.mark.asyncio
 async def test_concurrent_create_subscription_exactly_one_succeeds():
     """
@@ -74,7 +75,7 @@ async def test_concurrent_create_subscription_exactly_one_succeeds():
                 service = SubscriptionService(session)
                 return await service.create_subscription(
                     account_id=account.id,
-                    plan_id="pro",
+                    plan_id="standard",
                     starts_at=now,
                     expires_at=expires_at,
                     status=SubscriptionLifecycleStatus.ACTIVE,
@@ -110,6 +111,7 @@ async def test_concurrent_create_subscription_exactly_one_succeeds():
         assert active_count == 1
 
 
+@pytest.mark.skipif(engine.dialect.name == "sqlite", reason="SQLite does not support the concurrency controls being tested here (e.g., advisory locks or real row-level locking that blocks writers).")
 @pytest.mark.asyncio
 async def test_concurrent_create_payment_single_provider_order():
     """
@@ -146,7 +148,7 @@ async def test_concurrent_create_payment_single_provider_order():
                 amount_minor_units=99900,
                 currency="INR",
                 idempotency_key=idempotency_key,
-                plan_id="pro",
+                plan_id="standard",
             )
 
     payment_a, payment_b = await asyncio.gather(attempt_create(), attempt_create())
@@ -168,6 +170,7 @@ async def test_concurrent_create_payment_single_provider_order():
         assert row_count == 1
 
 
+@pytest.mark.skipif(engine.dialect.name == "sqlite", reason="SQLite does not support the concurrency controls being tested here (e.g., advisory locks or real row-level locking that blocks writers).")
 @pytest.mark.asyncio
 async def test_concurrent_provisioning_retry_enqueue_exactly_one_pending():
     """
@@ -184,7 +187,7 @@ async def test_concurrent_provisioning_retry_enqueue_exactly_one_pending():
             service = ProvisioningService(session, provider)
             await service._maybe_enqueue_retry(
                 account_id=account.id,
-                plan_id="pro",
+                plan_id="standard",
                 expire_at=datetime.now(timezone.utc) + timedelta(days=30),
                 exc=ProvisioningTimeoutError("simulated gateway timeout"),
             )
@@ -207,6 +210,7 @@ async def test_concurrent_provisioning_retry_enqueue_exactly_one_pending():
         assert pending_count == 1
 
 
+@pytest.mark.skipif(engine.dialect.name == "sqlite", reason="SQLite does not support the concurrency controls being tested here (e.g., advisory locks or real row-level locking that blocks writers).")
 @pytest.mark.asyncio
 async def test_concurrent_extend_subscription_both_extensions_apply():
     """

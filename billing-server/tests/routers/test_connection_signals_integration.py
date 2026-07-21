@@ -27,7 +27,7 @@ async def test_login_records_signals(async_client: AsyncClient, account_factory,
     # Successful login
     resp = await async_client.post(
         "/api/auth/login",
-        json={"account_id": "SIG-LOGIN-1", "master_token": master_token, "device_guid": "dev-login-1"},
+        json={"account_id": "SIG-LOGIN-1", "master_token": master_token, "device_guid": "dev-login-1", "client_type": "desktop"},
     )
     assert resp.status_code == 200
     signals = await signal_service.get_recent_signals(acc.id)
@@ -38,7 +38,7 @@ async def test_login_records_signals(async_client: AsyncClient, account_factory,
     # Failed login (wrong master token)
     resp_fail = await async_client.post(
         "/api/auth/login",
-        json={"account_id": "SIG-LOGIN-1", "master_token": "wrong-token", "device_guid": "dev-login-fail"},
+        json={"account_id": "SIG-LOGIN-1", "master_token": "wrong-token", "device_guid": "dev-login-fail", "client_type": "desktop"},
     )
     assert resp_fail.status_code == 401
     signals_after = await signal_service.get_recent_signals_for_device("dev-login-fail")
@@ -55,7 +55,7 @@ async def test_refresh_and_logout_record_signals(async_client: AsyncClient, acco
 
     login_resp = await async_client.post(
         "/api/auth/login",
-        json={"account_id": "SIG-REF-1", "master_token": master_token, "device_guid": "dev-ref-1"},
+        json={"account_id": "SIG-REF-1", "master_token": master_token, "device_guid": "dev-ref-1", "client_type": "desktop"},
     )
     assert login_resp.status_code == 200
     refresh_token = login_resp.json()["refresh_token"]
@@ -134,7 +134,7 @@ async def test_exception_safety_in_signal_recording(async_client: AsyncClient, a
     try:
         resp = await async_client.post(
             "/api/auth/login",
-            json={"account_id": "SIG-SAFE-1", "master_token": master_token, "device_guid": "dev-safe-1"},
+            json={"account_id": "SIG-SAFE-1", "master_token": master_token, "device_guid": "dev-safe-1", "client_type": "desktop"},
         )
         assert resp.status_code == 200, "Login must succeed even when signal recording fails"
         assert "access_token" in resp.json()
@@ -155,19 +155,18 @@ async def test_login_device_limit_records_signal_failure(
     """
     master_token = "a" * 64
     acc = await account_factory(
-        account_id="SIG-H7-LIMIT", master_token_hash=hash_master_token(master_token)
+        account_id="SIG-H7-LIMIT", master_token_hash=hash_master_token(master_token), plan_id="free"
     )
     assert acc.plan_id == "free"
 
     await device_service.register_device(acc.id, "sig-h7-d1", "Laptop")
-    await device_service.register_device(acc.id, "sig-h7-d2", "Phone")
 
     resp = await async_client.post(
         "/api/auth/login",
         json={
             "account_id": "SIG-H7-LIMIT",
             "master_token": master_token,
-            "device_guid": "sig-h7-d3-new",
+            "device_guid": "sig-h7-d3-new", "client_type": "desktop",
         },
     )
     assert resp.status_code == 403
@@ -205,7 +204,7 @@ async def test_login_device_ownership_records_signal_failure(
         json={
             "account_id": "SIG-H7-OWN-B",
             "master_token": master_b,
-            "device_guid": "sig-h7-shared",
+            "device_guid": "sig-h7-shared", "client_type": "desktop",
         },
     )
     assert resp.status_code == 401
@@ -238,7 +237,7 @@ async def test_login_deactivated_device_records_signal_failure(
         json={
             "account_id": "SIG-H7-DEACT",
             "master_token": master_token,
-            "device_guid": "sig-h7-deact-dev",
+            "device_guid": "sig-h7-deact-dev", "client_type": "desktop",
         },
     )
     assert login_resp.status_code == 200
@@ -257,7 +256,7 @@ async def test_login_deactivated_device_records_signal_failure(
         json={
             "account_id": "SIG-H7-DEACT",
             "master_token": master_token,
-            "device_guid": "sig-h7-deact-dev",
+            "device_guid": "sig-h7-deact-dev", "client_type": "desktop",
         },
     )
     assert resp.status_code == 403

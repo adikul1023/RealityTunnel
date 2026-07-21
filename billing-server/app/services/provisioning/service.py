@@ -9,7 +9,7 @@ import logging
 import uuid
 from typing import Any
 from datetime import datetime, timezone, timedelta
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import advisory_xact_lock, AsyncSessionLocal
@@ -220,7 +220,7 @@ class ProvisioningService:
                 await self.credential_service.generate(account_id)
             return profile
 
-        except DuplicateEntityError:
+        except (DuplicateEntityError, IntegrityError):
             if commit:
                 await self.session.rollback()
             logger.info("DuplicateEntityError caught during provision_subscription; returning existing profile for account_id=%s", account_id)

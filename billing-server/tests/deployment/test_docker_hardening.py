@@ -30,7 +30,7 @@ yaml = pytest.importorskip(
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _DOCKERIGNORE_PATH = _REPO_ROOT / ".dockerignore"
-_COMPOSE_PROD_PATH = _REPO_ROOT / "docker-compose.prod.yml"
+_COMPOSE_STANDARDD_PATH = _REPO_ROOT / "docker-compose.prod.yml"
 
 _REQUIRED_DOCKERIGNORE_PATTERNS = (
     ".env",
@@ -67,7 +67,7 @@ def test_dockerignore_excludes_required_patterns(pattern: str):
 
 
 def _load_billing_api_service() -> dict:
-    content = _COMPOSE_PROD_PATH.read_text(encoding="utf-8")
+    content = _COMPOSE_STANDARDD_PATH.read_text(encoding="utf-8")
     compose = yaml.safe_load(content)
     return compose["services"]["billing-api"]
 

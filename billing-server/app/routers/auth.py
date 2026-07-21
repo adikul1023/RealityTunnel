@@ -51,6 +51,7 @@ from app.security import hash_master_token
 from app.rate_limit import require_rate_limit, RateLimiter, get_rate_limiter, KeyType
 from app.routers.auth_models import (
     AccountMeResponse,
+    ClientType,
     DeviceLimitErrorResponse,
     ExchangeRequest,
     ExchangeResponse,
@@ -116,11 +117,8 @@ async def safe_record_signal(
 
 def is_web_client(request: Any) -> bool:
     """Check if the request originates from a web browser session where device registration should be skipped."""
-    if getattr(request, "client_type", None) == "web":
-        return True
-    if not getattr(request, "client_type", None) and getattr(request, "device_guid", "").upper().startswith("WEB-"):
-        return True
-    return False
+    client_type = getattr(request, "client_type", None)
+    return client_type in (ClientType.WEB, "web")
 
 
 @router.post(

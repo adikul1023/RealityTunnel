@@ -84,6 +84,9 @@ public class ExchangeRequestDto
     
     [JsonPropertyName("device_guid")]
     public string DeviceGuid { get; set; } = "";
+
+    [JsonPropertyName("client_type")]
+    public string ClientType { get; set; } = "desktop";
 }
 
 public class ExchangeResponseDto

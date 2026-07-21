@@ -43,7 +43,7 @@ async def test_create_subscription_success(service: SubscriptionService, test_ac
 
     sub = await service.create_subscription(
         account_id=test_account.id,
-        plan_id="pro",
+        plan_id="standard",
         starts_at=now,
         expires_at=expires_at,
         auto_renew=True,
@@ -52,7 +52,7 @@ async def test_create_subscription_success(service: SubscriptionService, test_ac
 
     assert sub.id is not None
     assert sub.account_id == test_account.id
-    assert sub.plan_id == "pro"
+    assert sub.plan_id == "standard"
     assert sub.status == SubscriptionLifecycleStatus.ACTIVE
     assert sub.starts_at == now
     assert sub.expires_at == expires_at
@@ -67,7 +67,7 @@ async def test_create_subscription_trial_status(service: SubscriptionService, te
 
     sub = await service.create_subscription(
         account_id=test_account.id,
-        plan_id="family",
+        plan_id="quarterly",
         starts_at=now,
         expires_at=expires_at,
         auto_renew=True,
@@ -97,7 +97,7 @@ async def test_create_subscription_nonexistent_account(service: SubscriptionServ
     with pytest.raises(EntityNotFoundError):
         await service.create_subscription(
             account_id=fake_id,
-            plan_id="pro",
+            plan_id="standard",
             starts_at=now,
             expires_at=now + timedelta(days=30),
         )
@@ -108,7 +108,7 @@ async def test_create_subscription_already_active_error(service: SubscriptionSer
     now = datetime.now(timezone.utc)
     await service.create_subscription(
         account_id=test_account.id,
-        plan_id="pro",
+        plan_id="standard",
         starts_at=now,
         expires_at=now + timedelta(days=30),
         status=SubscriptionLifecycleStatus.ACTIVE,
@@ -117,7 +117,7 @@ async def test_create_subscription_already_active_error(service: SubscriptionSer
     with pytest.raises(SubscriptionAlreadyActiveError) as exc_info:
         await service.create_subscription(
             account_id=test_account.id,
-            plan_id="family",
+            plan_id="quarterly",
             starts_at=now,
             expires_at=now + timedelta(days=30),
             status=SubscriptionLifecycleStatus.ACTIVE,
@@ -131,7 +131,7 @@ async def test_activate_subscription(service: SubscriptionService, test_account:
     now = datetime.now(timezone.utc)
     sub = await service.create_subscription(
         account_id=test_account.id,
-        plan_id="pro",
+        plan_id="standard",
         starts_at=now,
         expires_at=now + timedelta(days=7),
         status=SubscriptionLifecycleStatus.TRIAL,
@@ -151,7 +151,7 @@ async def test_activate_subscription_invalid_states(service: SubscriptionService
     now = datetime.now(timezone.utc)
     sub_cancel = await service.create_subscription(
         account_id=test_account.id,
-        plan_id="pro",
+        plan_id="standard",
         starts_at=now,
         expires_at=now + timedelta(days=30),
         status=SubscriptionLifecycleStatus.ACTIVE,
@@ -169,7 +169,7 @@ async def test_renew_subscription(service: SubscriptionService, test_account: Ac
     now = datetime.now(timezone.utc)
     sub = await service.create_subscription(
         account_id=test_account.id,
-        plan_id="pro",
+        plan_id="standard",
         starts_at=now,
         expires_at=now + timedelta(days=30),
         status=SubscriptionLifecycleStatus.ACTIVE,
@@ -187,7 +187,7 @@ async def test_renew_cancelled_subscription_fails(service: SubscriptionService, 
     now = datetime.now(timezone.utc)
     sub = await service.create_subscription(
         account_id=test_account.id,
-        plan_id="pro",
+        plan_id="standard",
         starts_at=now,
         expires_at=now + timedelta(days=30),
     )
@@ -202,7 +202,7 @@ async def test_cancel_subscription(service: SubscriptionService, test_account: A
     now = datetime.now(timezone.utc)
     sub = await service.create_subscription(
         account_id=test_account.id,
-        plan_id="pro",
+        plan_id="standard",
         starts_at=now,
         expires_at=now + timedelta(days=30),
         auto_renew=True,
@@ -223,7 +223,7 @@ async def test_enter_grace_period(service: SubscriptionService, test_account: Ac
     now = datetime.now(timezone.utc)
     sub = await service.create_subscription(
         account_id=test_account.id,
-        plan_id="pro",
+        plan_id="standard",
         starts_at=now,
         expires_at=now + timedelta(days=30),
         auto_renew=True,
@@ -241,7 +241,7 @@ async def test_enter_grace_period_invalid_state(service: SubscriptionService, te
     now = datetime.now(timezone.utc)
     sub = await service.create_subscription(
         account_id=test_account.id,
-        plan_id="pro",
+        plan_id="standard",
         starts_at=now,
         expires_at=now + timedelta(days=30),
         auto_renew=False, # Disabled auto-renew cannot enter grace period
@@ -257,7 +257,7 @@ async def test_expire_subscription(service: SubscriptionService, test_account: A
     now = datetime.now(timezone.utc)
     sub = await service.create_subscription(
         account_id=test_account.id,
-        plan_id="pro",
+        plan_id="standard",
         starts_at=now,
         expires_at=now + timedelta(days=30),
     )
@@ -271,7 +271,7 @@ async def test_expire_cancelled_subscription_fails(service: SubscriptionService,
     now = datetime.now(timezone.utc)
     sub = await service.create_subscription(
         account_id=test_account.id,
-        plan_id="pro",
+        plan_id="standard",
         starts_at=now,
         expires_at=now + timedelta(days=30),
     )
@@ -292,7 +292,7 @@ async def test_get_active_subscription_lookup(service: SubscriptionService, test
     # 2. Active subscription
     sub = await service.create_subscription(
         account_id=test_account.id,
-        plan_id="pro",
+        plan_id="standard",
         starts_at=now,
         expires_at=now + timedelta(days=30),
         status=SubscriptionLifecycleStatus.ACTIVE,
@@ -316,7 +316,7 @@ async def test_concurrent_subscription_modification(service: SubscriptionService
     now = datetime.now(timezone.utc)
     sub = await service.create_subscription(
         account_id=test_account.id,
-        plan_id="pro",
+        plan_id="standard",
         starts_at=now,
         expires_at=now + timedelta(days=30),
         status=SubscriptionLifecycleStatus.TRIAL,

@@ -76,7 +76,7 @@ async def test_smoke_04_user_auth_and_device_endpoints(smoke_client: httpx.Async
         json={
             "account_id": "ACC-SMOKE-TEST",
             "master_token": "token-smoke-123",
-            "device_guid": "device-smoke-guid-123",
+            "device_guid": "device-smoke-guid-123", "client_type": "desktop",
         },
     )
     # 401 Unauthorized confirms customer auth check is functioning

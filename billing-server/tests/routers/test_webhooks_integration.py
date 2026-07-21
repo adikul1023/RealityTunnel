@@ -105,7 +105,7 @@ async def setup_account(db_session: AsyncSession) -> Account:
     return await repo.create(
         account_id="WEBHOOK-ACC-1",
         master_token_hash="hash" * 8,
-        plan_id="pro",
+        plan_id="standard",
     )
 
 
@@ -186,7 +186,7 @@ async def test_webhook_success_creates_all_resources(
     sub_repo = SubscriptionRepository(db_session)
     sub = await sub_repo.get_by_id(payment.subscription_id)
     assert sub.status == SubscriptionLifecycleStatus.ACTIVE
-    assert sub.plan_id == "pro"
+    assert sub.plan_id == "standard"
 
     # 5. Verify Provisioning
     prov_repo = ProvisioningRepository(db_session)

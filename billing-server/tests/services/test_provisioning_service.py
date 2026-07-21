@@ -29,9 +29,9 @@ from app.services import (
 async def test_account(db_session: AsyncSession) -> Account:
     repo = AccountRepository(db_session)
     account = await repo.create(
-        account_id="PROV-TEST-001",
+        account_id="STANDARDV-TEST-001",
         master_token_hash="provhash" * 8,
-        plan_id="pro",
+        plan_id="standard",
     )
     return account
 
@@ -154,7 +154,7 @@ async def test_marzban_provider_unavailable_with_retries():
 async def test_provision_subscription_success(
     service: ProvisioningService, test_account: Account, mock_provider: AsyncMock
 ):
-    profile = await service.provision_subscription(test_account.id, plan_id="pro")
+    profile = await service.provision_subscription(test_account.id, plan_id="standard")
 
     assert profile.account_id == test_account.id
     assert profile.provisioning_state == ProvisioningState.ACTIVE
@@ -169,11 +169,11 @@ async def test_provision_subscription_idempotency(
     service: ProvisioningService, test_account: Account, mock_provider: AsyncMock
 ):
     # First provision
-    profile1 = await service.provision_subscription(test_account.id, plan_id="pro")
+    profile1 = await service.provision_subscription(test_account.id, plan_id="standard")
     assert mock_provider.create_user.call_count == 1
 
     # Second provision on already active account should not create user again
-    profile2 = await service.provision_subscription(test_account.id, plan_id="pro")
+    profile2 = await service.provision_subscription(test_account.id, plan_id="standard")
     assert mock_provider.create_user.call_count == 1
     assert profile2.id == profile1.id
     assert profile2.provisioning_state == ProvisioningState.ACTIVE
@@ -183,7 +183,7 @@ async def test_provision_subscription_idempotency(
 async def test_suspend_and_reactivate(
     service: ProvisioningService, test_account: Account, mock_provider: AsyncMock
 ):
-    await service.provision_subscription(test_account.id, plan_id="pro")
+    await service.provision_subscription(test_account.id, plan_id="standard")
 
     suspended = await service.suspend_subscription(test_account.id)
     assert suspended.provisioning_state == ProvisioningState.SUSPENDED
@@ -198,7 +198,7 @@ async def test_suspend_and_reactivate(
 async def test_idempotent_suspend_and_delete(
     service: ProvisioningService, test_account: Account, mock_provider: AsyncMock
 ):
-    await service.provision_subscription(test_account.id, plan_id="pro")
+    await service.provision_subscription(test_account.id, plan_id="standard")
 
     # First suspend
     await service.suspend_subscription(test_account.id)
@@ -225,7 +225,7 @@ async def test_idempotent_suspend_and_delete(
 async def test_sync_failures_recorded(
     service: ProvisioningService, test_account: Account, mock_provider: AsyncMock
 ):
-    await service.provision_subscription(test_account.id, plan_id="pro")
+    await service.provision_subscription(test_account.id, plan_id="standard")
 
     mock_provider.sync_user.side_effect = ProvisioningProviderError("Remote API failed")
 
@@ -240,7 +240,7 @@ async def test_concurrency_row_locking(
     with patch.object(
         service.provisioning_repo, "get_by_account_id", wraps=service.provisioning_repo.get_by_account_id
     ) as mock_get:
-        await service.provision_subscription(test_account.id, plan_id="pro")
+        await service.provision_subscription(test_account.id, plan_id="standard")
         mock_get.assert_called_with(test_account.id, for_update=True)
 
 
@@ -248,7 +248,7 @@ async def test_concurrency_row_locking(
 async def test_admin_suspension_blocks_extension(
     service: ProvisioningService, test_account: Account, mock_provider: AsyncMock
 ):
-    await service.provision_subscription(test_account.id, plan_id="pro")
+    await service.provision_subscription(test_account.id, plan_id="standard")
 
     # Suspend with reason="ADMIN"
     profile = await service.suspend_subscription(test_account.id, reason="ADMIN")
@@ -268,7 +268,7 @@ async def test_admin_suspension_blocks_extension(
 async def test_billing_suspension_allows_extension(
     service: ProvisioningService, test_account: Account, mock_provider: AsyncMock, db_session: AsyncSession
 ):
-    await service.provision_subscription(test_account.id, plan_id="pro")
+    await service.provision_subscription(test_account.id, plan_id="standard")
 
     # Suspend with reason="BILLING" (default)
     profile = await service.suspend_subscription(test_account.id)
@@ -296,7 +296,7 @@ async def test_provision_subscription_concurrency_race(
     async def provision_with_new_session():
         async with AsyncSessionLocal() as session:
             service = ProvisioningService(session, mock_provider)
-            return await service.provision_subscription(test_account.id, plan_id="pro")
+            return await service.provision_subscription(test_account.id, plan_id="standard")
 
     # Run two concurrent requests
     res1, res2 = await asyncio.gather(

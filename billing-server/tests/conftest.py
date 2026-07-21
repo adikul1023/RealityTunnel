@@ -34,6 +34,15 @@ if os.environ.get("TEST_USE_SQLITE", "0") == "1" or not _is_postgres_available(s
         echo=settings.debug,
         pool_pre_ping=True,
     )
+
+    from sqlalchemy import event
+    @event.listens_for(app.database.engine.sync_engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        if "sqlite" in settings.database_url.get_secret_value():
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+
     app.database.AsyncSessionLocal = async_sessionmaker(
         bind=app.database.engine,
         expire_on_commit=False,
@@ -55,8 +64,22 @@ async def dispose_engine() -> AsyncGenerator[None, None]:
     if "sqlite" in settings.database_url.get_secret_value():
         from app.database import engine, Base
         import app.models
+        import sqlalchemy
+        import datetime
+        from sqlalchemy import TypeDecorator, DateTime
+
+        class AwareDateTime(TypeDecorator):
+            impl = DateTime
+            cache_ok = True
+            def process_result_value(self, value, dialect):
+                if value is not None and value.tzinfo is None:
+                    return value.replace(tzinfo=datetime.timezone.utc)
+                return value
+
         for table in Base.metadata.tables.values():
             for col in table.columns:
+                if isinstance(col.type, sqlalchemy.DateTime):
+                    col.type = AwareDateTime()
                 if col.server_default and "gen_random_uuid()" in str(col.server_default.arg):
                     col.server_default = None
         async with engine.begin() as conn:
@@ -102,6 +125,7 @@ async def account_factory(db_session: AsyncSession) -> AsyncGenerator[Callable[.
         marzban_username: str | None = None,
         status: AccountStatus = AccountStatus.ACTIVE,
         subscription_expires_at=None,
+        plan_id: str = "standard",
         **kwargs,
     ) -> Account:
         if account_id is None:
@@ -114,6 +138,7 @@ async def account_factory(db_session: AsyncSession) -> AsyncGenerator[Callable[.
             marzban_username=marzban_username,
             status=status,
             subscription_expires_at=subscription_expires_at,
+            plan_id=plan_id,
             **kwargs,
         )
         created_ids.append(acc.id)
@@ -166,12 +191,12 @@ async def auth_headers_factory(async_client, account_factory):
     import secrets
     from app.security import hash_master_token
 
-    async def _helper(account_id: str = "RT-DEV-001") -> tuple[dict[str, str], Any]:
+    async def _helper(account_id: str = "RT-DEV-001", **kwargs) -> tuple[dict[str, str], Any]:
         master_token = secrets.token_hex(32)
-        acc = await account_factory(account_id=account_id, master_token_hash=hash_master_token(master_token))
+        acc = await account_factory(account_id=account_id, master_token_hash=hash_master_token(master_token), **kwargs)
         login_resp = await async_client.post(
             "/api/auth/login",
-            json={"account_id": account_id, "master_token": master_token, "device_guid": f"dev-{account_id}"},
+            json={"account_id": account_id, "master_token": master_token, "device_guid": f"dev-{account_id}", "client_type": "desktop"},
         )
         assert login_resp.status_code == 200, login_resp.text
         token = login_resp.json()["access_token"]

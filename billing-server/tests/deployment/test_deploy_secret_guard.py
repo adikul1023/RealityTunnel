@@ -30,7 +30,7 @@ DEPLOYMENT_DIR = (
 )
 DEPLOY_SH = DEPLOYMENT_DIR / "deploy.sh"
 DEPLOY_PS1 = DEPLOYMENT_DIR / "deploy.ps1"
-COMPOSE_PROD = (
+COMPOSE_STANDARDD = (
     Path(__file__).resolve().parent.parent.parent / "docker-compose.prod.yml"
 )
 
@@ -299,7 +299,7 @@ def test_docker_compose_prod_does_not_require_jwt_secret():
 
     docker-compose.prod.yml must not require JWT_SECRET, MASTER_TOKEN_HASH, or API_KEY.
     """
-    content = COMPOSE_PROD.read_text(encoding="utf-8")
+    content = COMPOSE_STANDARDD.read_text(encoding="utf-8")
 
     for dead_var in ("JWT_SECRET", "MASTER_TOKEN_HASH", "API_KEY"):
         assert f"${{{dead_var}" not in content, (

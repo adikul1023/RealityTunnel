@@ -89,6 +89,8 @@ async def advisory_xact_lock(session: AsyncSession, lock_key: str) -> None:
     Released automatically on commit or rollback. Used where SELECT ... FOR UPDATE cannot
     prevent duplicate inserts because the target row does not exist yet.
     """
+    if "sqlite" in str(session.bind.url):
+        return
     await session.execute(
         text("SELECT pg_advisory_xact_lock(hashtext(:lock_key))"),
         {"lock_key": lock_key},

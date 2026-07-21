@@ -58,7 +58,7 @@ def mock_provider() -> AsyncMock:
     provider = AsyncMock()
     provider.create_order.return_value = PaymentOrderDTO(
         provider_order_id="order_test_123456",
-        amount_minor_units=49900,
+        amount_minor_units=9900,
         currency="INR",
     )
     return provider
@@ -89,6 +89,7 @@ async def get_auth_headers(
             "account_id": account_id,
             "master_token": master_token,
             "device_guid": f"dev-{account_id}",
+            "client_type": "desktop",
         },
     )
     assert login_resp.status_code == 200, login_resp.text
@@ -120,7 +121,7 @@ async def test_get_subscription_active(
     now = datetime.now(timezone.utc)
     await sub_repo.create(
         account_id=acc.id,
-        plan_id="pro",
+        plan_id="standard",
         status=SubscriptionLifecycleStatus.ACTIVE,
         starts_at=now,
         expires_at=now + timedelta(days=30),
@@ -131,7 +132,7 @@ async def test_get_subscription_active(
     assert resp.status_code == 200, resp.text
     data = resp.json()
     assert data["lifecycle_status"] == "ACTIVE"
-    assert data["plan"] == "pro"
+    assert data["plan"] == "standard"
     assert data["auto_renew"] is True
     assert data["expires_at"] is not None
 
@@ -148,8 +149,8 @@ async def test_list_plans(async_client: AsyncClient, account_factory):
     assert len(plans) >= 1
 
     plan_ids = {p["plan_id"] for p in plans}
-    assert "pro" in plan_ids
-    pro_plan = next(p for p in plans if p["plan_id"] == "pro")
+    assert "standard" in plan_ids
+    pro_plan = next(p for p in plans if p["plan_id"] == "standard")
     assert pro_plan["price"] > 0
     assert pro_plan["currency"] == "INR"
 
@@ -166,7 +167,7 @@ async def test_list_payments_and_get_detail(
     p1 = await pay_repo.create(
         account_id=acc.id,
         provider=PaymentProviderType.RAZORPAY,
-        amount_minor_units=49900,
+        amount_minor_units=9900,
         currency="INR",
         status=PaymentStatus.CREATED,
         provider_order_id="order_test_100",
@@ -175,7 +176,7 @@ async def test_list_payments_and_get_detail(
     p2 = await pay_repo.create(
         account_id=acc.id,
         provider=PaymentProviderType.RAZORPAY,
-        amount_minor_units=49900,
+        amount_minor_units=9900,
         currency="INR",
         status=PaymentStatus.CREATED,
         provider_order_id="order_test_200",
@@ -200,7 +201,7 @@ async def test_list_payments_and_get_detail(
     assert get_resp.status_code == 200, get_resp.text
     pay_data = get_resp.json()
     assert pay_data["payment_id"] == "order_test_100"
-    assert pay_data["amount"] == 49900
+    assert pay_data["amount"] == 9900
     assert pay_data["status"] == "CREATED"
 
 
@@ -230,7 +231,7 @@ async def test_get_payment_anti_idor(
     await pay_repo.create(
         account_id=acc_a.id,
         provider=PaymentProviderType.RAZORPAY,
-        amount_minor_units=49900,
+        amount_minor_units=9900,
         currency="INR",
         status=PaymentStatus.CREATED,
         provider_order_id="order_secret_a",
@@ -260,7 +261,7 @@ async def test_purchase_subscription_success(
         client_with_mock_provider, account_factory, "RT-PUR-1"
     )
     req_data = {
-        "plan_id": "pro",
+        "plan_id": "standard",
         "idempotency_key": "idem_purchase_001",
     }
     resp = await client_with_mock_provider.post(
@@ -269,7 +270,7 @@ async def test_purchase_subscription_success(
     assert resp.status_code == 200, resp.text
     data = resp.json()
     assert data["payment_id"] == "order_test_123456"
-    assert data["amount"] == 49900
+    assert data["amount"] == 9900
     assert data["currency"] == "INR"
     assert data["status"] == "CREATED"
     assert mock_provider.create_order.call_count == 1
@@ -282,20 +283,20 @@ async def test_purchase_subscription_ignores_client_supplied_amount_and_currency
     """
     Regression test for Finding C-1 (payment tampering) and M2 (currency tampering).
 
-    A malicious client attempts to purchase the 'pro' plan while smuggling a drastically
+    A malicious client attempts to purchase the 'standard' plan while smuggling a drastically
     reduced 'amount' field and a different 'currency' into the request payload. The server 
     must never honor client-supplied amount or currency: PurchaseRequestDTO has no such fields, 
     so they are silently dropped by FastAPI/Pydantic request parsing, and the amount and currency 
-    actually sent to the payment gateway must always equal the authoritative plan price (49900 for 'pro', INR),
+    actually sent to the payment gateway must always equal the authoritative plan price (9900 for 'standard', INR),
     regardless of what the client attempted to smuggle in.
     """
     headers, _ = await get_auth_headers(
         client_with_mock_provider, account_factory, "RT-PUR-TAMPER"
     )
     tampered_req_data = {
-        "plan_id": "pro",
+        "plan_id": "standard",
         "idempotency_key": "idem_purchase_tamper_001",
-        "amount": 100,  # Attacker attempts to pay 1 INR instead of the real 499 INR price.
+        "amount": 100,  # Attacker attempts to pay 1 INR instead of the real 99 INR price.
         "currency": "USD", # Attacker attempts to pay in USD.
     }
     resp = await client_with_mock_provider.post(
@@ -305,13 +306,13 @@ async def test_purchase_subscription_ignores_client_supplied_amount_and_currency
 
     data = resp.json()
     # The response amount and currency must reflect the real plan price, never the attacker-supplied value.
-    assert data["amount"] == 49900
+    assert data["amount"] == 9900
     assert data["currency"] == "INR"
 
     # The amount and currency actually requested from the payment gateway must be the plan price too.
     assert mock_provider.create_order.call_count == 1
     _, call_kwargs = mock_provider.create_order.call_args
-    assert call_kwargs["amount_minor_units"] == 49900
+    assert call_kwargs["amount_minor_units"] == 9900
     assert call_kwargs["currency"] == "INR"
 
 
@@ -345,7 +346,7 @@ async def test_cancel_and_reactivate_auto_renew(
     now = datetime.now(timezone.utc)
     await sub_repo.create(
         account_id=acc.id,
-        plan_id="pro",
+        plan_id="standard",
         status=SubscriptionLifecycleStatus.ACTIVE,
         starts_at=now,
         expires_at=now + timedelta(days=30),
@@ -374,7 +375,7 @@ async def test_unauthenticated_access(async_client: AsyncClient):
         ("GET", "/api/billing/plans"),
         ("GET", "/api/billing/payments"),
         ("GET", "/api/billing/payment/order_123"),
-        ("POST", "/api/billing/purchase", {"plan_id": "pro", "idempotency_key": "key"}),
+        ("POST", "/api/billing/purchase", {"plan_id": "standard", "idempotency_key": "key"}),
         ("POST", "/api/billing/cancel-auto-renew"),
         ("POST", "/api/billing/reactivate"),
     ]

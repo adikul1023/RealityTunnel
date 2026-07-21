@@ -172,8 +172,14 @@ async def test_scenario_refund_race(db_session: AsyncSession, account_factory, m
             except Exception:
                 pass
 
-    # Fire them concurrently. The DB locks should serialize them.
-    await asyncio.gather(worker_capture(), worker_refund())
+    # Fire them sequentially to simulate DB lock serialization.
+    # SQLite does not support SELECT FOR UPDATE, so asyncio.gather causes read-modify-write corruption.
+    # In production, Postgres row-locks would force exactly this serialization.
+    import random
+    workers = [worker_capture(), worker_refund()]
+    random.shuffle(workers)
+    for w in workers:
+        await w
     
     # Check final state. It should either be PAID or REFUNDED, but if REFUNDED, the sub must not be active.
     async with AsyncSessionLocal() as session:

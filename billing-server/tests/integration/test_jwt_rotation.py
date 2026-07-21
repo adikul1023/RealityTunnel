@@ -33,7 +33,7 @@ async def test_jwt_key_rotation_drill(
     resp = await async_client.post("/api/auth/login", json={
         "account_id": "RT-JWT-0001",
         "master_token": master_token,
-        "device_guid": "device-jwt-123"
+        "device_guid": "device-jwt-123", "client_type": "desktop"
     })
     assert resp.status_code == 200
     tokens = resp.json()
@@ -91,7 +91,7 @@ async def test_jwt_key_rotation_drill(
         resp = await async_client.post("/api/auth/login", json={
             "account_id": "RT-JWT-0001",
             "master_token": master_token,
-            "device_guid": "device-jwt-123"
+            "device_guid": "device-jwt-123", "client_type": "desktop"
         })
         assert resp.status_code == 200
         new_tokens = resp.json()
