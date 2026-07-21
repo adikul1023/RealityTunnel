@@ -24,6 +24,8 @@ public class PipeServerWorker : BackgroundService
     private DateTimeOffset? _connectedSince = null;
     private string? _lastError = null;
     private int _activeClientCount = 0;
+    public TimeSpan OrphanGracePeriod { get; set; } = TimeSpan.FromSeconds(5);
+    private CancellationTokenSource? _orphanGraceCts = null;
 
     private readonly SemaphoreSlim _wakeupSignal = new(0);
 
@@ -302,6 +304,17 @@ public class PipeServerWorker : BackgroundService
                 _logger.LogInfo($"Hello handshake completed for PID {clientPid} ({clientIdentity}). Session established.");
 
                 Interlocked.Increment(ref _activeClientCount);
+                lock (_stateLock)
+                {
+                    if (_orphanGraceCts != null)
+                    {
+                        _logger.LogInfo($"Authenticated client reconnected (PID {clientPid}). Canceling pending orphan grace teardown.");
+                        _orphanGraceCts.Cancel();
+                        _orphanGraceCts.Dispose();
+                        _orphanGraceCts = null;
+                    }
+                }
+
                 try
                 {
                     while (!stoppingToken.IsCancellationRequested && pipeStream.IsConnected)
@@ -338,14 +351,40 @@ public class PipeServerWorker : BackgroundService
                     {
                         if (_desiredState == "Connected" && remaining <= 0)
                         {
-                            _logger.LogInfo($"Last client (PID {clientPid}) disconnected while desired state was Connected. Resetting desired state to Disconnected to prevent orphan session.");
-                            _desiredState = "Disconnected";
-                            _desiredProfile = null;
-                            if (_actualState != "Disconnected")
+                            _logger.LogInfo($"Last client (PID {clientPid}) disconnected while desired state was Connected. Starting {OrphanGracePeriod.TotalMilliseconds}ms grace timer before teardown.");
+                            _orphanGraceCts?.Cancel();
+                            _orphanGraceCts?.Dispose();
+                            _orphanGraceCts = new CancellationTokenSource();
+                            var graceToken = _orphanGraceCts.Token;
+
+                            _ = Task.Run(async () =>
                             {
-                                _actualState = "Disconnecting";
-                            }
-                            WakeupReconciliationLoop();
+                                try
+                                {
+                                    await Task.Delay(OrphanGracePeriod, graceToken);
+                                }
+                                catch (OperationCanceledException)
+                                {
+                                    return;
+                                }
+
+                                lock (_stateLock)
+                                {
+                                    if (graceToken.IsCancellationRequested || _activeClientCount > 0 || _desiredState != "Connected")
+                                    {
+                                        return;
+                                    }
+
+                                    _logger.LogInfo($"Orphan grace timer ({OrphanGracePeriod.TotalMilliseconds}ms) expired without client reconnection. Resetting desired state to Disconnected.");
+                                    _desiredState = "Disconnected";
+                                    _desiredProfile = null;
+                                    if (_actualState != "Disconnected")
+                                    {
+                                        _actualState = "Disconnecting";
+                                    }
+                                    WakeupReconciliationLoop();
+                                }
+                            });
                         }
                     }
                 }
@@ -395,6 +434,9 @@ public class PipeServerWorker : BackgroundService
                 _logger.LogInfo($"Received Connect command for profile '{profile.ServerHost}:{profile.ServerPort}'. Setting desired state to Connected.");
                 lock (_stateLock)
                 {
+                    _orphanGraceCts?.Cancel();
+                    _orphanGraceCts?.Dispose();
+                    _orphanGraceCts = null;
                     _desiredState = "Connected";
                     _desiredProfile = profile;
                     if (_actualState != "Connected")
@@ -411,6 +453,9 @@ public class PipeServerWorker : BackgroundService
                 _logger.LogInfo("Received Disconnect command. Setting desired state to Disconnected.");
                 lock (_stateLock)
                 {
+                    _orphanGraceCts?.Cancel();
+                    _orphanGraceCts?.Dispose();
+                    _orphanGraceCts = null;
                     _desiredState = "Disconnected";
                     _desiredProfile = null;
                     if (_actualState != "Disconnected")

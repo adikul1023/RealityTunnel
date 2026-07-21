@@ -165,12 +165,15 @@ public static class Program
         }
 
         // --------------------------------------------------------------------------------
-        // TEST 4: Kill the client (UI) while connected and verify helper teardown
+        // TEST 4: Kill the client (UI) while connected and verify helper teardown after grace period
         // --------------------------------------------------------------------------------
-        Console.WriteLine("\n[Test 4] Testing killing UI client while connected & verifying automatic helper teardown...");
+        Console.WriteLine("\n[Test 4] Testing killing UI client while connected & verifying automatic helper teardown after grace period...");
         using var workerCts4 = new CancellationTokenSource();
         var mockXray4 = new MockXrayController();
-        var serverWorker4 = new PipeServerWorker(logger, pipeSecurityHelper, mockXray4);
+        var serverWorker4 = new PipeServerWorker(logger, pipeSecurityHelper, mockXray4)
+        {
+            OrphanGracePeriod = TimeSpan.FromMilliseconds(1000)
+        };
         await serverWorker4.StartAsync(workerCts4.Token);
         await Task.Delay(600);
 
@@ -204,12 +207,13 @@ public static class Program
                 Assert(connectResp?.Type == IpcMessageTypes.Ack, "Simulated raw UI connected cleanly.", "Raw UI connect failed.");
 
                 Console.WriteLine(" -> Abruptly terminating simulated UI pipe connection (simulating client crash/kill)...");
-            } // clientStream disposes right here, closing the pipe while DesiredState is Connected!
+            } // clientStream disposes right here, starting 1000ms orphan grace period!
 
-            await WaitForActualStateAsync(backend, "Disconnected", 3000);
+            Console.WriteLine(" -> Waiting 1600ms (allowing 1000ms grace timer to expire without IPC reconnect)...");
+            await Task.Delay(1600); // Allow grace timer (1000ms) to expire and tear down without intervening pipe connection
             var statusAfterUiKill = await backend.GetStatusAsync();
             Assert(statusAfterUiKill != null && statusAfterUiKill.DesiredState == "Disconnected" && statusAfterUiKill.ActualState == "Disconnected",
-                "Test 4 PASSED: Helper detected client crash/disconnect, reset DesiredState to Disconnected, and tore down sing-box.",
+                "Test 4 PASSED: Helper detected client crash/disconnect, grace timer expired without reconnect, reset DesiredState to Disconnected, and tore down sing-box.",
                 $"Test 4 FAILED: Helper did not clean up after UI kill. Desired={statusAfterUiKill?.DesiredState}, Actual={statusAfterUiKill?.ActualState}");
 
             workerCts4.Cancel();
@@ -218,6 +222,69 @@ public static class Program
         catch (Exception ex)
         {
             Assert(false, "", $"Test 4 FAILED with exception: {ex}");
+        }
+
+        // --------------------------------------------------------------------------------
+        // TEST 4B: Reconnect during grace window after UI disconnect (verify session NOT torn down)
+        // --------------------------------------------------------------------------------
+        Console.WriteLine("\n[Test 4B] Testing client reconnecting during orphan grace window (verifying VPN session NOT torn down)...");
+        using var workerCts4b = new CancellationTokenSource();
+        var mockXray4b = new MockXrayController();
+        var serverWorker4b = new PipeServerWorker(logger, pipeSecurityHelper, mockXray4b)
+        {
+            OrphanGracePeriod = TimeSpan.FromMilliseconds(2500)
+        };
+        await serverWorker4b.StartAsync(workerCts4b.Token);
+        await Task.Delay(600);
+
+        try
+        {
+            using (var clientStream1 = new NamedPipeClientStream(".", "RealityTunnelHelper", PipeDirection.InOut, PipeOptions.Asynchronous))
+            {
+                await clientStream1.ConnectAsync(3000);
+                var helloMsg = new IpcMessage
+                {
+                    ProtocolVersion = 1,
+                    Type = IpcMessageTypes.Hello,
+                    Sequence = 1,
+                    Payload = JsonSerializer.SerializeToElement(new HelloRequest { ClientPid = Environment.ProcessId })
+                };
+                await IpcFraming.WriteMessageAsync(clientStream1, helloMsg);
+                var helloResp = await IpcFraming.ReadMessageAsync(clientStream1);
+                string token = helloResp!.GetPayload<HelloResponse>()!.SessionToken;
+
+                var connectMsg = new IpcMessage
+                {
+                    ProtocolVersion = 1,
+                    Type = IpcMessageTypes.Connect,
+                    Sequence = 2,
+                    SessionToken = token,
+                    Payload = JsonSerializer.SerializeToElement(testProfile)
+                };
+                await IpcFraming.WriteMessageAsync(clientStream1, connectMsg);
+                await IpcFraming.ReadMessageAsync(clientStream1);
+                Console.WriteLine(" -> Initial UI connected and started VPN session.");
+            } // clientStream1 disconnects, starting 2500ms grace period.
+
+            Console.WriteLine(" -> Waiting 500ms (within grace window) then simulating UI restart and reconnect...");
+            await Task.Delay(500);
+
+            using var backend4b = new NamedPipeVpnBackend();
+            await backend4b.ConnectAsync(testProfile); // This sends Hello during grace period, canceling grace timer!
+            Console.WriteLine(" -> New UI instance connected. Waiting 3000ms past original grace period...");
+            await Task.Delay(3000);
+
+            var status4b = await backend4b.GetStatusAsync();
+            Assert(status4b != null && status4b.DesiredState == "Connected" && status4b.ActualState == "Connected",
+                "Test 4B PASSED: Reconnecting within grace window canceled teardown and preserved active VPN session.",
+                $"Test 4B FAILED: Session was incorrectly torn down during grace period. Desired={status4b?.DesiredState}, Actual={status4b?.ActualState}");
+
+            workerCts4b.Cancel();
+            await Task.Delay(400);
+        }
+        catch (Exception ex)
+        {
+            Assert(false, "", $"Test 4B FAILED with exception: {ex}");
         }
 
         // --------------------------------------------------------------------------------

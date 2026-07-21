@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using RealityTunnel.Models;
 
 namespace RealityTunnel;
 
@@ -11,7 +12,7 @@ public class AppSettings
     public int? WindowX { get; set; }
     public int? WindowY { get; set; }
     public string Theme { get; set; } = "System";
-    public string VpnBackend { get; set; } = "InProcess";
+    public VpnBackendKind VpnBackend { get; set; } = VpnBackendKind.InProcess;
     private static string FilePath =>
         Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
