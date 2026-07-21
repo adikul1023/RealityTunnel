@@ -283,6 +283,7 @@ export interface LoginPayload {
   master_token: string;
   device_guid: string;
   two_fa_code?: string;
+  client_type?: string;
 }
 
 export interface LoginResponse {
@@ -349,7 +350,7 @@ export const api = {
   login: (payload: LoginPayload) =>
     apiRequest<LoginResponse>('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, client_type: 'web' }),
       skipAuth: true,
     }),
 
