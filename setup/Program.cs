@@ -227,6 +227,39 @@ class Program
             return;
         }
 
+        // 5. Write settings.json so the installed app uses the Windows Service (NamedPipe backend)
+        //    instead of the default InProcess backend, which would conflict with the running service.
+        Console.WriteLine("\nConfiguring app to use Windows Service backend...");
+        try
+        {
+            string settingsDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "OverREALITY");
+            Directory.CreateDirectory(settingsDir);
+            string settingsPath = Path.Combine(settingsDir, "settings.json");
+
+            // Write settings directly as a string — AOT-safe, no reflection needed.
+            // Preserves WindowWidth/WindowHeight defaults while forcing NamedPipe backend.
+            const string settingsJson =
+                "{\n" +
+                "  \"WindowWidth\": 1050,\n" +
+                "  \"WindowHeight\": 720,\n" +
+                "  \"Theme\": \"System\",\n" +
+                "  \"VpnBackend\": \"NamedPipe\"\n" +
+                "}";
+            File.WriteAllText(settingsPath, settingsJson);
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("  VpnBackend set to NamedPipe (Windows Service mode).");
+            Console.ResetColor();
+        }
+        catch (Exception ex)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"  Warning: Could not write settings.json: {ex.Message}");
+            Console.ResetColor();
+        }
+
+
         Console.WriteLine("\n=================================================");
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("        Installation Completed Successfully!     ");
