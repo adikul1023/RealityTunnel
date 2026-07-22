@@ -40,8 +40,9 @@ public class OracleApiClient
         
         string fullUrl = $"{_httpClient.BaseAddress}api/auth/login";
         string redactedMaster = masterToken.Length > 8 ? masterToken.Substring(0, 8) + "..." : "***";
+        var exactJsonPayload = System.Text.Json.JsonSerializer.Serialize(request);
         StartupLogger.LogAuth($"[OracleApiClient] POST {fullUrl}");
-        StartupLogger.LogAuth($"[OracleApiClient] Payload: account_id='{request.AccountId}', master_token='{redactedMaster}', device_guid='{request.DeviceGuid}', two_fa_code='{request.TwoFaCode ?? "null"}'");
+        StartupLogger.LogAuth($"[OracleApiClient] Exact JSON Payload sent by HttpClient: {exactJsonPayload}");
         foreach (var header in _httpClient.DefaultRequestHeaders)
         {
             StartupLogger.LogAuth($"[OracleApiClient] DefaultHeader: {header.Key} = {string.Join(", ", header.Value)}");

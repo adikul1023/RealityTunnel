@@ -36,8 +36,7 @@ class Program
         bool isSilent = args.Contains("--silent", StringComparer.OrdinalIgnoreCase) || args.Contains("--unattended", StringComparer.OrdinalIgnoreCase);
 
         string defaultPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Programs",
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
             "OverREALITY"
         );
 
