@@ -14,9 +14,7 @@ const publicLinks = [
 ]
 
 const authLinks = [
-  { href: '/dashboard/credits', label: 'My Credits' },
-  { href: '/dashboard/devices', label: 'Devices' },
-  { href: '/dashboard/billing', label: 'Billing' },
+  { href: '/dashboard', label: 'Dashboard' },
 ]
 
 import { api } from '@/lib/api'
@@ -66,7 +64,7 @@ export function Nav({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
                 href={link.href}
                 className={cn(
                   'px-3 py-1.5 text-sm rounded-md transition-colors',
-                  pathname === link.href
+                  pathname === link.href || (link.href === '/dashboard' && pathname.startsWith('/dashboard'))
                     ? 'text-primary bg-primary/10'
                     : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                 )}
@@ -124,7 +122,7 @@ export function Nav({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
                 onClick={() => setOpen(false)}
                 className={cn(
                   'block px-3 py-2 text-sm rounded-md transition-colors',
-                  pathname === link.href
+                  pathname === link.href || (link.href === '/dashboard' && pathname.startsWith('/dashboard'))
                     ? 'text-primary bg-primary/10'
                     : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                 )}

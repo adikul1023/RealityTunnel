@@ -101,14 +101,11 @@ function RealDownloadButton({ label, href }: { label: string; href: string }) {
 }
 
 // Plan metadata keyed by plan ID (matches planId in plan-cta.tsx)
-// QR files are assigned to match the actual UPI payment amount:
-//   basic (₹69)     → payment-qr-quarterly.jpg
-//   standard (₹99)  → payment-qr-basic.jpg
-//   quarterly (₹179) → payment-qr-standard.jpg
+// QR files match their plan names directly
 const PLAN_INFO: Record<string, { label: string; price: string; qr: string }> = {
-  basic:     { label: 'Basic Monthly',    price: '₹69/month',    qr: '/payment-qr-quarterly.jpg' },
-  standard:  { label: 'Standard Monthly', price: '₹99/month',    qr: '/payment-qr-basic.jpg' },
-  quarterly: { label: 'Quarterly',        price: '₹179/quarter', qr: '/payment-qr-standard.jpg' },
+  basic:     { label: 'Basic Monthly',    price: '₹55/month',    qr: '/payment-qr-basic.jpg' },
+  standard:  { label: 'Standard Monthly', price: '₹85/month',    qr: '/payment-qr-standard.jpg' },
+  quarterly: { label: 'Quarterly',        price: '₹145/quarter', qr: '/payment-qr-quarterly.jpg' },
 }
 
 // ─── Tab: My Credits ──────────────────────────────────────────────────────────
@@ -202,9 +199,9 @@ function CreditsTab({ profile }: { profile: AccountMeResponse | null }) {
           </div>
         </div>
         <div className="mt-5">
-          <a href="/plans" className="inline-block rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted hover:border-primary transition-colors">
+          <Link href="/plans" className="inline-block rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted hover:border-primary transition-colors">
             View Plans &amp; Pricing
-          </a>
+          </Link>
         </div>
       </div>
 

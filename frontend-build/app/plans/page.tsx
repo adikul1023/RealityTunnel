@@ -10,7 +10,7 @@ const features = [
   { label: 'Anonymous master token login', basic: true, standard: true, quarterly: true },
   { label: 'Windows client', basic: true, standard: true, quarterly: true },
   { label: 'Android client', basic: true, standard: true, quarterly: true },
-  { label: 'Data included', basic: '40 GB / mo', standard: '50 GB / mo', quarterly: '150 GB / qtr' },
+  { label: 'Data included', basic: '80 GB / mo', standard: '100 GB / mo', quarterly: '250 GB / qtr' },
   { label: 'Additional data rate', basic: '₹10/GB', standard: '₹10/GB', quarterly: '₹10/GB' },
   { label: 'Connected device slots', basic: '1 device', standard: '2 devices', quarterly: '1 device' },
   { label: 'India & global infrastructure', basic: true, standard: true, quarterly: true },
@@ -51,14 +51,14 @@ export default function PlansPage() {
               <div className="mb-6">
                 <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">Basic Monthly</p>
                 <div className="flex items-end gap-1">
-                  <span className="text-4xl font-bold text-foreground">₹69</span>
+                  <span className="text-4xl font-bold text-foreground">₹55</span>
                   <span className="text-muted-foreground pb-1">/month</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">GST included</p>
               </div>
 
               <ul className="space-y-2.5 mb-8 flex-1">
-                {['40 GB data per month', '1 connected device slot', 'All platform clients', 'Encrypted private access', 'No activity logs'].map((f) => (
+                {['80 GB data per month', '1 connected device slot', 'All platform clients', 'Encrypted private access', 'No activity logs'].map((f) => (
                   <li key={f} className="flex items-center gap-2 text-sm text-foreground">
                     <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
                     {f}
@@ -78,14 +78,14 @@ export default function PlansPage() {
               <div className="mb-6">
                 <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">Standard Monthly</p>
                 <div className="flex items-end gap-1">
-                  <span className="text-4xl font-bold text-foreground">₹99</span>
+                  <span className="text-4xl font-bold text-foreground">₹85</span>
                   <span className="text-muted-foreground pb-1">/month</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">GST included</p>
               </div>
 
               <ul className="space-y-2.5 mb-8 flex-1">
-                {['50 GB data per month', '2 connected device slots', 'All platform clients', 'Encrypted private access', 'No activity logs'].map((f) => (
+                {['100 GB data per month', '2 connected device slots', 'All platform clients', 'Encrypted private access', 'No activity logs'].map((f) => (
                   <li key={f} className="flex items-center gap-2 text-sm text-foreground">
                     <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
                     {f}
@@ -110,14 +110,14 @@ export default function PlansPage() {
               <div className="mb-6">
                 <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">Quarterly</p>
                 <div className="flex items-end gap-1">
-                  <span className="text-4xl font-bold text-foreground">₹179</span>
+                  <span className="text-4xl font-bold text-foreground">₹145</span>
                   <span className="text-muted-foreground pb-1">/quarter</span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">GST included · ≈ ₹59.67/month</p>
+                <p className="text-xs text-muted-foreground mt-1">GST included · ≈ ₹48.33/month</p>
               </div>
 
               <ul className="space-y-2.5 mb-8 flex-1">
-                {['150 GB data per 3 months', '1 connected device slot', 'All platform clients', 'Encrypted private access', 'No activity logs', 'Priority support'].map((f) => (
+                {['250 GB data per 3 months', '1 connected device slot', 'All platform clients', 'Encrypted private access', 'No activity logs', 'Priority support'].map((f) => (
                   <li key={f} className="flex items-center gap-2 text-sm text-foreground">
                     <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
                     {f}
@@ -146,13 +146,13 @@ export default function PlansPage() {
                       Feature
                     </th>
                     <th className="text-center px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      ₹69 Basic
+                      ₹55 Basic
                     </th>
                     <th className="text-center px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      ₹99 Standard
+                      ₹85 Standard
                     </th>
                     <th className="text-center px-6 py-3 text-xs font-medium text-primary uppercase tracking-wider">
-                      ₹179 Quarterly
+                      ₹145 Quarterly
                     </th>
                   </tr>
                 </thead>

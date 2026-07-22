@@ -175,7 +175,7 @@ export default function HomePage() {
               Ready to go private?
             </h2>
             <p className="text-muted-foreground mb-8 text-pretty">
-              Start for ₹69/month. No personal information required. Cancel any time.
+              Start for ₹55/month. No personal information required. Cancel any time.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Link
