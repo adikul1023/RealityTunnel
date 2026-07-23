@@ -101,11 +101,14 @@ function RealDownloadButton({ label, href }: { label: string; href: string }) {
 }
 
 // Plan metadata keyed by plan ID (matches planId in plan-cta.tsx)
-// QR files match their plan names directly
+// QR file contents (confirmed):
+//   payment-qr-quarterly.jpg = ₹55 QR
+//   payment-qr-basic.jpg     = ₹85 QR
+//   payment-qr-standard.jpg  = ₹145 QR
 const PLAN_INFO: Record<string, { label: string; price: string; qr: string }> = {
-  basic:     { label: 'Basic Monthly',    price: '₹55/month',    qr: '/payment-qr-basic.jpg' },
-  standard:  { label: 'Standard Monthly', price: '₹85/month',    qr: '/payment-qr-standard.jpg' },
-  quarterly: { label: 'Quarterly',        price: '₹145/quarter', qr: '/payment-qr-quarterly.jpg' },
+  basic:     { label: 'Basic Monthly',    price: '₹55/month',    qr: '/payment-qr-quarterly.jpg' },
+  standard:  { label: 'Standard Monthly', price: '₹85/month',    qr: '/payment-qr-basic.jpg' },
+  quarterly: { label: 'Quarterly',        price: '₹145/quarter', qr: '/payment-qr-standard.jpg' },
 }
 
 // ─── Tab: My Credits ──────────────────────────────────────────────────────────
