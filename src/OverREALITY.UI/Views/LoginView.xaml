@@ -1,0 +1,26 @@
+<UserControl x:Class="OverREALITY.UI.Views.LoginView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </UserControl.Resources>
+    <Grid Margin="32">
+        <StackPanel VerticalAlignment="Center" MaxWidth="400">
+            <TextBlock Text="Stealthy" FontSize="32" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,32" />
+            
+            <TextBox materialDesign:HintAssist.Hint="Account Key (e.g., ST-XXXX-XXXX:&lt;master-token&gt;)"
+                     Text="{Binding AccountKey, UpdateSourceTrigger=PropertyChanged}"
+                     Margin="0,0,0,16" />
+            
+            
+
+            <TextBlock Text="{Binding ErrorMessage}" Foreground="Red" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" Margin="0,0,0,16" />
+
+            <Button Command="{Binding LoginCommand}" Content="Authenticate" Margin="0,16,0,0" />
+            
+            <ProgressBar IsIndeterminate="True" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" Margin="0,16,0,0" />
+        </StackPanel>
+    </Grid>
+</UserControl>
+

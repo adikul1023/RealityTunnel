@@ -1,79 +1,70 @@
-## Build results
+# Build outputs
 bin/
 obj/
-[Dd]ebug/
-[Rr]elease/
-x64/
-x86/
-[Aa]rm/
-[Aa]rm64/
-bld/
-[Bb]in/
-[Oo]bj/
-
-## User-specific files
+out/
+publish/
 *.user
 *.suo
-*.userosscache
-*.sln.docstates
-
-## Visual Studio cache/options directory
 .vs/
+*.DotSettings
 
-## Generated files
-config.json
+# Published builds (not committed — release via GitHub Releases)
+publish\ build/
+
+# Environment / secrets — NEVER commit these
+environment.json
+appsettings.*.json
+*.pfx
+*.p12
+*.key
+*.pem
+*.cer
+*.crt
+secrets.json
+.env
+.env.*
+usersecrets.json
+
+# Log files that can contain server addresses or tokens
 *.log
+singbox.log
+startup_error.txt
+installer_err.txt
 
-## NuGet
-*.nupkg
-*.snupkg
-packages/
+# Scratch / dev artefacts at repo root
+dns_server.json
+schema.json
+xray.zip
+test.cs
+test.py
+*.ps1
+Test-UDP.ps1
+Test-UDP2.ps1
+udp_test_results.txt
+nul
+new.txt
+legacy.txt
 
-## Visual Studio profiler
-*.psess
-*.vsp
-*.vspx
+# sing-box config written at runtime (contains UUIDs / VLESS keys)
+sing-box-config.json
+config.json
 
-## Rider
+# Legacy server code
+legacy/
+
+# Rider
 .idea/
-*.sln.iml
 
-## VS Code
+# VS Code
 .vscode/
 
-## Secrets — never commit real credentials
-.env
+# macOS
+.DS_Store
 
-## Release zips — uploaded to GitHub Releases, not committed
-*.zip
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
 
-## Android local/generated
-android/.gradle/
-android/.idea/
-android/.kotlin/
-android/**/build/
-android/**/bin/
-android/local.properties
-android/stderr.log
-android/**/captures/
-android/*.iml
-
-## Mobile build artifacts
-*.apk
-*.aab
-
-## Local Android source dumps
-sing-box-for-android/
-sing-box-src/
-
-RealityTunnel_Architecture_v5.md
-
-android/connectivity.txt
-android/overreality-release.jks
-
-## Setup compiler and output
-setup/bin/
-setup/obj/
-setup*.exe
-
-
+# Installer payload — built from publish build, not committed
+src/Stealthy.Installer/payload.zip

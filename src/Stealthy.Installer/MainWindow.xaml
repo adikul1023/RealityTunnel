@@ -1,0 +1,163 @@
+<Window x:Class="Stealthy.Installer.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Stealthy VPN – Setup" Height="500" Width="640"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Background="#1a1a2e">
+
+    <Window.Resources>
+        <!-- Colors -->
+        <Color x:Key="PurpleColor">#6750A4</Color>
+        <Color x:Key="PurpleDarkColor">#4a3880</Color>
+        <Color x:Key="SurfaceColor">#27273f</Color>
+        <SolidColorBrush x:Key="PurpleBrush" Color="{StaticResource PurpleColor}"/>
+        <SolidColorBrush x:Key="PurpleDarkBrush" Color="{StaticResource PurpleDarkColor}"/>
+        <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}"/>
+
+        <!-- Install Button Style -->
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource PurpleBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="32,12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="24"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="{StaticResource PurpleDarkBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#3a2860"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="border" Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Progress Bar Style -->
+        <Style x:Key="InstallerProgressBar" TargetType="ProgressBar">
+            <Setter Property="Height" Value="6"/>
+            <Setter Property="Background" Value="#3a3a5c"/>
+            <Setter Property="Foreground" Value="{StaticResource PurpleBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Grid>
+                            <Border x:Name="PART_Track" Background="{TemplateBinding Background}" CornerRadius="3"/>
+                            <Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}"
+                                    HorizontalAlignment="Left" CornerRadius="3"/>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Border Background="#1a1a2e">
+        <Grid>
+            <!-- Top accent bar -->
+            <Border VerticalAlignment="Top" Height="4"
+                    HorizontalAlignment="Stretch">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                        <GradientStop Color="#6750A4" Offset="0"/>
+                        <GradientStop Color="#9C27B0" Offset="0.5"/>
+                        <GradientStop Color="#6750A4" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+            </Border>
+
+            <!-- Main Content -->
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Width="480">
+
+                <!-- Icon / Logo placeholder -->
+                <Border Width="72" Height="72" CornerRadius="36" Margin="0,0,0,24"
+                        HorizontalAlignment="Center">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#6750A4" Offset="0"/>
+                            <GradientStop Color="#9C27B0" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                    <TextBlock Text="S" FontSize="38" FontWeight="Bold" Foreground="White"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+
+                <!-- App Name -->
+                <TextBlock Text="Stealthy VPN" FontSize="36" FontWeight="Bold"
+                           Foreground="White" HorizontalAlignment="Center" Margin="0,0,0,8">
+                    <TextBlock.Effect>
+                        <DropShadowEffect Color="#6750A4" BlurRadius="20" ShadowDepth="0" Opacity="0.6"/>
+                    </TextBlock.Effect>
+                </TextBlock>
+
+                <TextBlock Text="Secure • Private • Unstoppable"
+                           FontSize="13" Foreground="#888aaa"
+                           HorizontalAlignment="Center" Margin="0,0,0,40"/>
+
+                <!-- Install Path Info -->
+                <Border Background="#27273f" CornerRadius="8" Padding="16,10" Margin="0,0,0,24">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Install location: " Foreground="#888aaa" FontSize="12"/>
+                        <TextBlock Text="C:\Program Files\Stealthy VPN" Foreground="#aaaacc" FontSize="12" FontWeight="SemiBold"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Status Text -->
+                <TextBlock x:Name="StatusText" Text="Ready to install"
+                           FontSize="14" Foreground="#ccccee"
+                           HorizontalAlignment="Center" Margin="0,0,0,16"/>
+
+                <!-- Progress Bar -->
+                <ProgressBar x:Name="ProgressBar"
+                             Style="{StaticResource InstallerProgressBar}"
+                             Value="0" Minimum="0" Maximum="100"
+                             Width="480" Margin="0,0,0,24"
+                             Visibility="Collapsed"/>
+
+                <!-- Step Detail Text -->
+                <TextBlock x:Name="StepText" Text=""
+                           FontSize="11" Foreground="#666880"
+                           HorizontalAlignment="Center" Margin="0,-12,0,20"
+                           Visibility="Collapsed"/>
+
+                <!-- Install Button -->
+                <Button x:Name="InstallButton"
+                        Content="INSTALL NOW"
+                        Style="{StaticResource PrimaryButton}"
+                        Width="220" HorizontalAlignment="Center"
+                        Click="InstallButton_Click"/>
+
+                <!-- Launch Button (hidden until done) -->
+                <Button x:Name="LaunchButton"
+                        Content="LAUNCH STEALTHY VPN"
+                        Style="{StaticResource PrimaryButton}"
+                        Width="240" HorizontalAlignment="Center"
+                        Click="LaunchButton_Click"
+                        Visibility="Collapsed"/>
+
+            </StackPanel>
+
+            <!-- Footer -->
+            <TextBlock VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,16"
+                       Text="© 2025 Stealthy VPN. All rights reserved."
+                       Foreground="#444466" FontSize="11"/>
+        </Grid>
+    </Border>
+</Window>

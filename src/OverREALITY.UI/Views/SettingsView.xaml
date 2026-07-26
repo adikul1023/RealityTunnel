@@ -1,0 +1,17 @@
+﻿<UserControl x:Class="OverREALITY.UI.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
+    <Grid Margin="32">
+        <StackPanel MaxWidth="400" HorizontalAlignment="Left">
+            <TextBlock Text="Settings" FontSize="24" FontWeight="Bold" Margin="0,0,0,24" />
+
+            <CheckBox Content="Auto-Connect on Launch" IsChecked="{Binding AutoConnect}" Margin="0,0,0,16" />
+            <CheckBox Content="Start with Windows" IsChecked="{Binding StartWithWindows}" Margin="0,0,0,24" />
+
+            <ComboBox materialDesign:HintAssist.Hint="Theme" ItemsSource="{Binding Themes}" SelectedItem="{Binding SelectedTheme}" Margin="0,0,0,16" />
+            <ComboBox materialDesign:HintAssist.Hint="Environment" ItemsSource="{Binding Environments}" SelectedItem="{Binding SelectedEnvironment}" Margin="0,0,0,16" />
+            <ComboBox materialDesign:HintAssist.Hint="Logging Level" ItemsSource="{Binding LoggingLevels}" SelectedItem="{Binding SelectedLoggingLevel}" Margin="0,0,0,16" />
+        </StackPanel>
+    </Grid>
+</UserControl>
