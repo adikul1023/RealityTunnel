@@ -24,7 +24,7 @@ const windowsPlatform = {
   requirements: 'Windows 10 or later (64-bit)',
   size: '~18 MB',
   steps: [
-    'Download the installer (StealthySetup.exe) and run it.',
+    'Download the installer (setup.exe) and run it.',
     'Accept the license agreement and complete installation.',
     'Launch Stealthy from your Start menu or desktop shortcut.',
     'Enter your 32-character master token when prompted.',
@@ -32,7 +32,7 @@ const windowsPlatform = {
     'Troubleshooting: If it fails to connect or the exit IP shows as "?", open Task Manager, kill "Reality Tunnel" and "Reality Tunnel Helper", then try again.',
   ],
   downloads: [
-    { label: 'Windows Installer', sublabel: 'Stealthy_setup.exe (~18 MB)', href: 'https://github.com/adikul1023/RealityTunnel/releases/latest/download/Stealthy_setup.exe' },
+    { label: 'Windows Installer', sublabel: 'setup.exe (~89 MB)', href: 'https://github.com/adikul1023/RealityTunnel/releases/download/v1.1.0/setup.exe' },
   ],
 }
 
