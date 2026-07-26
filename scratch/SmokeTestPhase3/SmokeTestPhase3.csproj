@@ -1,16 +1,17 @@
-<Project Sdk="Microsoft.NET.Sdk">
-
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Platforms>x64</Platforms>
+    <TargetFramework>net8.0-windows</TargetFramework>
   </PropertyGroup>
-
   <ItemGroup>
-    <ProjectReference Include="..\..\RealityTunnel.Shared\RealityTunnel.Shared.csproj" />
-    <ProjectReference Include="..\..\RealityTunnel.Helper\RealityTunnel.Helper.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+    <ProjectReference Include="..\..\src\OverREALITY.Core\OverREALITY.Core.csproj" />
+    <ProjectReference Include="..\..\src\OverREALITY.Infrastructure\OverREALITY.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\OverREALITY.Configuration\OverREALITY.Configuration.csproj" />
   </ItemGroup>
-
+  <ItemGroup>
+    <None Update="environment.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 </Project>
