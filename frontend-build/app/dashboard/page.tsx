@@ -537,7 +537,7 @@ const DOWNLOAD_PLATFORMS = [
       'Troubleshooting: If it fails to connect or the exit IP shows as "?", open Task Manager, kill "Reality Tunnel" and "Reality Tunnel Helper", then try again.',
     ],
     downloads: [
-      { label: 'Windows Installer', sublabel: 'setup.exe (~89 MB)', href: 'https://github.com/adikul1023/RealityTunnel/releases/latest/download/setup.exe' },
+      { label: 'Windows Installer', sublabel: 'setup.exe (~89 MB)', href: 'https://github.com/adikul1023/RealityTunnel/releases/download/setupv1.0-beta/Stealthy_setup.exe' },
     ],
   },
 ]
