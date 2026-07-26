@@ -6,9 +6,9 @@
 export const config = {
   /**
    * Oracle Billing & Authentication API URL
-   * Production: https://api.stealthy.co.in
+   * Production: https://api.reviewbook.biz
    */
-  apiUrl: process.env.NEXT_PUBLIC_API_URL || 'https://api.stealthy.co.in',
+  apiUrl: process.env.NEXT_PUBLIC_API_URL || 'https://api.reviewbook.biz',
 
   /**
    * Customer Marketing & Portal Main Site
