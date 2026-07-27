@@ -8,10 +8,10 @@ publish/
 .vs/
 *.DotSettings
 
-# Published builds (not committed — release via GitHub Releases)
+# Published builds (not committed â€” release via GitHub Releases)
 publish\ build/
 
-# Environment / secrets — NEVER commit these
+# Environment / secrets â€” NEVER commit these
 environment.json
 appsettings.*.json
 *.pfx
@@ -66,5 +66,11 @@ legacy/
 *.snupkg
 .nuget/
 
-# Installer payload — built from publish build, not committed
+# Installer payload â€” built from publish build, not committed
 src/Stealthy.Installer/payload.zip
+artifacts/
+publish_build/
+payload_temp/
+analysis/
+xray_temp/
+src/RealityTunnel.OperationsConsole/
