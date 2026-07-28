@@ -1,5 +1,6 @@
 package com.overreality.vpn.models
 
+@androidx.annotation.Keep
 data class DeviceRegistration(
     val deviceGuid: String,
     val deviceName: String,

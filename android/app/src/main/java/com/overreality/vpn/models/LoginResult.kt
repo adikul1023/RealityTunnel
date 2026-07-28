@@ -18,17 +18,20 @@ sealed class ExchangeResult {
     data class Error(val message: String) : ExchangeResult()
 }
 
+@androidx.annotation.Keep
 data class DeviceLimitDetails(
     @SerializedName("current_devices") val currentDevices: Int,
     @SerializedName("max_devices") val maxDevices: Int,
     @SerializedName("manage_devices_url") val manageDevicesUrl: String
 )
 
+@androidx.annotation.Keep
 data class Verify2FaRequest(
     @SerializedName("temporary_login_token") val temporaryLoginToken: String,
     @SerializedName("totp_code") val totpCode: String
 )
 
+@androidx.annotation.Keep
 data class ApiErrorResponse(
     val error: String,
     @SerializedName("current_devices") val currentDevices: Int?,
@@ -37,12 +40,14 @@ data class ApiErrorResponse(
     @SerializedName("temporary_login_token") val temporaryLoginToken: String?
 )
 
+@androidx.annotation.Keep
 data class ExchangeRequestDto(
     @SerializedName("exchange_token") val exchangeToken: String,
     @SerializedName("device_guid") val deviceGuid: String,
     @SerializedName("client_type") val clientType: String = "android"
 )
 
+@androidx.annotation.Keep
 data class ExchangeResponseDto(
     @SerializedName("access_token") val accessToken: String,
     @SerializedName("refresh_token") val refreshToken: String,

@@ -1,14 +1,17 @@
 package com.overreality.vpn.models
 
+@androidx.annotation.Keep
 data class VpnProfileDto(
     val uuid: String,
-    val server_ip: String,
+    @com.google.gson.annotations.SerializedName("server_host") val server_ip: String,
+    val server_port: Int,
     val public_key: String,
     val sni: String,
-    val dns: String? = null,
+    @com.google.gson.annotations.SerializedName("preferred_dns") val dns: String? = null,
     val short_id: String? = null
 )
 
+@androidx.annotation.Keep
 data class ClientMeResponse(
     val account_id: String,
     val status: String,
@@ -19,6 +22,7 @@ data class ClientMeResponse(
     val two_factor_enabled: Boolean
 )
 
+@androidx.annotation.Keep
 data class ClientUpdateResponse(
     val latest_version: String,
     val minimum_supported_version: String,
@@ -28,12 +32,14 @@ data class ClientUpdateResponse(
     val release_notes: String
 )
 
+@androidx.annotation.Keep
 data class DeviceStatusResponse(
     val active: Boolean,
     val reason: String?,
     val server_time: String
 )
 
+@androidx.annotation.Keep
 data class ClientConfigResponse(
     @com.google.gson.annotations.SerializedName("vpn_profile") val vpnProfile: VpnProfileDto,
     @com.google.gson.annotations.SerializedName("license_blob") val licenseBlob: LicenseBlob
