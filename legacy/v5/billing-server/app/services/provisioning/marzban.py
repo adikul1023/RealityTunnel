@@ -165,6 +165,33 @@ class MarzbanProvisioningProvider(ProvisioningProvider):
                     await asyncio.sleep(0.5 * (2 ** (attempt - 1)))
                     continue
                 raise ProvisioningUnavailableError(
+                    f"Marzban API unreachable on {path}"
+                ) from exc
+        raise ProvisioningProviderError("Max retries exceeded") from last_exception
+
+    async def create_user(
+        self,
+        username: str,
+        data_limit: int | None = None,
+        expire_at: int | None = None,
+        status: str = "active",
+        note: str = "",
+        on_hold_expire_duration: int = 0,
+        on_hold_timeout: str = "",
+    ) -> ProvisionedUserDTO:
+        path = "/api/user"
+        payload = {
+            "username": username,
+            "proxies": {"vless": {"flow": "xtls-rprx-vision"}},
+            "inbounds": {"vless": ["VLESS TCP REALITY"]},
+            "expire": expire_at or 0,
+            "data_limit": data_limit or 0,
+            "data_limit_reset_strategy": "no_reset",
+            "status": status,
+            "note": note,
+            "on_hold_timeout": on_hold_timeout,
+            "on_hold_expire_duration": on_hold_expire_duration,
+        }
         logger.info("Creating remote user in Marzban username=%s", username)
         response = await self._request_with_retry("POST", path, json=payload, expected_statuses=(200, 201))
         if response.status_code == 404:
@@ -186,7 +213,7 @@ class MarzbanProvisioningProvider(ProvisioningProvider):
         """Update existing user in Marzban."""
         path = settings.marzban_update_user_path.format(username=username)
         payload: dict[str, Any] = {
-            "proxies": {"vless": {}},
+            "proxies": {"vless": {"flow": "xtls-rprx-vision"}},
             "inbounds": {"vless": ["VLESS TCP REALITY"]}
         }
         if data_limit is not None:
@@ -312,4 +339,31 @@ class MarzbanProvisioningProvider(ProvisioningProvider):
             raise
         except Exception as exc:
             raise ProvisioningProviderError("Failed to fetch REALITY configuration from Marzban") from exc
+
+    def _parse_user_dto(self, data: dict[str, Any], username: str) -> ProvisionedUserDTO:
+        links = data.get("links", [])
+        if not links and "proxies" in data:
+            for proxy_type, proxy_data in data.get("proxies", {}).items():
+                if isinstance(proxy_data, list):
+                    links.extend(proxy_data)
+                elif isinstance(proxy_data, dict) and "id" not in proxy_data:
+                    # In Marzban, proxies like `vless: { id: ..., flow: ... }` shouldn't be added to links directly.
+                    # 'links' is natively returned in Marzban GET responses anyway.
+                    pass
+
+        uuid_val = data.get("uuid")
+        if not uuid_val and "proxies" in data and "vless" in data["proxies"]:
+            vless_proxy = data["proxies"]["vless"]
+            if isinstance(vless_proxy, dict):
+                uuid_val = vless_proxy.get("id")
+
+        return ProvisionedUserDTO(
+            remote_user_id=data.get("username", username),
+            status=data.get("status", "active"),
+            data_limit=data.get("data_limit"),
+            data_used=data.get("used_traffic"),
+            expire_at=data.get("expire"),
+            links=links,
+            uuid=uuid_val,
+        )
 
