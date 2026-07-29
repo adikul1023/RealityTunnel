@@ -524,10 +524,11 @@ const DOWNLOAD_PLATFORMS = [
   {
     icon: Monitor,
     name: 'Windows',
-    version: 'v1.0.0-rc1',
+    version: 'v1.1.2',
     requirements: 'Windows 10 or later (64-bit)',
-    size: '~18 MB',
+    size: '88.8 MB',
     available: true,
+    note: 'The application may crash the first time you try to connect. If this happens, open Task Manager, end the "Reality Tunnel" and "Reality Tunnel Helper" tasks, and try again.',
     steps: [
       'Download the installer (setup.exe) and run it.',
       'Accept the license agreement and complete installation.',
@@ -537,7 +538,27 @@ const DOWNLOAD_PLATFORMS = [
       'Troubleshooting: If it fails to connect or the exit IP shows as "?", open Task Manager, kill "Reality Tunnel" and "Reality Tunnel Helper", then try again.',
     ],
     downloads: [
-      { label: 'Windows Installer', sublabel: 'setup.exe (~89 MB)', href: 'https://github.com/adikul1023/RealityTunnel/releases/download/v1.1.1/Stealthy_setup.exe' },
+      { label: 'Windows Installer', sublabel: 'setup.exe (88.8 MB)', href: 'https://github.com/adikul1023/RealityTunnel/releases/latest/download/setup.exe' },
+    ],
+  },
+  {
+    icon: Smartphone,
+    name: 'Android',
+    version: 'v1.1.2',
+    requirements: 'Android 8.0 (Oreo) or later',
+    size: '55.6 MB',
+    available: true,
+    note: 'This is a sideloaded APK — not distributed via the Play Store. You will need to allow installation from unknown sources in your Android settings before installing.',
+    steps: [
+      'Download the APK file (app-release.apk) to your Android device.',
+      'Open Settings → Security (or Privacy) and enable "Install from unknown sources" for your browser or file manager.',
+      'Open the downloaded APK and tap Install.',
+      'Launch Stealthy from your app drawer.',
+      'Enter your 32-character master token when prompted.',
+      'Select a server region and tap Connect.',
+    ],
+    downloads: [
+      { label: 'Android APK', sublabel: 'app-release.apk (55.6 MB)', href: 'https://github.com/adikul1023/RealityTunnel/releases/latest/download/app-release.apk' },
     ],
   },
 ]
@@ -584,9 +605,11 @@ function DownloadsTab() {
             {/* Setup steps */}
             <div className="p-5 flex-1">
               <h3 className="text-sm font-semibold text-foreground mb-3">Setup instructions</h3>
-              <div className="mb-4 rounded-md border border-primary/20 bg-primary/5 p-3 text-sm text-foreground">
-                <strong>Note:</strong> The application may crash the first time you try to connect. If this happens, open Task Manager, end the "Reality Tunnel" and "Reality Tunnel Helper" tasks, and try again.
-              </div>
+              {p.note && (
+                <div className="mb-4 rounded-md border border-primary/20 bg-primary/5 p-3 text-sm text-foreground">
+                  <strong>Note:</strong> {p.note}
+                </div>
+              )}
               <ol className="space-y-2.5">
                 {p.steps.map((step, i) => (
                   <li key={i} className="flex items-start gap-2.5">
