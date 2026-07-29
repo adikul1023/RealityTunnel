@@ -213,7 +213,7 @@ class MarzbanProvisioningProvider(ProvisioningProvider):
         """Update existing user in Marzban."""
         path = settings.marzban_update_user_path.format(username=username)
         payload: dict[str, Any] = {
-            "proxies": {"vless": {"flow": "xtls-rprx-vision"}},
+            "proxies": {"vless": {}},
             "inbounds": {"vless": ["VLESS TCP REALITY"]}
         }
         if data_limit is not None:

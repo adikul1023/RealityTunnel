@@ -546,12 +546,14 @@ class ProvisioningService:
                     ) from exc
 
                 if not user_dto:
-                    profile.provisioning_state = ProvisioningState.PENDING
-                    if commit:
-                        await self.session.commit()
-                    raise EntityNotFoundError(
-                        f"Remote user '{profile.remote_user_id}' not found in provisioning provider."
-                    )
+                    logger.warning(f"Remote user '{profile.remote_user_id}' not found, attempting to recreate...")
+                    account = await AccountRepository.get_by_id(self.session, account_id)
+                    if not account:
+                        raise EntityNotFoundError(f"Account {account_id} not found.")
+                    await self._create_user(self.session, profile, account)
+                    user_dto = await self.provider.get_user(profile.remote_user_id)
+                    if not user_dto:
+                        raise ProvisioningSynchronizationError(f"Failed to fetch recreated identity for account {account_id}")
                     
                 if not user_dto.uuid:
                     raise ProvisioningSynchronizationError(
