@@ -1,16 +1,16 @@
-﻿import requests
+import jwt
+import datetime
+import urllib.request
 
-url = 'https://api.stealthy.co.in/api/auth/login'
+secret = '4020a5de542bb12ab1253e7f41f0217a32b005e83011400bc192e48e89f81cb4'
 payload = {
-    'account_id': 'ST-V9SF-IHCU',
-    'master_token': 'cc79bac3bb1c38850d3f65afe3676dd3c1221e7753bc191665f5a7e8febddbe8',
-    'device_guid': '00000000-0000-0000-0000-000000000000'
+    'sub': 'test-account',
+    'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=1)
 }
-headers = {'Content-Type': 'application/json'}
-
+token = jwt.encode(payload, secret, algorithm='HS256')
+req = urllib.request.Request('https://api.reviewbook.biz/api/client/config', headers={'Authorization': 'Bearer ' + token, 'X-Device-ID': 'test-device'})
 try:
-    response = requests.post(url, json=payload)
-    print(f"Status: {response.status_code}")
-    print(f"Body: {response.text}")
-except Exception as e:
-    print(f"Error: {e}")
+    with urllib.request.urlopen(req) as response:
+        print(response.read().decode())
+except urllib.error.HTTPError as e:
+    print('HTTP Error:', e.code, e.read().decode())

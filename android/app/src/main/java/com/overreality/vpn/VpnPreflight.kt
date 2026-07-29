@@ -29,9 +29,10 @@ object VpnPreflight {
     }
 
     fun run(context: Context, serverIp: String): Result {
-        val prefs = VpnConfigStore.prefs(context)
-        val uuid = prefs.getString(VpnConfigStore.KEY_UUID, "")?.trim().orEmpty()
-        val pubKey = prefs.getString(VpnConfigStore.KEY_PUBLIC_KEY, "")?.trim().orEmpty()
+        val secureStorage = com.overreality.vpn.data.SecureStorage(context)
+        val profile = secureStorage.getVpnProfile()
+        val uuid = profile?.uuid?.trim().orEmpty()
+        val pubKey = profile?.public_key?.trim().orEmpty()
 
         if (serverIp.isBlank()) return Result(false, "Server IP is empty")
         if (!SERVER_HOST_REGEX.matches(serverIp)) {

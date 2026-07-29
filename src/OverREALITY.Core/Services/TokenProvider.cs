@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,13 +12,15 @@ public class TokenProvider : ITokenProvider
 {
     private readonly ISecureStorage _secureStorage;
     private readonly IAuthenticationApi _authApi;
+    private readonly ISessionManager _sessionManager;
     private readonly ILogger<TokenProvider> _logger;
     private string? _cachedAccessToken;
 
-    public TokenProvider(ISecureStorage secureStorage, IAuthenticationApi authApi, ILogger<TokenProvider> logger)
+    public TokenProvider(ISecureStorage secureStorage, IAuthenticationApi authApi, ISessionManager sessionManager, ILogger<TokenProvider> logger)
     {
         _secureStorage = secureStorage;
         _authApi = authApi;
+        _sessionManager = sessionManager;
         _logger = logger;
     }
 
@@ -66,6 +68,14 @@ public class TokenProvider : ITokenProvider
                 await _secureStorage.SaveSecureAsync("AccessToken", response.Value.AccessToken);
                 await _secureStorage.SaveSecureAsync("RefreshToken", response.Value.RefreshToken);
                 return response.Value.AccessToken;
+            }
+            else if (!response.IsSuccess && (response.Error?.Code == "DEVICE_REVOKED" || response.Error?.Code == "REPLAY_DETECTED" || response.Error?.Code == "INVALID_TOKEN"))
+            {
+                _logger.LogWarning("Fatal error during token refresh: {ErrorCode}. Clearing session.", response.Error?.Code);
+                InvalidateToken();
+                await _secureStorage.DeleteSecureAsync("AccessToken");
+                await _secureStorage.DeleteSecureAsync("RefreshToken");
+                _sessionManager.ClearSession();
             }
         }
         catch (Exception ex)

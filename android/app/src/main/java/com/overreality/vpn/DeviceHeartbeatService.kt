@@ -3,6 +3,7 @@ package com.overreality.vpn
 import com.overreality.vpn.auth.AuthenticationManager
 import com.overreality.vpn.data.OracleApiClient
 import com.overreality.vpn.logging.ClientLogger
+import com.overreality.vpn.data.SecureStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -13,6 +14,7 @@ import kotlinx.coroutines.launch
 class DeviceHeartbeatService(
     private val apiClient: OracleApiClient,
     private val authManager: AuthenticationManager,
+    private val secureStorage: SecureStorage,
     private val clientLogger: ClientLogger,
     private val onTerminateSession: () -> Unit
 ) {
@@ -33,7 +35,8 @@ class DeviceHeartbeatService(
                         continue
                     }
 
-                    val statusResponse = apiClient.fetchDeviceStatus(token)
+                    val deviceId = secureStorage.getDeviceGuid()
+                    val statusResponse = apiClient.fetchDeviceStatus(token, deviceId)
                     if (statusResponse != null) {
                         if (!statusResponse.active) {
                             clientLogger.log(com.overreality.vpn.logging.LogLevel.WARN, "HEARTBEAT", "Device marked inactive (revoked). Terminating session.")

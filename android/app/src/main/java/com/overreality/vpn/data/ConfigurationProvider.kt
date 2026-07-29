@@ -16,15 +16,15 @@ class ConfigurationProvider(
     private val prefs: SharedPreferences = context.getSharedPreferences("vpn_prefs", Context.MODE_PRIVATE)
 
     suspend fun getVpnProfile(): com.overreality.vpn.models.VpnProfileDto? {
+        val networkProfile = refreshProfileFromNetwork()
+        if (networkProfile != null) {
+            return networkProfile
+        }
         val cachedProfile = secureStorage.getVpnProfile()
         if (cachedProfile != null && licenseRepository.isGracePeriodValid()) {
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-                refreshProfileFromNetwork()
-            }
             return cachedProfile
         }
-        
-        return refreshProfileFromNetwork()
+        return null
     }
 
     suspend fun refreshProfileBackground() {
@@ -38,13 +38,14 @@ class ConfigurationProvider(
     private suspend fun refreshProfileFromNetwork(): com.overreality.vpn.models.VpnProfileDto? {
         val token = authManager.getValidAccessToken() ?: return getDebugProfile()
         try {
-            val remoteConfig = apiClient.fetchClientConfig(token)
+            val remoteConfig = apiClient.fetchClientConfig(token, secureStorage.getDeviceGuid())
             if (remoteConfig != null) {
                 secureStorage.saveVpnProfile(remoteConfig.vpnProfile)
                 licenseRepository.updateLicenseBlob(remoteConfig.licenseBlob)
                 return remoteConfig.vpnProfile
             }
         } catch (e: Exception) {
+            android.util.Log.e("OVERREALITY_CONFIG", "Failed to refresh profile", e)
             // Fallback to cache on network failure
         }
         return getDebugProfile()
@@ -56,6 +57,7 @@ class ConfigurationProvider(
             if (!serverIp.isNullOrEmpty()) {
                 return com.overreality.vpn.models.VpnProfileDto(
                     server_ip = serverIp,
+                    server_port = 443,
                     uuid = "00000000-0000-0000-0000-000000000000",
                     public_key = "dummy-key",
                     sni = "www.microsoft.com"

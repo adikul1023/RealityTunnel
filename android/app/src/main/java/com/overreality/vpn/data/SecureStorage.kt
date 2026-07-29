@@ -108,6 +108,10 @@ class SecureStorage(context: Context) {
         return guid
     }
 
+    fun clearDeviceGuid() {
+        sharedPrefs.edit().remove("device_guid").apply()
+    }
+
     fun clearAll() {
         sharedPrefs.edit().clear().apply()
     }

@@ -1,0 +1,43 @@
+{
+  "log": { "level": "debug", "output": "/storage/emulated/0/Android/data/com.overreality.vpn/files/libbox/sing-box.log", "timestamp": true },
+  "dns": {
+    "servers": [
+      { "tag": "google", "address": "tcp://8.8.8.8", "detour": "proxy" },
+      { "tag": "local",  "address": "local",          "detour": "direct" }
+    ],
+    "rules": [
+      { "outbound": "any", "server": "local" }
+    ],
+    "final": "google"
+  },
+  "inbounds": [{
+    "type": "tun", "tag": "tun-in",
+    "address": ["10.0.85.2/24"],
+    "mtu": 1500, "auto_route": true,
+    "route_address": ["0.0.0.0/1", "128.0.0.0/1"],
+    "stack": "mixed", "sniff": true
+  }],
+  "outbounds": [
+    {
+      "type": "vless", "tag": "proxy",
+      "server": "edge.reviewbook.biz", "server_port": 443,
+      "uuid": "38934d8a-8010-4f9c-8cc8-0c4cf0c7e91f",
+      "flow": "xtls-rprx-vision", "packet_encoding": "",
+      "tls": {
+        "enabled": true, "server_name": "dl.google.com",
+        "utls": { "enabled": true, "fingerprint": "chrome" },
+        "reality": { "enabled": true, "public_key": "EO7aALQ5lBwiu0pkQVrukY8leN9gySPjc_tCPURy_Co", "short_id": "" }
+      }
+    },
+    { "type": "direct", "tag": "direct" },
+    { "type": "block",  "tag": "block" }
+  ],
+  "route": {
+    "rules": [
+      { "domain": ["api.reviewbook.biz"], "outbound": "direct" },
+      { "ip_is_private": true, "outbound": "direct" }
+    ],
+    "auto_detect_interface": false,
+    "final": "proxy"
+  }
+}

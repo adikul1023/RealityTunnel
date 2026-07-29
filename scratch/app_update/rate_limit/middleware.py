@@ -1,0 +1,138 @@
+"""
+app/rate_limit/middleware.py — Request identification, IP extraction, and header injection middleware (Phase 3.3).
+Strictly decoupled from authentication and business logic.
+"""
+
+from __future__ import annotations
+
+import ipaddress
+import logging
+from functools import lru_cache
+from typing import Any, Callable
+
+from fastapi import Request, Response
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.types import ASGIApp
+
+from app.config import settings
+
+logger = logging.getLogger(__name__)
+
+
+@lru_cache
+def _parse_trusted_proxies(
+    raw: str,
+) -> tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...]:
+    """
+    Parse a comma-separated list of trusted reverse-proxy IPs/CIDRs into IP networks.
+    Invalid entries are skipped (logged) rather than raising, so a startup typo cannot
+    crash the application — it simply fails to trust that entry.
+    """
+    networks: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
+    for entry in raw.split(","):
+        candidate = entry.strip()
+        if not candidate:
+            continue
+        try:
+            networks.append(ipaddress.ip_network(candidate, strict=False))
+        except ValueError:
+            logger.warning("Ignoring invalid entry in trusted_proxy_ips: %r", candidate)
+    return tuple(networks)
+
+
+def _is_trusted_proxy(
+    ip_str: str,
+    trusted_networks: tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...],
+) -> bool:
+    if not trusted_networks:
+        return False
+    try:
+        ip_obj = ipaddress.ip_address(ip_str)
+    except ValueError:
+        return False
+    return any(ip_obj in network for network in trusted_networks)
+
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    """
+    Middleware responsible strictly for:
+    1. Client IP extraction (with configurable, allow-listed proxy trust for X-Forwarded-For / X-Real-IP).
+    2. Request identification binding.
+    3. Injecting X-RateLimit-* and Retry-After headers onto HTTP responses.
+
+    Do NOT perform authentication or rate limit evaluations here.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        super().__init__(app)
+
+    def _extract_client_ip(self, request: Request) -> str:
+        """
+        Extract the real client IP address.
+
+        SECURITY INVARIANT (Finding H-2):
+        X-Forwarded-For and X-Real-IP are client-controllable HTTP headers. Trusting them
+        unconditionally (or trusting the leftmost X-Forwarded-For hop, which is the
+        original — attacker-controlled — value in the standard append convention) allows
+        trivial per-IP rate-limit and IP-ban bypass by spoofing a different value on every
+        request. These headers are therefore ONLY consulted when:
+          1. settings.trust_proxy is True, AND
+          2. the immediate TCP peer (request.client.host) is itself an allow-listed
+             reverse proxy in settings.trusted_proxy_ips.
+        When trusted, the RIGHTMOST hop of X-Forwarded-For that is not itself a
+        known trusted proxy is used (standard reverse-proxy-chain parsing) — never the
+        leftmost, client-supplied hop.
+        """
+        peer_ip = (
+            request.client.host
+            if request.client and request.client.host
+            else "127.0.0.1"
+        )
+
+        if not getattr(settings, "trust_proxy", False):
+            return peer_ip
+
+        trusted_networks = _parse_trusted_proxies(
+            getattr(settings, "trusted_proxy_ips", "") or ""
+        )
+        if not _is_trusted_proxy(peer_ip, trusted_networks):
+            # The immediate peer is not an allow-listed proxy. Never trust forwarded
+            # headers from an untrusted source; use the actual socket peer address.
+            return peer_ip
+
+        x_forwarded_for = request.headers.get("x-forwarded-for")
+        if x_forwarded_for:
+            hops = [hop.strip() for hop in x_forwarded_for.split(",") if hop.strip()]
+            # Walk from the rightmost hop backwards, skipping hops that are themselves
+            # trusted proxies, and return the first hop that is not a trusted proxy —
+            # this is the address the last trusted proxy actually received the request from.
+            for hop in reversed(hops):
+                if not _is_trusted_proxy(hop, trusted_networks):
+                    return hop
+            # Every hop was itself a trusted proxy (e.g. an internal health-check chain);
+            # fall back to the leftmost (original) hop as a last resort.
+            if hops:
+                return hops[0]
+
+        x_real_ip = request.headers.get("x-real-ip")
+        if x_real_ip and x_real_ip.strip():
+            return x_real_ip.strip()
+
+        return peer_ip
+
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Any]
+    ) -> Response:
+        client_ip = self._extract_client_ip(request)
+        request.state.client_ip = client_ip
+
+        response = await call_next(request)
+
+        # Inject rate limit headers if generated by router checks
+        headers_to_inject = getattr(request.state, "rate_limit_headers", None)
+        if headers_to_inject and isinstance(headers_to_inject, dict):
+            for key, val in headers_to_inject.items():
+                if val is not None:
+                    response.headers[key] = str(val)
+
+        return response

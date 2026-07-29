@@ -1,0 +1,46 @@
+{
+  "log": { "level": "debug" },
+  "dns": {
+    "servers": [
+      { "type": "udp", "tag": "remote",          "server": "8.8.8.8", "server_port": 53 },
+      { "type": "udp", "tag": "remote-fallback", "server": "9.9.9.9", "server_port": 53 },
+      { "type": "local", "tag": "local" }
+    ],
+    "final": "remote",
+    "strategy": "ipv4_only"
+  },
+  "inbounds": [{
+    "type": "tun", "tag": "tun-in",
+    "interface_name": "singbox_tun",
+    "stack": "mixed",
+    "address": ["10.0.85.2/24", "fdfe:dcba:9876::1/126"],
+    "auto_route": true, "strict_route": true,
+    "sniff": true, "sniff_override_destination": true
+  }],
+  "outbounds": [
+    {
+      "type": "vless", "tag": "proxy",
+      "server": "<from-profile>", "server_port": 443,
+      "uuid": "<from-profile>",
+      "flow": "", "packet_encoding": "",
+      "tls": {
+        "enabled": true, "server_name": "dl.google.com",
+        "utls": { "enabled": true, "fingerprint": "<from-profile>" },
+        "reality": { "enabled": true, "public_key": "<from-profile>", "short_id": "<from-profile>" }
+      }
+    },
+    { "type": "direct", "tag": "direct" },
+    { "type": "block",  "tag": "block" }
+  ],
+  "route": {
+    "rules": [
+      { "port": [53], "action": "hijack-dns" },
+      { "ip_version": 6, "outbound": "block" },
+      { "ip_is_private": true, "outbound": "direct" },
+      { "ip_cidr": ["8.8.8.8/32", "9.9.9.9/32"], "outbound": "direct" }
+    ],
+    "auto_detect_interface": true,
+    "final": "proxy",
+    "default_domain_resolver": "remote"
+  }
+}

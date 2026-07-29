@@ -26,13 +26,20 @@ class AuthenticationManager(
         val model = android.os.Build.MODEL
         val clientVersion = com.overreality.vpn.BuildConfig.VERSION_NAME
         val device = DeviceRegistration(deviceId, model, "android", clientVersion, osVersion)
-        val result = apiClient.login(accountId, masterToken, device)
+        var result = apiClient.login(accountId, masterToken, device)
+        
+        if (result is com.overreality.vpn.models.LoginResult.Error && result.message == "This device has been deactivated.") {
+            secureStorage.clearDeviceGuid()
+            val newDeviceId = secureStorage.getDeviceGuid()
+            val newDevice = device.copy(deviceGuid = newDeviceId)
+            result = apiClient.login(accountId, masterToken, newDevice)
+        }
         
         if (result is com.overreality.vpn.models.LoginResult.Success) {
             tokenRepository.updateTokens(result.tokens)
             secureStorage.saveLastTrustedTimestamp(System.currentTimeMillis())
             
-            val config = apiClient.fetchClientConfig(result.tokens.accessToken)
+            val config = apiClient.fetchClientConfig(result.tokens.accessToken, secureStorage.getDeviceGuid())
             if (config != null) {
                 licenseRepository.updateLicenseBlob(config.licenseBlob)
                 secureStorage.saveVpnProfile(config.vpnProfile)
@@ -48,7 +55,7 @@ class AuthenticationManager(
             tokenRepository.updateTokens(tokens)
             secureStorage.saveLastTrustedTimestamp(System.currentTimeMillis())
             
-            val config = apiClient.fetchClientConfig(tokens.accessToken)
+            val config = apiClient.fetchClientConfig(tokens.accessToken, secureStorage.getDeviceGuid())
             if (config != null) {
                 licenseRepository.updateLicenseBlob(config.licenseBlob)
                 secureStorage.saveVpnProfile(config.vpnProfile)

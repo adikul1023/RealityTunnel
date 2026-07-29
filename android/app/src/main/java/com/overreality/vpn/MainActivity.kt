@@ -579,8 +579,7 @@ fun ProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
             
             Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0x1AFFFFFF))) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Plan: Premium", color = Color.White, fontWeight = FontWeight.Bold)
-                    Text("Devices: 1 / 5", color = Color.LightGray)
+                    Text("Status: Active", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
 

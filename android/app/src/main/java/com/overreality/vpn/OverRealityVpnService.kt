@@ -46,7 +46,7 @@ class OverRealityVpnService : VpnService(), PlatformInterface {
         val licenseRepository = LicenseRepository(secureStorage)
         val authManager = AuthenticationManager(apiClient, tokenRepository, secureStorage, licenseRepository)
         val clientLogger = ClientLogger(applicationContext)
-        DeviceHeartbeatService(apiClient, authManager, clientLogger) {
+        DeviceHeartbeatService(apiClient, authManager, secureStorage, clientLogger) {
             val intent = Intent(applicationContext, OverRealityVpnService::class.java).setAction(ACTION_STOP)
             startService(intent)
             
@@ -129,27 +129,26 @@ class OverRealityVpnService : VpnService(), PlatformInterface {
         while (addr4.hasNext()) {
             val cidr = addr4.next().toString()
             val slash = cidr.lastIndexOf('/')
-            builder.addAddress(cidr.substring(0, slash), cidr.substring(slash + 1).toInt())
-        }
-
-        // Add IPv4 routes from libbox. With inet4_route_address set in tun config, libbox
-        // will provide "0.0.0.0/1" and "128.0.0.0/1". Fall back to those same split-default
-        // routes if libbox provides none, to ensure all IPv4 traffic enters the tun.
-        var ipv4RouteAdded = false
-        val route4 = options.getInet4RouteAddress()
-        while (route4.hasNext()) {
-            val cidr = route4.next().toString()
-            val slash = cidr.lastIndexOf('/')
             if (slash >= 0) {
-                builder.addRoute(cidr.substring(0, slash), cidr.substring(slash + 1).toInt())
-                ipv4RouteAdded = true
-                Log.d(TAG, "openTun: route $cidr")
+                builder.addAddress(cidr.substring(0, slash), cidr.substring(slash + 1).toInt())
+            } else {
+                builder.addAddress(cidr, 32)
             }
         }
-        if (!ipv4RouteAdded) {
-            Log.w(TAG, "openTun: no IPv4 routes from libbox, adding split-default fallback")
-            builder.addRoute("0.0.0.0", 1)
-            builder.addRoute("128.0.0.0", 1)
+
+        // Always add split-default IPv4 routes to ensure all IPv4 traffic enters the tun
+        builder.addRoute("0.0.0.0", 1)
+        builder.addRoute("128.0.0.0", 1)
+
+        // Always add split-default IPv6 routes to ensure all IPv6 traffic enters the tun
+        try {
+            builder.addRoute("::", 1)
+            builder.addRoute("8000::", 1)
+            // Add a local IPv6 address to the interface so IPv6 routing works
+            builder.addAddress("fdfe:dcba:9876::1", 126)
+            Log.d(TAG, "openTun: IPv4 and IPv6 routes added successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to add IPv6 routes", e)
         }
 
         // Use real DNS servers instead of libbox's fake TUN address (10.0.85.3).
@@ -231,10 +230,64 @@ class OverRealityVpnService : VpnService(), PlatformInterface {
 
     @Throws(Exception::class)
     override fun getInterfaces(): NetworkInterfaceIterator {
-        return object : NetworkInterfaceIterator {
-            override fun hasNext(): Boolean = false
-            override fun next(): NetworkInterface {
-                throw NoSuchElementException("No interface snapshot implementation")
+        val cm = getSystemService(ConnectivityManager::class.java)
+        val activeNet = cm.activeNetwork
+        val linkProps = if (activeNet != null) cm.getLinkProperties(activeNet) else null
+        val ifaceName = linkProps?.interfaceName
+
+        if (ifaceName == null) {
+            Log.w(TAG, "getInterfaces: no active network interface found")
+            return object : NetworkInterfaceIterator {
+                override fun hasNext(): Boolean = false
+                override fun next(): NetworkInterface = throw NoSuchElementException()
+            }
+        }
+
+        try {
+            val javaIface = java.net.NetworkInterface.getByName(ifaceName)
+            if (javaIface == null) {
+                Log.w(TAG, "getInterfaces: getByName('$ifaceName') returned null")
+                return object : NetworkInterfaceIterator {
+                    override fun hasNext(): Boolean = false
+                    override fun next(): NetworkInterface = throw NoSuchElementException()
+                }
+            }
+
+            // Build the addresses StringIterator from link properties
+            val addrs = (linkProps?.linkAddresses ?: emptyList())
+                .map { it.toString() } // e.g. "172.25.255.176/21"
+            val addrIterator = object : StringIterator {
+                var pos = 0
+                override fun len(): Int = addrs.size
+                override fun hasNext(): Boolean = pos < addrs.size
+                override fun next(): String = addrs[pos++]
+            }
+
+            val iface = NetworkInterface()
+            iface.setName(ifaceName)
+            iface.setIndex(javaIface.index)
+            iface.setMTU(javaIface.mtu.coerceAtLeast(1500))
+            iface.setAddresses(addrIterator)
+            // net.FlagUp=1 | net.FlagRunning=64 | net.FlagMulticast=4096
+            val flags = 1 or 64 or (if (javaIface.supportsMulticast()) 4096 else 0)
+            iface.setFlags(flags)
+
+            Log.d(TAG, "getInterfaces: name=$ifaceName index=${javaIface.index} mtu=${javaIface.mtu} addrs=$addrs flags=$flags")
+
+            var yielded = false
+            return object : NetworkInterfaceIterator {
+                override fun hasNext(): Boolean = !yielded
+                override fun next(): NetworkInterface {
+                    if (yielded) throw NoSuchElementException()
+                    yielded = true
+                    return iface
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "getInterfaces: failed for '$ifaceName'", e)
+            return object : NetworkInterfaceIterator {
+                override fun hasNext(): Boolean = false
+                override fun next(): NetworkInterface = throw NoSuchElementException()
             }
         }
     }

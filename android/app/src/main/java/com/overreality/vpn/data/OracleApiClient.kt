@@ -41,7 +41,16 @@ class OracleApiClient {
         .build()
         
     private val gson = Gson()
-    private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
+
+    companion object {
+        private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
+    }
+
+    private data class TokenResponseDto(
+        @com.google.gson.annotations.SerializedName("access_token") val accessToken: String,
+        @com.google.gson.annotations.SerializedName("refresh_token") val refreshToken: String,
+        @com.google.gson.annotations.SerializedName("expires_in") val expiresIn: Long
+    )
 
     suspend fun login(accountId: String, masterToken: String, device: DeviceRegistration): com.overreality.vpn.models.LoginResult = withContext(Dispatchers.IO) {
         val json = """
@@ -60,7 +69,8 @@ class OracleApiClient {
             
         client.newCall(request).execute().use { response ->
             if (response.isSuccessful) {
-                val tokens = gson.fromJson(response.body?.string(), JwtTokens::class.java)
+                val dto = gson.fromJson(response.body?.string(), TokenResponseDto::class.java)
+                val tokens = JwtTokens(dto.accessToken, dto.refreshToken, System.currentTimeMillis() + (dto.expiresIn * 1000))
                 return@withContext com.overreality.vpn.models.LoginResult.Success(tokens)
             }
             
@@ -117,7 +127,8 @@ class OracleApiClient {
             
         client.newCall(request).execute().use { response ->
             if (response.isSuccessful) {
-                return@withContext gson.fromJson(response.body?.string(), JwtTokens::class.java)
+                val dto = gson.fromJson(response.body?.string(), TokenResponseDto::class.java)
+                return@withContext JwtTokens(dto.accessToken, dto.refreshToken, System.currentTimeMillis() + (dto.expiresIn * 1000))
             }
         }
         return@withContext null
@@ -154,12 +165,13 @@ class OracleApiClient {
             
         client.newCall(request).execute().use { response ->
             if (response.isSuccessful) {
-                return@withContext gson.fromJson(response.body?.string(), JwtTokens::class.java)
+                val dto = gson.fromJson(response.body?.string(), TokenResponseDto::class.java)
+                return@withContext JwtTokens(dto.accessToken, dto.refreshToken, System.currentTimeMillis() + (dto.expiresIn * 1000))
             }
             if (response.code == 401 || response.code == 403) {
                 val bodyStr = response.body?.string()
                 val errorBody = try { gson.fromJson(bodyStr, com.overreality.vpn.models.ApiErrorResponse::class.java) } catch (e: Exception) { null }
-                if (response.code == 403 || errorBody?.error == "DEVICE_REVOKED" || errorBody?.error == "REPLAY_DETECTED" || errorBody?.error == "INVALID_TOKEN") {
+                if (errorBody?.error == "DEVICE_REVOKED" || errorBody?.error == "REPLAY_DETECTED" || errorBody?.error == "INVALID_TOKEN") {
                     throw SecurityException("ReplayDetected")
                 }
             }
@@ -167,27 +179,47 @@ class OracleApiClient {
         return@withContext null
     }
 
-    suspend fun fetchClientConfig(accessToken: String): com.overreality.vpn.models.ClientConfigResponse? = withContext(Dispatchers.IO) {
-        val request = Request.Builder()
+    suspend fun fetchClientConfig(accessToken: String, deviceId: String?): com.overreality.vpn.models.ClientConfigResponse? = withContext(Dispatchers.IO) {
+        val requestBuilder = Request.Builder()
             .url("${BuildConfig.API_BASE_URL}/api/client/config")
             .header("Authorization", "Bearer $accessToken")
-            .build()
+        
+        if (deviceId != null) {
+            requestBuilder.header("X-Device-ID", deviceId)
+        }
             
+        val request = requestBuilder.build()
+
         client.newCall(request).execute().use { response ->
             if (response.isSuccessful) {
-                return@withContext gson.fromJson(response.body?.string(), com.overreality.vpn.models.ClientConfigResponse::class.java)
+                var bodyStr = response.body?.string()
+                // Temporary patch: Backend is returning old edge domain due to stale config after reboot
+                bodyStr = bodyStr?.replace("edge.stealthy.co.in", "edge.reviewbook.biz")
+                android.util.Log.d("OVERREALITY_API_JSON", "Got config: $bodyStr")
+                try {
+                    return@withContext gson.fromJson(bodyStr, com.overreality.vpn.models.ClientConfigResponse::class.java)
+                } catch (e: Exception) {
+                    android.util.Log.e("OVERREALITY_API", "Failed to parse config: $bodyStr", e)
+                }
+            } else {
+                android.util.Log.e("OVERREALITY_API", "Failed to fetch config, code: ${response.code}, body: ${response.body?.string()}")
             }
         }
         return@withContext null
     }
 
 
-    suspend fun fetchClientMe(accessToken: String): ClientMeResponse? = withContext(Dispatchers.IO) {
-        val request = Request.Builder()
+    suspend fun fetchClientMe(accessToken: String, deviceId: String?): ClientMeResponse? = withContext(Dispatchers.IO) {
+        val requestBuilder = Request.Builder()
             .url("${BuildConfig.API_BASE_URL}/api/client/me")
             .header("Authorization", "Bearer $accessToken")
-            .build()
             
+        if (deviceId != null) {
+            requestBuilder.header("X-Device-ID", deviceId)
+        }
+            
+        val request = requestBuilder.build()
+
         client.newCall(request).execute().use { response ->
             if (response.isSuccessful) {
                 return@withContext gson.fromJson(response.body?.string(), ClientMeResponse::class.java)
@@ -196,10 +228,11 @@ class OracleApiClient {
         return@withContext null
     }
 
-    suspend fun fetchDeviceStatus(accessToken: String): com.overreality.vpn.models.DeviceStatusResponse? = withContext(Dispatchers.IO) {
+    suspend fun fetchDeviceStatus(accessToken: String, deviceId: String): com.overreality.vpn.models.DeviceStatusResponse? = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url("${BuildConfig.API_BASE_URL}/api/devices/status")
             .header("Authorization", "Bearer $accessToken")
+            .header("X-Device-Guid", deviceId)
             .build()
             
         client.newCall(request).execute().use { response ->
@@ -209,7 +242,7 @@ class OracleApiClient {
             if (response.code == 401 || response.code == 403) {
                 val bodyStr = response.body?.string()
                 val errorBody = try { gson.fromJson(bodyStr, com.overreality.vpn.models.ApiErrorResponse::class.java) } catch (e: Exception) { null }
-                if (response.code == 403 || errorBody?.error == "DEVICE_REVOKED" || errorBody?.error == "REPLAY_DETECTED" || errorBody?.error == "INVALID_TOKEN") {
+                if (errorBody?.error == "DEVICE_REVOKED" || errorBody?.error == "REPLAY_DETECTED" || errorBody?.error == "INVALID_TOKEN") {
                     throw SecurityException("ReplayDetected")
                 }
             }

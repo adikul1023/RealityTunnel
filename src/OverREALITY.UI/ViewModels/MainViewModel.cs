@@ -69,11 +69,7 @@ public partial class MainViewModel : ObservableObject
         if (_sessionManager.CurrentSession != null)
         {
             var result = await _apiClient.GetAsync<OverREALITY.Shared.Api.DeviceStatusResponse>("/api/devices/status");
-            if (!result.IsSuccess && (result.Error?.Code == "Unauthorized" || result.Error?.Code == "Forbidden"))
-            {
-                await _authService.LogoutAsync();
-            }
-            else if (result.IsSuccess && result.Value != null && !result.Value.Active)
+            if (result.IsSuccess && result.Value != null && !result.Value.Active)
             {
                 await _authService.LogoutAsync();
             }

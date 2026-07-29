@@ -1,0 +1,11 @@
+R_DEF: Internal format may change without notice
+local
+color launcher_background
+drawable ic_launcher_foreground
+drawable ic_notification_vpn
+mipmap ic_launcher
+mipmap ic_launcher_round
+string app_name
+style Theme.OverREALITYAndroid
+xml backup_rules
+xml data_extraction_rules
