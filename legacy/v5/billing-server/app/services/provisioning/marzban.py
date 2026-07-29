@@ -182,7 +182,7 @@ class MarzbanProvisioningProvider(ProvisioningProvider):
         path = "/api/user"
         payload = {
             "username": username,
-            "proxies": {"vless": {"flow": "xtls-rprx-vision"}},
+            "proxies": {"vless": {"flow": ""}},
             "inbounds": {"vless": ["VLESS TCP REALITY"]},
             "expire": expire_at or 0,
             "data_limit": data_limit or 0,
