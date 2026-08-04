@@ -61,6 +61,9 @@ public partial class App : Application
 
         await _host.StartAsync();
 
+        // Fire and forget update checker
+        _ = CheckForUpdatesAsync();
+
         _notifyIcon = (TaskbarIcon)FindResource("NotifyIcon");
         _notifyIcon.DataContext = _host.Services.GetRequiredService<TrayViewModel>();
 
@@ -121,6 +124,49 @@ public partial class App : Application
             {
                 System.Diagnostics.Debug.WriteLine($"Failed to start helper: {ex.Message}");
             }
+        }
+    }
+
+    private async System.Threading.Tasks.Task CheckForUpdatesAsync()
+    {
+        try
+        {
+            using var client = new System.Net.Http.HttpClient();
+            client.DefaultRequestHeaders.Add("User-Agent", "OverREALITY-Update-Checker");
+            var response = await client.GetAsync("https://api.github.com/repos/adikul1023/RealityTunnel/releases/latest");
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var match = System.Text.RegularExpressions.Regex.Match(json, @"""tag_name"":\s*""([^""]+)""");
+                if (match.Success)
+                {
+                    var latestTag = match.Groups[1].Value; // e.g. "v1.1.4"
+                    var currentVersion = "v" + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3);
+                    if (!string.IsNullOrEmpty(latestTag) && latestTag != currentVersion)
+                    {
+                        var result = MessageBox.Show(
+                            $"A new version ({latestTag}) of Stealthy is available! Would you like to update now?",
+                            "Update Available",
+                            MessageBoxButton.YesNo,
+                            MessageBoxImage.Information);
+                        
+                        if (result == MessageBoxResult.Yes)
+                        {
+                            var downloadUrl = "https://github.com/adikul1023/RealityTunnel/releases/latest/download/setup.exe";
+                            var psi = new System.Diagnostics.ProcessStartInfo
+                            {
+                                FileName = downloadUrl,
+                                UseShellExecute = true
+                            };
+                            System.Diagnostics.Process.Start(psi);
+                        }
+                    }
+                }
+            }
+        }
+        catch (System.Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Update check failed: {ex.Message}");
         }
     }
 }

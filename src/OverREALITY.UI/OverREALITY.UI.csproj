@@ -21,6 +21,7 @@
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="1.1.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
     <PackageReference Include="MaterialDesignThemes" Version="4.9.0" />
+    <PackageReference Include="Obfuscar" Version="2.2.38" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
@@ -29,4 +30,13 @@
     </Content>
     <Resource Include="Assets\logo.ico" />
   </ItemGroup>
+
+  <Target Name="Obfuscate" AfterTargets="Publish" Condition="'$(Configuration)' == 'Release'">
+    <Exec Command="$(Obfuscar) obfuscar.xml" WorkingDirectory="$(ProjectDir)" />
+    <!-- Copy obfuscated files back to publish folder so Inno Setup picks them up -->
+    <ItemGroup>
+      <ObfuscatedFiles Include="bin\Release\net8.0-windows\win-x64\publish_obfuscated\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ObfuscatedFiles)" DestinationFolder="bin\Release\net8.0-windows\win-x64\publish" />
+  </Target>
 </Project>

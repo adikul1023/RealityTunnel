@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Obfuscator>
+  <Var name="InPath" value="bin\Release\net8.0-windows\win-x64\publish" />
+  <Var name="OutPath" value="bin\Release\net8.0-windows\win-x64\publish_obfuscated" />
+  <Var name="KeepPublicApi" value="false" />
+  <Var name="HidePrivateApi" value="true" />
+  <Var name="HideStrings" value="true" />
+  <Var name="RenameProperties" value="true" />
+  <Var name="RenameEvents" value="true" />
+  <Var name="RenameFields" value="true" />
+  <Var name="UseUnicodeNames" value="true" />
+  <Var name="OptimizeMethods" value="true" />
+  
+  <Module file="$(InPath)\OverREALITY.UI.dll" />
+  <Module file="$(InPath)\OverREALITY.Core.dll" />
+  <Module file="$(InPath)\OverREALITY.Infrastructure.dll" />
+  <Module file="$(InPath)\OverREALITY.Shared.dll" />
+  <Module file="$(InPath)\OverREALITY.Configuration.dll" />
+</Obfuscator>
