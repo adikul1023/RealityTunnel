@@ -4,6 +4,22 @@
     "output": "{{LOG_PATH}}",
     "timestamp": true
   },
+  "dns": {
+    "servers": [
+      {
+        "tag": "remote",
+        "address": "udp://8.8.8.8",
+        "detour": "direct"
+      },
+      {
+        "tag": "remote-fallback",
+        "address": "udp://9.9.9.9",
+        "detour": "direct"
+      }
+    ],
+    "final": "remote",
+    "strategy": "ipv4_only"
+  },
   "inbounds": [
     {{TUN_INBOUND}}
   ],
@@ -14,7 +30,7 @@
       "server": "{{SERVER_IP}}",
       "server_port": 443,
       "uuid": "{{VPN_UUID}}",
-      "flow": "xtls-rprx-vision",
+      "flow": "",
       "packet_encoding": "",
       "tls": {
         "enabled": true,
@@ -33,16 +49,33 @@
     {
       "type": "direct",
       "tag": "direct"
+    },
+    {
+      "type": "block",
+      "tag": "block"
     }
   ],
   "route": {
     "rules": [
       {
+        "port": [443],
+        "network": ["udp"],
+        "outbound": "block"
+      },
+      {
         "port": [53],
+        "outbound": "direct"
+      },
+      {
+        "domain": ["api.reviewbook.biz"],
+        "outbound": "direct"
+      },
+      {
+        "ip_is_private": true,
         "outbound": "direct"
       }
     ],
-    "final": "proxy",
-    "auto_detect_interface": false
+    "auto_detect_interface": false,
+    "final": "proxy"
   }
 }
