@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { Monitor, Smartphone, Download, CheckCircle2 } from 'lucide-react'
 import { Nav } from '@/components/nav'
 import { Footer } from '@/components/footer'
@@ -51,11 +52,29 @@ const androidPlatform = {
     'Select a server region and tap Connect.',
   ],
   downloads: [
-    { label: 'Android APK', sublabel: 'app-release.apk (55.6 MB)', href: 'https://github.com/adikul1023/RealityTunnel/releases/download/v1.1.3/app-release.apk' },
+    { label: 'Android APK', sublabel: 'app-release.apk (55.6 MB)', href: 'https://github.com/adikul1023/RealityTunnel/releases/latest/download/app-release.apk' },
   ],
 }
 
 export default function DownloadsPage() {
+  const [release, setRelease] = useState({ version: 'v1.1.2', apkSize: '55.6 MB', exeSize: '88.8 MB' })
+
+  useEffect(() => {
+    fetch('https://api.github.com/repos/adikul1023/RealityTunnel/releases/latest')
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.tag_name) return
+        const apk = data.assets?.find((a: any) => a.name === 'app-release.apk')
+        const exe = data.assets?.find((a: any) => a.name === 'setup.exe')
+        setRelease({
+          version: data.tag_name,
+          apkSize: apk ? (apk.size / 1048576).toFixed(1) + ' MB' : '55.6 MB',
+          exeSize: exe ? (exe.size / 1048576).toFixed(1) + ' MB' : '88.8 MB',
+        })
+      })
+      .catch(() => {})
+  }, [])
+
   return (
     <div className="flex min-h-screen flex-col">
       <Nav />
@@ -83,11 +102,11 @@ export default function DownloadsPage() {
                 <div className="flex items-center gap-2">
                   <h2 className="font-semibold text-foreground text-lg">{windowsPlatform.name}</h2>
                   <span className="text-xs rounded-full border border-border px-2 py-0.5 text-muted-foreground font-mono">
-                    {windowsPlatform.version}
+                    {release.version}
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {windowsPlatform.requirements} · {windowsPlatform.size}
+                  {windowsPlatform.requirements} · {release.exeSize}
                 </p>
               </div>
             </div>
@@ -98,7 +117,9 @@ export default function DownloadsPage() {
                 <div key={dl.label} className="flex items-center justify-between gap-4">
                   <div>
                     <p className="text-sm font-medium text-foreground">{dl.label}</p>
-                    <p className="text-xs text-muted-foreground">{dl.sublabel}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {dl.sublabel.includes('setup.exe') ? `setup.exe (${release.exeSize})` : dl.sublabel}
+                    </p>
                   </div>
                   <DownloadButton href={dl.href} label="Download" />
                 </div>
@@ -135,11 +156,11 @@ export default function DownloadsPage() {
                 <div className="flex items-center gap-2">
                   <h2 className="font-semibold text-foreground text-lg">{androidPlatform.name}</h2>
                   <span className="text-xs rounded-full border border-border px-2 py-0.5 text-muted-foreground font-mono">
-                    {androidPlatform.version}
+                    {release.version}
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {androidPlatform.requirements} · {androidPlatform.size}
+                  {androidPlatform.requirements} · {release.apkSize}
                 </p>
               </div>
             </div>
@@ -150,7 +171,9 @@ export default function DownloadsPage() {
                 <div key={dl.label} className="flex items-center justify-between gap-4">
                   <div>
                     <p className="text-sm font-medium text-foreground">{dl.label}</p>
-                    <p className="text-xs text-muted-foreground">{dl.sublabel}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {dl.sublabel.includes('app-release.apk') ? `app-release.apk (${release.apkSize})` : dl.sublabel}
+                    </p>
                   </div>
                   <DownloadButton href={dl.href} label="Download" />
                 </div>
