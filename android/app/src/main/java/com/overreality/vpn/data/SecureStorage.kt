@@ -13,13 +13,24 @@ class SecureStorage(context: Context) {
         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
         .build()
 
-    private val sharedPrefs = EncryptedSharedPreferences.create(
-        context,
-        "stealthy_secure_prefs",
-        masterKey,
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-    )
+    private val sharedPrefs = try {
+        EncryptedSharedPreferences.create(
+            context,
+            "stealthy_secure_prefs",
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    } catch (e: Exception) {
+        try { context.deleteSharedPreferences("stealthy_secure_prefs") } catch (ignored: Exception) {}
+        EncryptedSharedPreferences.create(
+            context,
+            "stealthy_secure_prefs",
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    }
 
     fun saveMasterToken(token: String) {
         val bytes = token.toByteArray(Charsets.UTF_8)

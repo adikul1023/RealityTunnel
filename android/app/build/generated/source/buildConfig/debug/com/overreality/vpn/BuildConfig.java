@@ -7,8 +7,8 @@ public final class BuildConfig {
   public static final boolean DEBUG = Boolean.parseBoolean("true");
   public static final String APPLICATION_ID = "com.overreality.vpn";
   public static final String BUILD_TYPE = "debug";
-  public static final int VERSION_CODE = 4;
-  public static final String VERSION_NAME = "1.1.2";
+  public static final int VERSION_CODE = 5;
+  public static final String VERSION_NAME = "1.1.4";
   // Field from build type: debug
   public static final String API_BASE_URL = "https://api.reviewbook.biz";
 }
