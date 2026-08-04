@@ -146,8 +146,35 @@ class MainActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     var currentNavState by remember { mutableStateOf(NavigationState.SPLASH) }
                     val uiState by VpnStatusStore.state.collectAsState()
+                    var showUpdateDialog by remember { mutableStateOf(false) }
+                    var latestVersion by remember { mutableStateOf("") }
+                    val updateUrl = "https://github.com/adikul1023/RealityTunnel/releases/latest/download/app-release.apk"
 
                     LaunchedEffect(Unit) {
+                        launch(kotlinx.coroutines.Dispatchers.IO) {
+                            try {
+                                val request = okhttp3.Request.Builder()
+                                    .url("https://api.github.com/repos/adikul1023/RealityTunnel/releases/latest")
+                                    .build()
+                                val client = okhttp3.OkHttpClient()
+                                client.newCall(request).execute().use { response ->
+                                    if (response.isSuccessful) {
+                                        val bodyStr = response.body?.string()
+                                        if (bodyStr != null) {
+                                            val data = org.json.JSONObject(bodyStr)
+                                            val tagName = data.optString("tag_name", "")
+                                            val currentVersion = "v" + BuildConfig.VERSION_NAME
+                                            if (tagName.isNotEmpty() && tagName != currentVersion) {
+                                                latestVersion = tagName
+                                                showUpdateDialog = true
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
                         clientLogger.log(com.overreality.vpn.logging.LogLevel.INFO, "STARTUP", "Starting explicit 6-step Android initialization sequence")
                         if (processActivationIntent(intent)) {
                             currentNavState = NavigationState.MAIN
@@ -242,6 +269,28 @@ class MainActivity : ComponentActivity() {
                                 onComplete = { currentNavState = NavigationState.MAIN }
                             )
                         }
+                    }
+
+                    if (showUpdateDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showUpdateDialog = false },
+                            title = { Text("Update Available") },
+                            text = { Text("A new version ($latestVersion) of Stealthy is available. Would you like to update now?") },
+                            confirmButton = {
+                                Button(onClick = {
+                                    showUpdateDialog = false
+                                    val updateIntent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(updateUrl))
+                                    startActivity(updateIntent)
+                                }) {
+                                    Text("Update Now")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showUpdateDialog = false }) {
+                                    Text("Later")
+                                }
+                            }
+                        )
                     }
                 }
             }
