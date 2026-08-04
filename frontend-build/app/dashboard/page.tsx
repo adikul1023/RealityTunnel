@@ -558,7 +558,7 @@ const DOWNLOAD_PLATFORMS = [
       'Select a server region and tap Connect.',
     ],
     downloads: [
-      { label: 'Android APK', sublabel: 'app-release.apk (55.6 MB)', href: 'https://github.com/adikul1023/RealityTunnel/releases/latest/download/app-release.apk' },
+      { label: 'Android APK', sublabel: 'app-release.apk (55.6 MB)', href: 'https://github.com/adikul1023/RealityTunnel/releases/download/v1.1.3/app-release.apk' },
     ],
   },
 ]
