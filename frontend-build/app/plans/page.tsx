@@ -10,8 +10,7 @@ const features = [
   { label: 'Anonymous master token login', basic: true, standard: true, quarterly: true },
   { label: 'Windows client', basic: true, standard: true, quarterly: true },
   { label: 'Android client', basic: true, standard: true, quarterly: true },
-  { label: 'Data included', basic: '80 GB / mo', standard: '100 GB / mo', quarterly: '250 GB / qtr' },
-  { label: 'Additional data rate', basic: '₹10/GB', standard: '₹10/GB', quarterly: '₹10/GB' },
+  { label: 'Data included', basic: 'Unlimited', standard: 'Unlimited', quarterly: 'Unlimited' },
   { label: 'Connected device slots', basic: '1 device', standard: '2 devices', quarterly: '1 device' },
   { label: 'India & global infrastructure', basic: true, standard: true, quarterly: true },
   { label: '2FA support', basic: true, standard: true, quarterly: true },
@@ -58,16 +57,12 @@ export default function PlansPage() {
               </div>
 
               <ul className="space-y-2.5 mb-8 flex-1">
-                {['80 GB data per month', '1 connected device slot', 'All platform clients', 'Encrypted private access', 'No activity logs'].map((f) => (
+                {['Unlimited data', '1 connected device slot', 'All platform clients', 'Encrypted private access', 'No activity logs'].map((f) => (
                   <li key={f} className="flex items-center gap-2 text-sm text-foreground">
                     <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
                     {f}
                   </li>
                 ))}
-                <li className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <CheckCircle2 className="h-4 w-4 text-muted/50 flex-shrink-0" />
-                  Additional data at ₹10/GB
-                </li>
               </ul>
 
               <PlanCta planId="basic" />
@@ -85,16 +80,12 @@ export default function PlansPage() {
               </div>
 
               <ul className="space-y-2.5 mb-8 flex-1">
-                {['100 GB data per month', '2 connected device slots', 'All platform clients', 'Encrypted private access', 'No activity logs'].map((f) => (
+                {['Unlimited data', '2 connected device slots', 'All platform clients', 'Encrypted private access', 'No activity logs'].map((f) => (
                   <li key={f} className="flex items-center gap-2 text-sm text-foreground">
                     <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
                     {f}
                   </li>
                 ))}
-                <li className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <CheckCircle2 className="h-4 w-4 text-muted/50 flex-shrink-0" />
-                  Additional data at ₹10/GB
-                </li>
               </ul>
 
               <PlanCta planId="standard" />
@@ -117,16 +108,12 @@ export default function PlansPage() {
               </div>
 
               <ul className="space-y-2.5 mb-8 flex-1">
-                {['250 GB data per 3 months', '1 connected device slot', 'All platform clients', 'Encrypted private access', 'No activity logs', 'Priority support'].map((f) => (
+                {['Unlimited data', '1 connected device slot', 'All platform clients', 'Encrypted private access', 'No activity logs', 'Priority support'].map((f) => (
                   <li key={f} className="flex items-center gap-2 text-sm text-foreground">
                     <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
                     {f}
                   </li>
                 ))}
-                <li className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <CheckCircle2 className="h-4 w-4 text-muted/50 flex-shrink-0" />
-                  Additional data at ₹10/GB
-                </li>
               </ul>
 
               <PlanCta planId="quarterly" variant="primary" />
@@ -177,7 +164,7 @@ export default function PlansPage() {
           </div>
 
           <p className="mt-6 text-xs text-center text-muted-foreground">
-            All prices include GST. Data add-ons are billed immediately.
+            All prices include GST. Unlimited data on all plans.
             See our{' '}
             <Link href="/legal/refund" className="text-primary hover:underline">
               Refund & Cancellation Policy
