@@ -24,7 +24,7 @@ class SecureStorage(context: Context) {
     fun saveMasterToken(token: String) {
         val bytes = token.toByteArray(Charsets.UTF_8)
         try {
-            sharedPrefs.edit().putString("master_token", token).apply()
+            sharedPrefs.edit().putString("master_token", token).commit()
         } finally {
             bytes.fill(0.toByte())
         }
@@ -40,7 +40,7 @@ class SecureStorage(context: Context) {
     private val gson = Gson()
 
     fun saveJwtTokens(tokens: JwtTokens) {
-        sharedPrefs.edit().putString("jwt_tokens", gson.toJson(tokens)).apply()
+        sharedPrefs.edit().putString("jwt_tokens", gson.toJson(tokens)).commit()
     }
 
     fun getJwtTokens(): JwtTokens? {
@@ -57,7 +57,7 @@ class SecureStorage(context: Context) {
     }
 
     fun saveLicenseBlob(blob: LicenseBlob) {
-        sharedPrefs.edit().putString("license_blob", gson.toJson(blob)).apply()
+        sharedPrefs.edit().putString("license_blob", gson.toJson(blob)).commit()
     }
 
     fun getLicenseBlob(): LicenseBlob? {
@@ -74,7 +74,7 @@ class SecureStorage(context: Context) {
     }
     
     fun saveVpnProfile(profile: VpnProfileDto) {
-        sharedPrefs.edit().putString("vpn_profile", gson.toJson(profile)).apply()
+        sharedPrefs.edit().putString("vpn_profile", gson.toJson(profile)).commit()
     }
 
     fun getVpnProfile(): VpnProfileDto? {
@@ -91,7 +91,7 @@ class SecureStorage(context: Context) {
     }
 
     fun saveLastTrustedTimestamp(timestampMs: Long) {
-        sharedPrefs.edit().putLong("last_trusted_timestamp", timestampMs).apply()
+        sharedPrefs.edit().putLong("last_trusted_timestamp", timestampMs).commit()
     }
 
     fun getLastTrustedTimestamp(): Long? {
@@ -103,16 +103,16 @@ class SecureStorage(context: Context) {
         var guid = sharedPrefs.getString("device_guid", null)
         if (guid == null) {
             guid = java.util.UUID.randomUUID().toString()
-            sharedPrefs.edit().putString("device_guid", guid).apply()
+            sharedPrefs.edit().putString("device_guid", guid).commit()
         }
         return guid
     }
 
     fun clearDeviceGuid() {
-        sharedPrefs.edit().remove("device_guid").apply()
+        sharedPrefs.edit().remove("device_guid").commit()
     }
 
     fun clearAll() {
-        sharedPrefs.edit().clear().apply()
+        sharedPrefs.edit().clear().commit()
     }
 }
