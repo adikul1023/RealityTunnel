@@ -17,8 +17,8 @@ class LicenseRepository(private val storage: SecureStorage) {
         val now = System.currentTimeMillis()
         val lastTrusted = storage.getLastTrustedTimestamp()
         
-        // Clock rollback detected
-        if (lastTrusted != null && now < lastTrusted) {
+        // Clock rollback detected (allow 1 hour drift for NTP syncs)
+        if (lastTrusted != null && now < lastTrusted - (60L * 60 * 1000)) {
             return false
         }
         

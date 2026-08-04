@@ -170,8 +170,8 @@ class OracleApiClient {
             }
             if (response.code == 401 || response.code == 403) {
                 val bodyStr = response.body?.string()
-                val errorBody = try { gson.fromJson(bodyStr, com.overreality.vpn.models.ApiErrorResponse::class.java) } catch (e: Exception) { null }
-                if (errorBody?.error == "DEVICE_REVOKED" || errorBody?.error == "REPLAY_DETECTED" || errorBody?.error == "INVALID_TOKEN") {
+                val code = try { org.json.JSONObject(bodyStr ?: "").getString("code") } catch (e: Exception) { null }
+                if (code == "DEVICE_REVOKED" || code == "REPLAY_DETECTED" || code == "INVALID_TOKEN") {
                     throw SecurityException("ReplayDetected")
                 }
             }
@@ -242,7 +242,8 @@ class OracleApiClient {
             if (response.code == 401 || response.code == 403) {
                 val bodyStr = response.body?.string()
                 val errorBody = try { gson.fromJson(bodyStr, com.overreality.vpn.models.ApiErrorResponse::class.java) } catch (e: Exception) { null }
-                if (errorBody?.error == "DEVICE_REVOKED" || errorBody?.error == "REPLAY_DETECTED" || errorBody?.error == "INVALID_TOKEN") {
+                val errCode = errorBody?.error ?: errorBody?.code
+                if (errCode == "DEVICE_REVOKED" || errCode == "REPLAY_DETECTED" || errCode == "INVALID_TOKEN") {
                     throw SecurityException("ReplayDetected")
                 }
             }

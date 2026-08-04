@@ -396,8 +396,7 @@ class OverRealityVpnService : VpnService(), PlatformInterface {
             logWithMetadata("startVpn: calling engine.start()")
             engine.start(serverIp)
             logWithMetadata("startVpn: engine.start() completed successfully")
-            val msg = if (serverIp.isBlank()) "Connected (${engine.name})"
-            else "Connected via $serverIp"
+            val msg = "Connected"
             VpnStatusStore.setState(VpnConnectionState.CONNECTED, msg)
             updateForegroundNotification(msg, connected = true)
 

@@ -10,7 +10,13 @@ class TokenRepository(private val storage: SecureStorage) {
 
     private var currentTokens: JwtTokens? = storage.getJwtTokens()
 
-    fun getCurrentTokens(): JwtTokens? = currentTokens
+    fun getCurrentTokens(): JwtTokens? {
+        val mem = currentTokens
+        if (mem == null || Instant.now().toEpochMilli() >= mem.expiresAt - 5000) {
+            currentTokens = storage.getJwtTokens()
+        }
+        return currentTokens
+    }
 
     fun getCurrentState(): SessionState {
         val tokens = currentTokens ?: return SessionState.OFFLINE

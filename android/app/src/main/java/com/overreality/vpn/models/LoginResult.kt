@@ -33,7 +33,8 @@ data class Verify2FaRequest(
 
 @androidx.annotation.Keep
 data class ApiErrorResponse(
-    val error: String,
+    val error: String?,
+    val code: String?,
     @SerializedName("current_devices") val currentDevices: Int?,
     @SerializedName("max_devices") val maxDevices: Int?,
     @SerializedName("manage_devices_url") val manageDevicesUrl: String?,

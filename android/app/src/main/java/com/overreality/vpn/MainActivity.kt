@@ -518,7 +518,7 @@ fun LoginScreen(
             text = { Text("You have reached your device limit (${details.currentDevices} / ${details.maxDevices}). Please remove a device to continue.") },
             confirmButton = {
                 TextButton(onClick = {
-                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(details.manageDevicesUrl))
+                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://stealthy.co.in/dashboard"))
                     context.startActivity(intent)
                     showDeviceLimitDialog = null
                 }) { Text("Manage Devices") }
@@ -536,7 +536,7 @@ fun LoginScreen(
             text = { Text("Your VPN subscription has expired. Please renew to continue using the service.") },
             confirmButton = {
                 TextButton(onClick = {
-                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://stealthy.co.in/account/billing"))
+                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://stealthy.co.in/dashboard"))
                     context.startActivity(intent)
                     showSubscriptionExpired = false
                 }) { Text("Renew") }
@@ -585,7 +585,7 @@ fun ProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
 
             Button(
                 onClick = {
-                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://stealthy.co.in/account"))
+                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://stealthy.co.in/dashboard"))
                     context.startActivity(intent)
                 },
                 modifier = Modifier.fillMaxWidth()
@@ -931,11 +931,7 @@ private fun HomeScreen(
             fontWeight = FontWeight.Bold,
         )
         Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = activeProfile?.server_ip.orEmpty(),
-            color = Color(0xFFB8C3FF),
-            style = MaterialTheme.typography.bodyMedium,
-        )
+
         Spacer(modifier = Modifier.height(32.dp))
         Button(
             onClick = onPrimaryAction,
