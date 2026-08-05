@@ -152,7 +152,7 @@ public partial class App : Application
                         
                         if (result == MessageBoxResult.Yes)
                         {
-                            var downloadUrl = "https://github.com/adikul1023/RealityTunnel/releases/latest/download/setup.exe";
+                            var downloadUrl = "https://github.com/adikul1023/StealthyDownloads/releases/latest/download/setup.exe";
                             var psi = new System.Diagnostics.ProcessStartInfo
                             {
                                 FileName = downloadUrl,

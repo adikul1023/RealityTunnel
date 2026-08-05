@@ -538,7 +538,7 @@ const DOWNLOAD_PLATFORMS = [
       'Troubleshooting: If it fails to connect or the exit IP shows as "?", open Task Manager, kill "Reality Tunnel" and "Reality Tunnel Helper", then try again.',
     ],
     downloads: [
-      { label: 'Windows Installer', sublabel: 'setup.exe (88.8 MB)', href: 'https://github.com/adikul1023/RealityTunnel/releases/latest/download/setup.exe' },
+      { label: 'Windows Installer', sublabel: 'setup.exe (88.8 MB)', href: 'https://github.com/adikul1023/StealthyDownloads/releases/latest/download/setup.exe' },
     ],
   },
   {
@@ -558,7 +558,7 @@ const DOWNLOAD_PLATFORMS = [
       'Select a server region and tap Connect.',
     ],
     downloads: [
-      { label: 'Android APK', sublabel: 'app-release.apk (55.6 MB)', href: 'https://github.com/adikul1023/RealityTunnel/releases/latest/download/app-release.apk' },
+      { label: 'Android APK', sublabel: 'app-release.apk (55.6 MB)', href: 'https://github.com/adikul1023/StealthyDownloads/releases/latest/download/app-release.apk' },
     ],
   },
 ]

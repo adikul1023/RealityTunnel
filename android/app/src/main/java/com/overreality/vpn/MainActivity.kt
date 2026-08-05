@@ -148,7 +148,7 @@ class MainActivity : ComponentActivity() {
                     val uiState by VpnStatusStore.state.collectAsState()
                     var showUpdateDialog by remember { mutableStateOf(false) }
                     var latestVersion by remember { mutableStateOf("") }
-                    val updateUrl = "https://github.com/adikul1023/RealityTunnel/releases/latest/download/app-release.apk"
+                    val updateUrl = "https://github.com/adikul1023/StealthyDownloads/releases/latest/download/app-release.apk"
 
                     LaunchedEffect(Unit) {
                         launch(kotlinx.coroutines.Dispatchers.IO) {

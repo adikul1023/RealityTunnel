@@ -71,7 +71,7 @@ Server configuration is fetched dynamically at runtime from the backend. The cli
 
 ## Installation
 
-Download `setup.exe` from the [Releases](https://github.com/adikul1023/RealityTunnel/releases) page.
+Download `setup.exe` from the [Releases](https://github.com/adikul1023/StealthyDownloads/releases) page.
 
 The installer:
 1. Extracts all files to `C:\Program Files\Stealthy VPN`
