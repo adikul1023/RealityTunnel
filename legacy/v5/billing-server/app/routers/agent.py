@@ -16,8 +16,6 @@ from app.routers.agent_models import (
     SessionResponse,
     ServerStatus,
     ServerCommand,
-    ServerInfo,
-    ServerConfig,
     Traffic
 )
 
@@ -88,21 +86,3 @@ async def update_status(
     """Update server telemetry and receive commands/config changes"""
     return await service.update_status(status)
 
-
-@router.post("/configure", response_model=ServerConfig)
-async def configure(
-    info: ServerInfo,
-    service: VPNHoodSessionService = Depends(get_vpnhood_session_service)
-):
-    """Configure the VPNHood server"""
-    return await service.configure(info)
-
-
-@router.get("/acme/http01_key_authorization")
-async def get_acme_http01_key_authorization(
-    token: str = Query(...)
-):
-    """Provide ACME challenge answers if the server acts as an ACME agent"""
-    # Just returning a 404 for now, as this isn't strictly needed for Phase 2 MVP
-    from fastapi import HTTPException
-    raise HTTPException(status_code=404, detail="Not Found")

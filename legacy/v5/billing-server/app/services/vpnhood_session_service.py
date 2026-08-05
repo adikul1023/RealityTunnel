@@ -9,8 +9,6 @@ from app.routers.agent_models import (
     SessionResponse,
     ServerStatus,
     ServerCommand,
-    ServerInfo,
-    ServerConfig,
     Traffic
 )
 
@@ -18,9 +16,7 @@ logger = logging.getLogger(__name__)
 
 class VPNHoodSessionService:
     def __init__(self):
-        # In-memory session store for now
-        self._sessions: Dict[int, SessionResponseEx] = {}
-        self._next_session_id = 1
+        pass
 
     async def create_session(self, request: SessionRequestEx) -> SessionResponseEx:
         logger.info(f"VPNHood Agent: Creating session for token {request.token_id}")
@@ -34,8 +30,8 @@ class VPNHoodSessionService:
                 protocolVersion=request.protocol_version,
             )
             
-        session_id = self._next_session_id
-        self._next_session_id += 1
+        # We generate a deterministic session ID based on the token for statelessness
+        session_id = hash(request.token_id) % (2**31 - 1)
         
         response = SessionResponseEx(
             errorCode=SessionErrorCode.Success,
@@ -44,29 +40,27 @@ class VPNHoodSessionService:
             protocolVersion=request.protocol_version,
             createdTime=datetime.now(timezone.utc)
         )
-        self._sessions[session_id] = response
         return response
 
     async def get_session(self, session_id: int) -> SessionResponseEx:
         logger.info(f"VPNHood Agent: Getting session {session_id}")
-        if session_id in self._sessions:
-            return self._sessions[session_id]
-            
+        # In a stateless model, if VPNHood asks about a session, we can just say it's valid
+        # or we could verify it against DB if we were persisting them. For now, assume success.
         return SessionResponseEx(
-            errorCode=SessionErrorCode.SessionClosed,
+            errorCode=SessionErrorCode.Success,
             sessionId=session_id,
             sessionKey="",
             protocolVersion=0
         )
 
     async def get_all_sessions(self) -> List[SessionResponseEx]:
-        return list(self._sessions.values())
+        # We don't track live sessions, so return empty list to let VPNHood manage its own
+        return []
 
     async def add_usage(self, session_id: int, traffic: Traffic, close_session: bool) -> SessionResponse:
         logger.info(f"VPNHood Agent: Adding usage to session {session_id} (close={close_session})")
-        
-        if close_session and session_id in self._sessions:
-            del self._sessions[session_id]
+        # We don't track state, so we just acknowledge the usage report.
+        # In future, this usage will be persisted to the database.
             
         return SessionResponse(
             errorCode=SessionErrorCode.Success
@@ -83,8 +77,3 @@ class VPNHoodSessionService:
     async def update_status(self, status: ServerStatus) -> ServerCommand:
         # Keep track of VPNHood server status if necessary
         return ServerCommand(configCode=status.config_code or "default_config")
-
-    async def configure(self, info: ServerInfo) -> ServerConfig:
-        logger.info(f"VPNHood Agent: Server configuration request for {info.machine_name}")
-        return ServerConfig()
-

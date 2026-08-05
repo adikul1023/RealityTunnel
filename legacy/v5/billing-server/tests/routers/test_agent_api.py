@@ -53,7 +53,7 @@ async def test_vpnhood_agent_create_session(async_client: AsyncClient):
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
     assert data["errorCode"] == 0 # Success
-    assert data["sessionId"] == 1
+    assert isinstance(data["sessionId"], int)
     assert "sessionKey" in data
     assert data["protocolVersion"] == 1
 
