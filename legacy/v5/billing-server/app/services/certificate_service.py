@@ -62,11 +62,31 @@ class CertificateService:
             common_name = attr.value
             break
 
+        # Extract Subject Alternative Name (SAN)
+        san_list = []
+        try:
+            san_ext = certificate.extensions.get_extension_for_class(x509.SubjectAlternativeName)
+            san_list = [name.value for name in san_ext.value]
+        except x509.ExtensionNotFound:
+            pass
+            
+        # 4. Validate SAN (Crucial for identity verification)
+        if not san_list:
+            raise InvalidCertificateError("Certificate must contain at least one Subject Alternative Name (SAN).")
+            
+        for san in san_ext.value:
+            if not isinstance(san, (x509.DNSName, x509.IPAddress)):
+                raise InvalidCertificateError("SAN must contain only DNS names or IP addresses.")
+            # Check for wildcards
+            if isinstance(san, x509.DNSName) and san.value.startswith("*"):
+                raise InvalidCertificateError("Wildcard SANs are not permitted for agent nodes.")
+                
         fingerprint = certificate.fingerprint(hashlib.sha256()).hex()
 
         return {
             "fingerprint": fingerprint,
             "common_name": common_name,
+            "subject_alternative_names": san_list,
             "algorithm": algorithm,
             "expires_at": certificate.not_valid_after,
         }

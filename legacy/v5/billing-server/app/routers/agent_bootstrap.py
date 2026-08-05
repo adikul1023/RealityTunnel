@@ -54,30 +54,26 @@ async def bootstrap_node(
     """
     Exchanges a one-time bootstrap token for a long-term agent secret.
     """
-    # 1. Verify Bootstrap Token
-    # Since we use Argon2, we must query all unused, unexpired tokens and verify.
-    # In production, we'd prefix the token with an ID to avoid full table scans.
-    # For now, we will do a simple scan or assume token contains ID.
-    # Let's assume the client passes the raw token, and we hash it (if it was SHA256) 
-    # or we just use Argon2. Wait, Argon2 takes time.
-    # To keep it simple and robust, let's assume the token is just a secure random string and we check it.
-    
-    # Actually, let's find the token. If we assume token_hash is actually just a SHA-256 for fast lookup:
+    # 1. Verify Bootstrap Token Atomically
+    # Using UPDATE ... WHERE used_at IS NULL RETURNING id prevents race conditions.
     import hashlib
+    from sqlalchemy import update
+    
     token_hash = hashlib.sha256(bootstrap_token.encode('utf-8')).hexdigest()
     
     result = await db.execute(
-        select(AgentBootstrapToken)
+        update(AgentBootstrapToken)
         .where(AgentBootstrapToken.token_hash == token_hash)
         .where(AgentBootstrapToken.used_at.is_(None))
+        .where(AgentBootstrapToken.expires_at > datetime.utcnow())
+        .values(used_at=datetime.utcnow())
+        .returning(AgentBootstrapToken)
     )
     token_obj = result.scalars().first()
     
-    if not token_obj or token_obj.expires_at < datetime.utcnow():
-        raise HTTPException(status_code=401, detail="Invalid or expired bootstrap token.")
-        
-    # Mark token used
-    token_obj.used_at = datetime.utcnow()
+    if not token_obj:
+        raise HTTPException(status_code=401, detail="Invalid, expired, or already used bootstrap token.")
+
     
     # 2. Generate new AgentNode and AgentSecret
     raw_agent_secret = base64.urlsafe_b64encode(os.urandom(32)).decode('ascii').rstrip("=")

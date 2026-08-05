@@ -23,18 +23,23 @@ class VPNHoodSessionService:
 
     async def configure(self, server_info: ServerInfo, node: 'AgentNode', db: 'AsyncSession') -> ServerConfig:
         from app.models.agent_certificate import AgentCertificate
-        from sqlalchemy import select
+        from sqlalchemy import select, case
         from app.services.crypto_service import crypto_service
+        
+        # Priority: pending=0, active=1
+        status_priority = case(
+            (AgentCertificate.status == "pending", 0),
+            (AgentCertificate.status == "active", 1),
+            else_=2
+        )
         
         # Get pending cert if exists, otherwise active
         result = await db.execute(
             select(AgentCertificate)
             .where(AgentCertificate.node_id == node.id)
             .where(AgentCertificate.status.in_(["pending", "active"]))
-            .order_by(AgentCertificate.status.desc(), AgentCertificate.rotation_version.desc())
+            .order_by(status_priority, AgentCertificate.rotation_version.desc())
         )
-        # order_by status desc means 'pending' comes before 'active' alphabetically!
-        # wait, 'p' > 'a', so pending will be first.
         cert = result.scalars().first()
         
         certificates_payload = []
@@ -49,8 +54,8 @@ class VPNHoodSessionService:
             # Wait, CertificateData in VPNHood uses byte[] which JSON serializes to base64.
             import base64
             certificates_payload.append({
-                "commonName": cert.common_name or "VPN Node",
-                "rawData": base64.b64encode(decrypted_pfx).decode('ascii')
+                "CommonName": cert.common_name or "VPN Node",
+                "RawData": base64.b64encode(decrypted_pfx).decode('ascii')
             })
             
         machine_name = server_info.machine_name or "unknown"
@@ -129,8 +134,8 @@ class VPNHoodSessionService:
         from sqlalchemy import select, update
         
         # Two-phase certificate commit
-        # If there's no ConfigError and we have a pending cert, promote it to active.
-        if not status.configError:
+        # If there's no config_error and we have a pending cert, promote it to active.
+        if not status.config_error:
             # Promote pending to active, retire active
             result = await db.execute(
                 select(AgentCertificate).where(AgentCertificate.node_id == node.id)
