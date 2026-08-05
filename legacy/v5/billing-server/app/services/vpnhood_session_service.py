@@ -1,6 +1,7 @@
 import logging
 from typing import Dict, List, Optional
 from datetime import datetime, timezone
+from app.config import settings
 from app.routers.agent_models import (
     SessionRequestEx,
     SessionResponseEx,
@@ -9,14 +10,61 @@ from app.routers.agent_models import (
     SessionResponse,
     ServerStatus,
     ServerCommand,
-    Traffic
+    Traffic,
+    ServerInfo,
+    ServerConfig
 )
 
 logger = logging.getLogger(__name__)
 
 class VPNHoodSessionService:
     def __init__(self):
-        pass
+        self._registered_servers = set()
+
+    async def configure(self, server_info: ServerInfo, node: 'AgentNode', db: 'AsyncSession') -> ServerConfig:
+        from app.models.agent_certificate import AgentCertificate
+        from sqlalchemy import select
+        from app.services.crypto_service import crypto_service
+        
+        # Get pending cert if exists, otherwise active
+        result = await db.execute(
+            select(AgentCertificate)
+            .where(AgentCertificate.node_id == node.id)
+            .where(AgentCertificate.status.in_(["pending", "active"]))
+            .order_by(AgentCertificate.status.desc(), AgentCertificate.rotation_version.desc())
+        )
+        # order_by status desc means 'pending' comes before 'active' alphabetically!
+        # wait, 'p' > 'a', so pending will be first.
+        cert = result.scalars().first()
+        
+        certificates_payload = []
+        if cert:
+            decrypted_pfx = crypto_service.decrypt_blob(
+                key_version=cert.crypto_key_version,
+                crypto_nonce=cert.crypto_nonce,
+                crypto_tag=cert.crypto_tag,
+                encrypted_blob=cert.encrypted_pfx
+            )
+            # Encode byte array as base64 string for JSON transmission
+            # Wait, CertificateData in VPNHood uses byte[] which JSON serializes to base64.
+            import base64
+            certificates_payload.append({
+                "commonName": cert.common_name or "VPN Node",
+                "rawData": base64.b64encode(decrypted_pfx).decode('ascii')
+            })
+            
+        machine_name = server_info.machine_name or "unknown"
+        logger.info(
+            f"VPNHood node configure - "
+            f"Machine: {machine_name}, "
+            f"ConfigRev: {node.config_revision}, "
+            f"Cert: {cert.rotation_version if cert else 'None'}"
+        )
+        
+        return ServerConfig(
+            configCode=str(node.config_revision),
+            certificates=certificates_payload
+        )
 
     async def create_session(self, request: SessionRequestEx) -> SessionResponseEx:
         logger.info(f"VPNHood Agent: Creating session for token {request.token_id}")
@@ -76,6 +124,28 @@ class VPNHoodSessionService:
             result[str(usage.session_id)] = SessionResponse(errorCode=SessionErrorCode.Success)
         return result
 
-    async def update_status(self, status: ServerStatus) -> ServerCommand:
-        # Keep track of VPNHood server status if necessary
-        return ServerCommand(configCode=status.config_code or "default_config")
+    async def update_status(self, status: ServerStatus, node: 'AgentNode', db: 'AsyncSession') -> ServerCommand:
+        from app.models.agent_certificate import AgentCertificate
+        from sqlalchemy import select, update
+        
+        # Two-phase certificate commit
+        # If there's no ConfigError and we have a pending cert, promote it to active.
+        if not status.configError:
+            # Promote pending to active, retire active
+            result = await db.execute(
+                select(AgentCertificate).where(AgentCertificate.node_id == node.id)
+            )
+            certs = result.scalars().all()
+            
+            pending_certs = [c for c in certs if c.status == "pending"]
+            active_certs = [c for c in certs if c.status == "active"]
+            
+            if pending_certs:
+                for c in active_certs:
+                    c.status = "retired"
+                for c in pending_certs:
+                    c.status = "active"
+                await db.commit()
+                logger.info(f"Node {node.id} promoted pending certificate to active.")
+
+        return ServerCommand(configCode=str(node.config_revision))

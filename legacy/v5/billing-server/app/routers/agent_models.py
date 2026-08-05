@@ -169,3 +169,48 @@ class ServerCommand(BaseModel):
     session_responses: Dict[str, SessionResponse] = Field(default_factory=dict, alias="sessionResponses")
 
 
+class ServerInfo(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    version: Optional[str] = Field(None)
+    environment_version: Optional[str] = Field(None, alias="environmentVersion")
+    private_ip_addresses: Optional[List[str]] = Field(None, alias="privateIpAddresses")
+    public_ip_addresses: Optional[List[str]] = Field(None, alias="publicIpAddresses")
+    status: Optional[ServerStatus] = Field(None)
+    os_info: Optional[str] = Field(None, alias="osInfo")
+    os_version: Optional[str] = Field(None, alias="osVersion")
+    total_memory: Optional[int] = Field(None, alias="totalMemory")
+    machine_name: Optional[str] = Field(None, alias="machineName")
+    logical_core_count: Optional[int] = Field(None, alias="logicalCoreCount")
+    free_udp_port_v4: Optional[int] = Field(None, alias="freeUdpPortV4")
+    free_udp_port_v6: Optional[int] = Field(None, alias="freeUdpPortV6")
+    free_quic_port_v4: Optional[int] = Field(None, alias="freeQuicPortV4")
+    free_quic_port_v6: Optional[int] = Field(None, alias="freeQuicPortV6")
+    network_interface_names: Optional[List[str]] = Field(None, alias="networkInterfaceNames")
+    is_restarted: Optional[bool] = Field(None, alias="isRestarted")
+
+
+class TrackingOptions(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class SessionOptions(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class NetFilterOptions(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+class CertificateData(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    common_name: str = Field(..., alias="CommonName")
+    raw_data: str = Field(..., alias="RawData")  # base64 encoded byte array
+
+class ServerConfig(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    tracking_options: TrackingOptions = Field(default_factory=TrackingOptions, alias="Tracking")
+    session_options: SessionOptions = Field(default_factory=SessionOptions, alias="Session")
+    net_filter_options: NetFilterOptions = Field(default_factory=NetFilterOptions, alias="NetFilter")
+    config_code: Optional[str] = Field(None, alias="configCode")
+    certificates: Optional[List[CertificateData]] = Field(default=None, alias="Certificates")

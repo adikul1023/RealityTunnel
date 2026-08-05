@@ -14,6 +14,12 @@ class RepositoryError(Exception):
         self.detail = detail
 
 
+class InvalidCertificateError(RepositoryError):
+    """Raised when an invalid certificate is provided."""
+    def __init__(self, message: str = "Invalid certificate provided", detail: Any = None):
+        super().__init__(message, detail)
+
+
 class EntityNotFoundError(RepositoryError):
     """Raised when a queried entity does not exist in the persistence layer."""
     pass

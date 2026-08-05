@@ -560,3 +560,53 @@ async def verify_agent_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
     return True
+
+
+async def verify_agent_node(
+    credentials: HTTPAuthorizationCredentials | None = Depends(agent_oauth2_scheme),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Authenticates a VPNHood node using its per-node Bearer token (<node_id>.<secret>).
+    Falls back to the global agent_secret for legacy/bootstrap clients.
+    Returns the AgentNode ORM object on success, or None for legacy clients.
+    """
+    from app.models.agent_node import AgentNode
+    import argon2
+    from sqlalchemy import select
+
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing Authorization header",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token = credentials.credentials
+
+    # Legacy fallback: global agent_secret (for the old verify_agent_token path)
+    if "." not in token:
+        if token == settings.agent_secret.get_secret_value():
+            return None
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Agent token format")
+
+    node_id_str, raw_secret = token.split(".", 1)
+
+    try:
+        node_id = uuid.UUID(node_id_str)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid node ID format")
+
+    result = await db.execute(select(AgentNode).where(AgentNode.id == node_id))
+    node = result.scalars().first()
+
+    if not node or node.status != "active":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Node not found or inactive")
+
+    ph = argon2.PasswordHasher()
+    try:
+        ph.verify(node.agent_secret_hash, raw_secret)
+    except argon2.exceptions.VerifyMismatchError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Agent token")
+
+    return node

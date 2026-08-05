@@ -76,7 +76,7 @@ class Settings(BaseSettings):
         "https://stealthy.co.in",
         "https://www.stealthy.co.in",
     ]  # [Public Config]
-
+    agent_base_url: str = "http://127.0.0.1:8080/api/agent"  # [Public Config]
     # ── Security [Security Secret / Public Config] ───────────────────────────
     # secret_key is reserved for future HMAC-based operations (e.g., cookie signing).
     # In production, this MUST be overridden via environment variable SECRET_KEY.
@@ -87,6 +87,7 @@ class Settings(BaseSettings):
     admin_jwt_audience: str = "RealityTunnel Admin Panel"  # [Public Config]
     ipc_secret_key: SecretStr = SecretStr("DEV_IPC_SECRET")  # [Security Secret]
     agent_secret: SecretStr = SecretStr("DEV_AGENT_SECRET")  # [Security Secret]
+    vpnhood_config_code: str = "lab-v1"  # [Internal Config] Policy version trigger for VPNHood
 
     # ── VPN Provisioning (Marzban Integration) [Internal Config / Secret] ────
     marzban_base_url: str = "http://marzban:8000"  # [Internal Config / Public ID]
