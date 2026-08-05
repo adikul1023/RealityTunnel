@@ -30,8 +30,10 @@ class VPNHoodSessionService:
                 protocolVersion=request.protocol_version,
             )
             
-        # We generate a deterministic session ID based on the token for statelessness
-        session_id = hash(request.token_id) % (2**31 - 1)
+        # We generate a random session ID (ulong) to represent a unique session
+        # even if the same token reconnects.
+        import random
+        session_id = random.getrandbits(64)
         
         response = SessionResponseEx(
             errorCode=SessionErrorCode.Success,
