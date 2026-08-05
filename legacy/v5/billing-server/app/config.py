@@ -86,6 +86,7 @@ class Settings(BaseSettings):
     admin_jwt_issuer: str = "RealityTunnel Admin"  # [Public Config]
     admin_jwt_audience: str = "RealityTunnel Admin Panel"  # [Public Config]
     ipc_secret_key: SecretStr = SecretStr("DEV_IPC_SECRET")  # [Security Secret]
+    agent_secret: SecretStr = SecretStr("DEV_AGENT_SECRET")  # [Security Secret]
 
     # ── VPN Provisioning (Marzban Integration) [Internal Config / Secret] ────
     marzban_base_url: str = "http://marzban:8000"  # [Internal Config / Public ID]

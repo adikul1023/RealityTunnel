@@ -526,6 +526,37 @@ async def get_operations_service(
 get_marzban_provider = get_vpn_provider
 
 
+from app.services.vpnhood_session_service import VPNHoodSessionService
+
+_vpnhood_session_service: VPNHoodSessionService | None = None
+
+def get_vpnhood_session_service() -> VPNHoodSessionService:
+    global _vpnhood_session_service
+    if _vpnhood_session_service is None:
+        _vpnhood_session_service = VPNHoodSessionService()
+    return _vpnhood_session_service
 
 
+agent_oauth2_scheme = HTTPBearer(
+    auto_error=False,
+    scheme_name="AgentBearer",
+    description="Internal Agent API Secret",
+)
 
+
+async def verify_agent_token(
+    credentials: HTTPAuthorizationCredentials | None = Depends(agent_oauth2_scheme)
+) -> bool:
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing Authorization header",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if credentials.credentials != settings.agent_secret.get_secret_value():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Agent token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return True
