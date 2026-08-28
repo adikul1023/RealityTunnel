@@ -9,6 +9,7 @@ from typing import Dict, Any, Tuple
 
 from cryptography.hazmat.primitives.serialization import pkcs12
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
+from cryptography.hazmat.primitives import hashes
 from cryptography.x509.oid import NameOID
 from cryptography import x509
 
@@ -24,9 +25,15 @@ class CertificateService:
         """
         try:
             # We expect passwordless PFX as per VPNHood protocol if generated correctly, or whatever password was set.
-            private_key, certificate, additional_certificates = pkcs12.load_pkcs12(pfx_data, password)
+            result = pkcs12.load_pkcs12(pfx_data, password)
         except Exception as e:
             raise InvalidCertificateError(f"Failed to parse PFX: {str(e)}")
+
+        if hasattr(result, 'key'):
+            private_key = result.key
+            certificate = result.cert.certificate if hasattr(result.cert, 'certificate') else result.cert
+        else:
+            private_key, certificate, additional_certificates = result
 
         if not certificate:
             raise InvalidCertificateError("PFX does not contain a certificate.")
@@ -81,7 +88,7 @@ class CertificateService:
             if isinstance(san, x509.DNSName) and san.value.startswith("*"):
                 raise InvalidCertificateError("Wildcard SANs are not permitted for agent nodes.")
                 
-        fingerprint = certificate.fingerprint(hashlib.sha256()).hex()
+        fingerprint = certificate.fingerprint(hashes.SHA256()).hex()
 
         return {
             "fingerprint": fingerprint,
