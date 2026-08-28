@@ -122,10 +122,34 @@ class VPNHoodSessionService:
         return []
 
     async def add_usage(self, session_id: int, traffic: Traffic, close_session: bool, node: 'AgentNode', db: 'AsyncSession') -> SessionResponse:
-        logger.info(f"VPNHood Agent: Adding usage to session {session_id} (close={close_session})")
-        return SessionResponse(
-            errorCode=SessionErrorCode.Success
+        from app.models.agent_session import AgentSession, SessionStatus
+        from sqlalchemy import select
+
+        # Fresh DB lookup — revocation must be authoritative from the database,
+        # never from stale in-memory state.
+        db_result = await db.execute(
+            select(AgentSession).where(AgentSession.session_id == session_id)
         )
+        session = db_result.scalar_one_or_none()
+
+        if session is None:
+            logger.warning(f"VPNHood Agent: add_usage for unknown session {session_id}")
+            return SessionResponse(errorCode=SessionErrorCode.GeneralError)
+
+        if session.status == SessionStatus.revoked:
+            logger.info(f"VPNHood Agent: Revoking session {session_id} (AccessError returned to node)")
+            return SessionResponse(errorCode=SessionErrorCode.AccessError)
+
+        # Accumulate usage
+        session.bytes_sent += traffic.sent
+        session.bytes_received += traffic.received
+        if close_session:
+            session.status = SessionStatus.closed
+            session.closed_at = __import__('datetime').datetime.now(__import__('datetime').timezone.utc)
+        await db.commit()
+
+        logger.info(f"VPNHood Agent: Adding usage to session {session_id} (close={close_session})")
+        return SessionResponse(errorCode=SessionErrorCode.Ok)
 
     async def add_usages(self, usages: list[SessionUsage], node: 'AgentNode', db: 'AsyncSession') -> dict[str, SessionResponse]:
         from app.models.agent_session import AgentSession, SessionStatus
@@ -138,14 +162,25 @@ class VPNHoodSessionService:
                 select(AgentSession).where(AgentSession.session_id == usage.session_id)
             )
             session = db_result.scalar_one_or_none()
-            if session:
-                session.bytes_sent += usage.sent
-                session.bytes_received += usage.received
-                if usage.error_code == SessionErrorCode.SessionClosed.value:
-                    session.status = SessionStatus.CLOSED
-                    
+
+            if session is None:
+                result[str(usage.session_id)] = SessionResponse(errorCode=SessionErrorCode.GeneralError)
+                continue
+
+            # Fresh DB lookup — revocation is authoritative from the database.
+            if session.status == SessionStatus.revoked:
+                logger.info(f"VPNHood Agent: Revoking session {usage.session_id} via add_usages (AccessError)")
+                result[str(usage.session_id)] = SessionResponse(errorCode=SessionErrorCode.AccessError)
+                continue
+
+            session.bytes_sent += usage.sent
+            session.bytes_received += usage.received
+            if usage.error_code == SessionErrorCode.SessionClosed.value:
+                session.status = SessionStatus.closed
+                session.closed_at = __import__('datetime').datetime.now(__import__('datetime').timezone.utc)
+
             result[str(usage.session_id)] = SessionResponse(errorCode=SessionErrorCode.Ok)
-            
+
         await db.commit()
         return result
 
@@ -158,19 +193,31 @@ class VPNHoodSessionService:
         
         log = logging.getLogger("uvicorn")
         
-        # Process usages embedded in status
+        # Process usages embedded in status; build per-session responses for revocation signalling.
+        session_responses: dict[str, SessionResponse] = {}
         if status.session_usages:
             for usage in status.session_usages:
-                result = await db.execute(
+                db_result = await db.execute(
                     select(AgentSession).where(AgentSession.session_id == usage.session_id)
                 )
-                session = result.scalar_one_or_none()
-                if session:
-                    session.bytes_sent += usage.sent
-                    session.bytes_received += usage.received
-                    if usage.error_code == SessionErrorCode.SessionClosed.value:
-                        session.status = SessionStatus.CLOSED
-                
+                session = db_result.scalar_one_or_none()
+
+                if session is None:
+                    session_responses[str(usage.session_id)] = SessionResponse(errorCode=SessionErrorCode.GeneralError)
+                    continue
+
+                # Fresh DB lookup — revocation is authoritative from the database.
+                if session.status == SessionStatus.revoked:
+                    log.info(f"VPNHood Agent: Revoking session {usage.session_id} via update_status (AccessError)")
+                    session_responses[str(usage.session_id)] = SessionResponse(errorCode=SessionErrorCode.AccessError)
+                    continue
+
+                session.bytes_sent += usage.sent
+                session.bytes_received += usage.received
+                if usage.error_code == SessionErrorCode.SessionClosed.value:
+                    session.status = SessionStatus.closed
+                    session.closed_at = __import__('datetime').datetime.now(__import__('datetime').timezone.utc)
+
         # Two-phase certificate commit
         # If there's no config_error and we have a pending cert, promote it to active.
         if not status.config_error:
@@ -191,4 +238,4 @@ class VPNHoodSessionService:
                 await db.commit()
                 logger.info(f"Node {node.id} promoted pending certificate to active.")
 
-        return ServerCommand(configCode=str(node.config_revision))
+        return ServerCommand(configCode=str(node.config_revision), sessionResponses=session_responses)
