@@ -1,7 +1,7 @@
 param (
     [string]$BillingServerUrl = "http://localhost:8000",
     [string]$BootstrapToken = "dummy_token",
-    [string]$AgentAppsettingsPath = "..\..\..\VpnHood\src\Server\VpnHood.Server.App\appsettings.Lab.json"
+    [string]$AgentAppsettingsPath = "..\..\..\VpnHood\src\Apps\Server.Net\appsettings.json"
 )
 
 Write-Host "VPNHood Node Bootstrap Script"
@@ -19,20 +19,27 @@ Write-Host "Successfully bootstrapped Node ID: $nodeId"
 
 # 2. Update appsettings.json for the Agent
 Write-Host "2. Updating appsettings.json with Agent Secret..."
-$config = Get-Content $AgentAppsettingsPath | ConvertFrom-Json
-$config.Server.AgentToken = $agentSecret
-$config.Server.AgentBaseUrl = $BillingServerUrl
+$config = Get-Content $AgentAppsettingsPath -Raw | ConvertFrom-Json
+
+if ($null -eq $config.HttpAccessManager) {
+    $config | Add-Member -MemberType NoteProperty -Name "HttpAccessManager" -Value @{}
+}
+$config.HttpAccessManager = @{
+    Authorization = "Bearer $agentSecret"
+    BaseUrl = "$BillingServerUrl/api/agent/"
+}
+
 $config | ConvertTo-Json -Depth 10 | Set-Content $AgentAppsettingsPath
 Write-Host "Agent appsettings updated successfully."
 
 # 3. Generate a Self-Signed PFX Certificate
 Write-Host "3. Generating Self-Signed Certificate..."
 $certName = "CN=VPNHood-Node-$nodeId"
-$cert = New-SelfSignedCertificate -DnsName "localhost" -CertStoreLocation "cert:\LocalMachine\My" -Subject $certName -KeyAlgorithm RSA -KeyLength 2048 -NotAfter (Get-Date).AddYears(1)
+$cert = New-SelfSignedCertificate -DnsName "localhost" -CertStoreLocation "cert:\CurrentUser\My" -Subject $certName -KeyAlgorithm RSA -KeyLength 2048 -NotAfter (Get-Date).AddYears(1)
 
-$pfxPassword = ConvertTo-SecureString -String "" -Force -AsPlainText
 $pfxPath = "$env:TEMP\vpnhood_$nodeId.pfx"
-Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password $pfxPassword | Out-Null
+$certBytes = $cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx)
+[System.IO.File]::WriteAllBytes($pfxPath, $certBytes)
 
 $pfxBytes = [System.IO.File]::ReadAllBytes($pfxPath)
 $pfxBase64 = [Convert]::ToBase64String($pfxBytes)

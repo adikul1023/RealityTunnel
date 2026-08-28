@@ -1,43 +1,51 @@
 from __future__ import annotations
 from typing import Optional, Dict, List, Any
-from enum import IntEnum
+from enum import IntEnum, Enum
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 
 
-class SessionErrorCode(IntEnum):
-    Success = 0
-    Unauthorized = 1
-    Maintenance = 2
-    NotSupported = 3
-    QuotaReached = 4
-    SessionClosed = 5
-    InvalidClientVersion = 6
-    Timeout = 7
-    GeneralError = 8
+class SessionErrorCode(str, Enum):
+    Ok = "Ok"
+    AccessError = "AccessError"
+    PlanRejected = "PlanRejected"
+    GeneralError = "GeneralError"
+    SessionClosed = "SessionClosed"
+    SessionSuppressedBy = "SessionSuppressedBy"
+    SessionError = "SessionError"
+    SessionExpired = "SessionExpired"
+    AccessExpired = "AccessExpired"
+    AccessCodeRejected = "AccessCodeRejected"
+    AccessLocked = "AccessLocked"
+    AccessTrafficOverflow = "AccessTrafficOverflow"
+    DailyLimitExceeded = "DailyLimitExceeded"
+    NoServerAvailable = "NoServerAvailable"
+    PremiumLocation = "PremiumLocation"
+    AdError = "AdError"
+    RewardedAdRejected = "RewardedAdRejected"
+    Maintenance = "Maintenance"
 
 
-class SessionSuppressType(IntEnum):
-    None_ = 0
-    Client = 1
-    Server = 2
+class SessionSuppressType(str, Enum):
+    None_ = "None"
+    YourSelf = "YourSelf"
+    Other = "Other"
 
 
-class AdRequirement(IntEnum):
-    None_ = 0
-    Banner = 1
-    Interstitial = 2
-    Rewarded = 3
+class AdRequirement(str, Enum):
+    None_ = "None"
+    Flexible = "Flexible"
+    Rewarded = "Rewarded"
 
 
 class ClientInfo(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     client_id: str = Field(..., alias="clientId")
-    os_name: str = Field(..., alias="osName")
-    os_version: str = Field(..., alias="osVersion")
-    app_version: str = Field(..., alias="appVersion")
-    build_number: int = Field(..., alias="buildNumber")
+    client_version: str = Field(..., alias="clientVersion")
+    min_protocol_version: int = Field(..., alias="minProtocolVersion")
+    max_protocol_version: int = Field(..., alias="maxProtocolVersion")
+    user_agent: str = Field(..., alias="userAgent")
 
 
 class UserReview(BaseModel):
@@ -46,11 +54,12 @@ class UserReview(BaseModel):
     action: str = Field(..., alias="action")
 
 
-class ConnectPlanId(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
-    id: str = Field(..., alias="id")
-    type: int = Field(..., alias="type")
+class ConnectPlanId(str, Enum):
+    Normal = "Normal"
+    NormalByRewardedAd = "NormalByRewardedAd"
+    PremiumByTrial = "PremiumByTrial"
+    PremiumByRewardedAd = "PremiumByRewardedAd"
+    Status = "Status"
 
 
 class SessionRequestEx(BaseModel):
@@ -131,7 +140,7 @@ class SessionUsage(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     session_id: int = Field(..., alias="sessionId")
-    error_code: SessionErrorCode = Field(SessionErrorCode.Success, alias="errorCode")
+    error_code: SessionErrorCode = Field(SessionErrorCode.Ok, alias="errorCode")
     sent: int = Field(0, alias="sent")
     received: int = Field(0, alias="received")
     ad_data: Optional[str] = Field(None, alias="adData")
@@ -203,8 +212,8 @@ class NetFilterOptions(BaseModel):
 
 class CertificateData(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
-    common_name: str = Field(..., alias="CommonName")
-    raw_data: str = Field(..., alias="RawData")  # base64 encoded byte array
+    common_name: str = Field(..., alias="commonName")
+    raw_data: str = Field(..., alias="rawData")  # base64 encoded byte array
 
 class ServerConfig(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
@@ -213,4 +222,8 @@ class ServerConfig(BaseModel):
     session_options: SessionOptions = Field(default_factory=SessionOptions, alias="Session")
     net_filter_options: NetFilterOptions = Field(default_factory=NetFilterOptions, alias="NetFilter")
     config_code: Optional[str] = Field(None, alias="configCode")
-    certificates: Optional[List[CertificateData]] = Field(default=None, alias="Certificates")
+    certificates: Optional[List[CertificateData]] = Field(default=None, alias="certificates")
+    tcp_endpoints: Optional[List[str]] = Field(default=None, alias="tcpEndPoints")
+    udp_endpoints: Optional[List[str]] = Field(default=None, alias="udpEndPoints")
+    update_status_interval: Optional[str] = Field(default=None, alias="updateStatusInterval")
+    dns_servers: Optional[List[str]] = Field(default=None, alias="dnsServers")

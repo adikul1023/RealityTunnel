@@ -18,6 +18,7 @@ from app.models.exchange_token import ExchangeToken
 from app.models.agent_bootstrap_token import AgentBootstrapToken
 from app.models.agent_node import AgentNode
 from app.models.agent_certificate import AgentCertificate
+from app.models.agent_session import AgentSession
 
 __all__ = [
     "AccountStatus",

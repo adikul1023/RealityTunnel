@@ -7,7 +7,7 @@
   - **Key:** `d:\My projects\VPN\AWSKEY\ssh-key-2026-03-01.key`
   - **Services:** Billing API (`ghcr.io/adikul1023/realitytunnel`), PostgreSQL (16-alpine), Redis (7-alpine), Caddy (2-alpine).
   - **Location:** `/opt/realitytunnel/releases/oracle-update-2026-07-10`
-  - **Endpoint:** `api.stealthy.co.in`
+  - **Endpoint:** `api.reviewbook.biz`
 
 - **Server 2 (VPN Edge & Marzban) - Contabo**
   - **IP:** 217.216.79.209
@@ -15,7 +15,15 @@
   - **Key:** `~/.ssh/id_ed25519`
   - **Services:** Marzban (`gozargah/marzban:v0.8.3`), sing-box/Xray.
   - **Location:** `/opt/realitytunnel/current` (configs in `/opt/realitytunnel/marzban`)
-  - **Endpoint:** `edge.stealthy.co.in`
+  - **Endpoint:** `edge.reviewbook.biz`
+
+- **Server 3 (VPNHood CA Server) - Oracle Cloud**
+  - **IP:** 129.159.236.34
+  - **User:** ubuntu
+  - **Key:** "D:\My projects\VPN\AWSKEY\server2oracle.key"
+  - **Services:** VPNHood CA Server (`ghcr.io/adikul1023/vpn-node-ca`)
+  - **Location:** ``
+  - **Endpoint:** 
 
 ## Current Deployment Status
 - Production endpoints are live. No staging or development API exists.
@@ -36,8 +44,8 @@ After Phase 10.3C:
 - **Reactivate Device** -> `is_active = true`
 
 ## Active Phases
-- **Current Phase:** End-to-end VPN connection.
-- **Completed:** Production login, JWT, Refresh, 2FA, Secure credential storage, UI modernization, Single-instance application, Backend-driven VPN configuration, Removal of local `.env` dependency, Hard-delete device removal & legacy inactive device migration (`a1b2c3d4e5f0`).
+- **Current Phase:** Phase 5 — End-to-End VPNHood Validation
+- **Completed:** Phase 4 (Node Bootstrap & Certificate Distribution), Production login, JWT, Refresh, 2FA, Secure credential storage, UI modernization, Single-instance application, Backend-driven VPN configuration, Removal of local `.env` dependency, Hard-delete device removal & legacy inactive device migration (`a1b2c3d4e5f0`).
 
 ## Known Bugs
 - *To be discovered/documented*
@@ -47,8 +55,10 @@ After Phase 10.3C:
 - Single-instance application constraints
 - Removal of `.env` dependency for VPN configuration
 - Device lifecycle architectural split (Remove = Hard Delete vs Suspend = Soft Deactivate)
+- VPNHood node bootstrap and certificate management abstractions
 
 ## Pending Work
-- End-to-end VPN connection for the Windows Client.
-- Android Client (Future Phase 3).
+- End-to-end VPNHood lifecycle validation in lab environment (Phase 5).
+- Future Phase: Telemetry, Observability & Advanced Node Lifecycle (Post-Validation).
+- Future Phase: Android Client (Phase 3).
 

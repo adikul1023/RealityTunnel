@@ -13,6 +13,7 @@ from app.models.base import TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.agent_certificate import AgentCertificate
+    from app.models.agent_session import AgentSession
 
 
 class AgentNode(Base, TimestampMixin):
@@ -38,4 +39,8 @@ class AgentNode(Base, TimestampMixin):
 
     certificates: Mapped[list["AgentCertificate"]] = relationship(
         "AgentCertificate", back_populates="node", cascade="all, delete-orphan"
+    )
+
+    sessions: Mapped[list["AgentSession"]] = relationship(
+        "AgentSession", back_populates="node", cascade="all, delete-orphan"
     )

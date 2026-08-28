@@ -54,8 +54,8 @@ class VPNHoodSessionService:
             # Wait, CertificateData in VPNHood uses byte[] which JSON serializes to base64.
             import base64
             certificates_payload.append({
-                "CommonName": cert.common_name or "VPN Node",
-                "RawData": base64.b64encode(decrypted_pfx).decode('ascii')
+                "common_name": cert.common_name or "VPN Node",
+                "raw_data": base64.b64encode(decrypted_pfx).decode('ascii')
             })
             
         machine_name = server_info.machine_name or "unknown"
@@ -68,13 +68,16 @@ class VPNHoodSessionService:
         
         return ServerConfig(
             configCode=str(node.config_revision),
-            certificates=certificates_payload
+            certificates=certificates_payload,
+            sync_interval="00:00:05",
+            dns_servers=["8.8.8.8"]
         )
 
-    async def create_session(self, request: SessionRequestEx) -> SessionResponseEx:
+    async def create_session(self, request: SessionRequestEx, node: 'AgentNode', db: 'AsyncSession') -> SessionResponseEx:
+        from app.models.agent_session import AgentSession
+        
         logger.info(f"VPNHood Agent: Creating session for token {request.token_id}")
         
-        # Basic validation placeholder
         if not request.token_id:
             return SessionResponseEx(
                 errorCode=SessionErrorCode.Unauthorized,
@@ -83,24 +86,31 @@ class VPNHoodSessionService:
                 protocolVersion=request.protocol_version,
             )
             
-        # We generate a random session ID (ulong) to represent a unique session
-        # even if the same token reconnects.
         import random
-        session_id = random.getrandbits(64)
+        # Generate a 63-bit positive integer to fit safely in Postgres BIGINT and VPNHood ulong
+        session_id = random.getrandbits(63)
+        
+        new_session = AgentSession(
+            session_id=session_id,
+            node_id=node.id,
+            token_id=request.token_id,
+            config_revision=node.config_revision,
+            status="active"
+        )
+        db.add(new_session)
+        await db.commit()
         
         response = SessionResponseEx(
-            errorCode=SessionErrorCode.Success,
+            errorCode=SessionErrorCode.Ok,
             sessionId=session_id,
-            sessionKey="dummy_session_key", # Base64 encoded byte array in real impl
+            sessionKey="ZHVtbXlfc2Vzc2lvbl9rZXk=", # Base64 encoded byte array in real impl
             protocolVersion=request.protocol_version,
             createdTime=datetime.now(timezone.utc)
         )
         return response
 
-    async def get_session(self, session_id: int) -> SessionResponseEx:
+    async def get_session(self, session_id: int, node: 'AgentNode', db: 'AsyncSession') -> SessionResponseEx:
         logger.info(f"VPNHood Agent: Getting session {session_id}")
-        # In a stateless model, if VPNHood asks about a session, we can just say it's valid
-        # or we could verify it against DB if we were persisting them. For now, assume success.
         return SessionResponseEx(
             errorCode=SessionErrorCode.Success,
             sessionId=session_id,
@@ -108,31 +118,59 @@ class VPNHoodSessionService:
             protocolVersion=0
         )
 
-    async def get_all_sessions(self) -> List[SessionResponseEx]:
-        # We don't track live sessions, so return empty list to let VPNHood manage its own
+    async def get_all_sessions(self, node: 'AgentNode', db: 'AsyncSession') -> List[SessionResponseEx]:
         return []
 
-    async def add_usage(self, session_id: int, traffic: Traffic, close_session: bool) -> SessionResponse:
+    async def add_usage(self, session_id: int, traffic: Traffic, close_session: bool, node: 'AgentNode', db: 'AsyncSession') -> SessionResponse:
         logger.info(f"VPNHood Agent: Adding usage to session {session_id} (close={close_session})")
-        # We don't track state, so we just acknowledge the usage report.
-        # In future, this usage will be persisted to the database.
-            
         return SessionResponse(
             errorCode=SessionErrorCode.Success
         )
 
-    async def add_usages(self, usages: List[SessionUsage]) -> Dict[str, SessionResponse]:
-        logger.info(f"VPNHood Agent: Adding multiple usages ({len(usages)})")
+    async def add_usages(self, usages: list[SessionUsage], node: 'AgentNode', db: 'AsyncSession') -> dict[str, SessionResponse]:
+        from app.models.agent_session import AgentSession, SessionStatus
+        from app.routers.agent_models import SessionResponse, SessionErrorCode
+        from sqlalchemy import select
+        
         result = {}
         for usage in usages:
-            # We don't remove from self._sessions here unless explicitly closed
-            result[str(usage.session_id)] = SessionResponse(errorCode=SessionErrorCode.Success)
+            db_result = await db.execute(
+                select(AgentSession).where(AgentSession.session_id == usage.session_id)
+            )
+            session = db_result.scalar_one_or_none()
+            if session:
+                session.bytes_sent += usage.sent
+                session.bytes_received += usage.received
+                if usage.error_code == SessionErrorCode.SessionClosed.value:
+                    session.status = SessionStatus.CLOSED
+                    
+            result[str(usage.session_id)] = SessionResponse(errorCode=SessionErrorCode.Ok)
+            
+        await db.commit()
         return result
 
     async def update_status(self, status: ServerStatus, node: 'AgentNode', db: 'AsyncSession') -> ServerCommand:
         from app.models.agent_certificate import AgentCertificate
+        from app.models.agent_session import AgentSession, SessionStatus
+        from app.routers.agent_models import SessionResponse, SessionErrorCode
         from sqlalchemy import select, update
+        import logging
         
+        log = logging.getLogger("uvicorn")
+        
+        # Process usages embedded in status
+        if status.session_usages:
+            for usage in status.session_usages:
+                result = await db.execute(
+                    select(AgentSession).where(AgentSession.session_id == usage.session_id)
+                )
+                session = result.scalar_one_or_none()
+                if session:
+                    session.bytes_sent += usage.sent
+                    session.bytes_received += usage.received
+                    if usage.error_code == SessionErrorCode.SessionClosed.value:
+                        session.status = SessionStatus.CLOSED
+                
         # Two-phase certificate commit
         # If there's no config_error and we have a pending cert, promote it to active.
         if not status.config_error:
