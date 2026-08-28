@@ -238,4 +238,25 @@ class VPNHoodSessionService:
                 await db.commit()
                 logger.info(f"Node {node.id} promoted pending certificate to active.")
 
+        # Proactive revocation scan: find ALL revoked sessions for this node,
+        # regardless of whether VPNHood included them in this payload.
+        # This is necessary because VPNHood only reports sessions with recent traffic;
+        # zero-traffic sessions will never appear in status.session_usages, so we
+        # must independently signal AccessError for any revoked session.
+        revoked_result = await db.execute(
+            select(AgentSession).where(
+                AgentSession.node_id == node.id,
+                AgentSession.status == SessionStatus.revoked
+            )
+        )
+        revoked_sessions = revoked_result.scalars().all()
+        for rev_session in revoked_sessions:
+            sid_str = str(rev_session.session_id)
+            if sid_str not in session_responses:
+                log.info(
+                    f"VPNHood Agent: Proactive revocation — signalling AccessError "
+                    f"for session {rev_session.session_id} (no traffic in payload)"
+                )
+                session_responses[sid_str] = SessionResponse(errorCode=SessionErrorCode.AccessError)
+
         return ServerCommand(configCode=str(node.config_revision), sessionResponses=session_responses)
