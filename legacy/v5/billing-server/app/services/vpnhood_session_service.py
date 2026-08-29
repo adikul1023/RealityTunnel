@@ -59,11 +59,17 @@ class VPNHoodSessionService:
             })
             
         machine_name = server_info.machine_name or "unknown"
+        # Phase 5F-A: log is_restarted prominently.
+        # is_restarted=True means the VPNHood process just started; it does NOT mean
+        # sessions are gone. RecoverSessions() already ran before Configure() is called,
+        # so recovered sessions may be live in the node's memory by the time we see this.
+        # No orphan cleanup is performed here. See Phase 5F-B for reconciliation design.
         logger.info(
             f"VPNHood node configure - "
             f"Machine: {machine_name}, "
             f"ConfigRev: {node.config_revision}, "
-            f"Cert: {cert.rotation_version if cert else 'None'}"
+            f"Cert: {cert.rotation_version if cert else 'None'}, "
+            f"IsRestarted: {server_info.is_restarted}"
         )
         
         return ServerConfig(
@@ -119,6 +125,27 @@ class VPNHoodSessionService:
         )
 
     async def get_all_sessions(self, node: 'AgentNode', db: 'AsyncSession') -> List[SessionResponseEx]:
+        # Phase 5F-A: intentionally returns [] — session recovery is not implemented.
+        #
+        # VPNHood calls this endpoint (GET /api/agent/sessions) in RecoverSessions() on
+        # startup. If we return active SessionResponseEx objects here, the node would
+        # attempt to restore those sessions in memory. We do not yet return them because:
+        #
+        #   1. We have not traced exactly which fields VPNHood requires for a successful
+        #      recovery (session key, virtual IP assignment, timestamps, etc.).
+        #
+        #   2. Even if the billing API were to return sessions, VPNHood also checks
+        #      SessionLocalService (disk) before trusting the API response. The exact
+        #      interaction between the two recovery paths is not yet verified.
+        #
+        # Current consequence: after a node restart without disk recovery, sessions that
+        # were 'active' in the DB become orphans. This is operationally safe (orphaned
+        # sessions generate no further usage events) but leaves stale metadata.
+        #
+        # Phase 5F-B will implement proper reconciliation: once get_all_sessions() returns
+        # live sessions, a follow-up reconciliation step will close any DB sessions the
+        # node failed to recover. The reconciliation trigger and required schema changes
+        # will be determined after running the Recovery Matrix experiment.
         return []
 
     async def add_usage(self, session_id: int, traffic: Traffic, close_session: bool, node: 'AgentNode', db: 'AsyncSession') -> SessionResponse:
