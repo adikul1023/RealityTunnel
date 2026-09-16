@@ -46,6 +46,7 @@ from app.dependencies import get_provisioning_service
 from app.config import settings
 from app.models.base import AccountStatus
 from app.exceptions import EntityNotFoundError
+from app.services.exceptions import ProvisioningSynchronizationError
 import logging
 
 logger = logging.getLogger(__name__)
@@ -94,6 +95,9 @@ async def get_client_config(
         except Exception as e:
             logger.error(f"Auto-provisioning failed for {current_account.account_id}: {e}")
             raise HTTPException(status_code=404, detail="VPN identity not found and could not be auto-provisioned")
+    except ProvisioningSynchronizationError as e:
+        logger.error(f"Upstream provider sync failed for {current_account.account_id}: {e}")
+        raise HTTPException(status_code=502, detail="Upstream VPN provider synchronization failed. The service might be temporarily unreachable.")
     
     return ClientConfigResponse(
         vpn_profile=VpnProfileDto(
@@ -180,3 +184,81 @@ async def get_client_update() -> ClientUpdateResponse:
         download_url="https://stealthy.co.in/download",
         release_notes="Initial release"
     )
+
+class VpnHoodTokenResponse(BaseModel):
+    access_key: str
+
+@router.post(
+    "/vpnhood/token",
+    summary="Generate a dynamic VPNHood access key",
+    response_model=VpnHoodTokenResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def generate_vpnhood_token(
+    current_account: Account = Depends(get_current_account),
+    db: AsyncSession = Depends(get_db),
+) -> VpnHoodTokenResponse:
+    from app.models.agent_node import AgentNode
+    from app.models.agent_certificate import AgentCertificate
+    import base64
+    import json
+    import os
+    
+    result = await db.execute(select(AgentNode).where(AgentNode.status == "active").limit(1))
+    node = result.scalar_one_or_none()
+    
+    cert = None
+    if node:
+        cert_result = await db.execute(
+            select(AgentCertificate).where(AgentCertificate.node_id == node.id, AgentCertificate.status == "active").limit(1)
+        )
+        cert = cert_result.scalar_one_or_none()
+        server_secret = base64.b64encode(node.id.bytes).decode('ascii')
+        server_host = node.public_ip or settings.vpn_edge_host
+    else:
+        # Fallback for new users / testing environments where no active node exists
+        mock_node_id = uuid.uuid4()
+        server_secret = base64.b64encode(mock_node_id.bytes).decode('ascii')
+        server_host = settings.vpn_edge_host
+    
+    client_secret = base64.b64encode(os.urandom(16)).decode('ascii')
+    token_id = str(uuid.uuid4())
+    
+    cert_hash = None
+    is_valid_host = True
+    if cert and cert.fingerprint:
+        try:
+            cert_hash = base64.b64encode(bytes.fromhex(cert.fingerprint.replace(":", ""))).decode('ascii')
+            is_valid_host = False
+        except Exception:
+            pass
+
+    server_port = settings.vpn_edge_port
+    
+    token_dict = {
+        'v': 4,
+        'name': f"RealityTunnel-{current_account.account_id[:8]}",
+        'sid': str(current_account.id),
+        'tid': token_id,
+        'iat': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+        'sec': client_secret,
+        'ser': {
+            'ct': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+            'hname': server_host,
+            'hport': server_port,
+            'isv': is_valid_host,
+            'sec': server_secret,
+            'ch': cert_hash,
+            'urls': [],
+            'ep': [f"{server_host}:{server_port}"],
+            'ep_st': 2,
+            'loc': ["Global/Auto"],
+            'loc2': ["Global/Auto"]
+        },
+        'tags': []
+    }
+    
+    json_str = json.dumps(token_dict, separators=(',', ':'))
+    access_key = 'vh://' + base64.b64encode(json_str.encode('utf-8')).decode('ascii')
+    
+    return VpnHoodTokenResponse(access_key=access_key)

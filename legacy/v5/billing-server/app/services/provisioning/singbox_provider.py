@@ -239,13 +239,36 @@ class SingBoxProvider(IVpnProvider):
     def _dto_from_dict(self, data: Dict[str, Any], remote_user_id: str) -> "ProvisionedUserDTO":
         """Convert a Marzban API response dict to a ProvisionedUserDTO."""
         from app.services.provisioning.provider import ProvisionedUserDTO
+        
+        links = data.get("links", [])
+        if not links and "proxies" in data:
+            for proxy_type, proxy_data in data.get("proxies", {}).items():
+                if isinstance(proxy_data, list):
+                    links.extend(proxy_data)
+
+        uuid_val = data.get("uuid")
+        if not uuid_val and "proxies" in data and "vless" in data["proxies"]:
+            vless_proxy = data["proxies"]["vless"]
+            if isinstance(vless_proxy, dict):
+                uuid_val = vless_proxy.get("id")
+                
+        if not uuid_val and links:
+            import urllib.parse
+            try:
+                parsed = urllib.parse.urlparse(links[0])
+                if parsed.scheme == "vless" and parsed.username:
+                    uuid_val = parsed.username
+            except Exception:
+                pass
+
         return ProvisionedUserDTO(
             remote_user_id=data.get("username", remote_user_id),
             status=data.get("status", "unknown"),
             data_limit=data.get("data_limit"),
             data_used=data.get("used_traffic"),
             expire_at=data.get("expire"),
-            links=data.get("links", []),
+            uuid=uuid_val,
+            links=links,
         )
 
     async def get_user(self, remote_user_id: str) -> "ProvisionedUserDTO":
