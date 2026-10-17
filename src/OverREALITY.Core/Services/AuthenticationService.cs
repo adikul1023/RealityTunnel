@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -102,6 +103,20 @@ public class AuthenticationService : IAuthService
             if (!string.IsNullOrEmpty(token))
             {
                 var accountId = await _secureStorage.GetSecureAsync("account_id");
+                if (string.IsNullOrEmpty(accountId))
+                {
+                    var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+                    if (handler.CanReadToken(token))
+                    {
+                        var jwt = handler.ReadJwtToken(token);
+                        accountId = jwt.Claims.FirstOrDefault(c => c.Type == "account")?.Value;
+                        if (!string.IsNullOrEmpty(accountId))
+                        {
+                            await _secureStorage.SaveSecureAsync("account_id", accountId);
+                        }
+                    }
+                }
+
                 if (!string.IsNullOrEmpty(accountId))
                 {
                     var session = _sessionFactory.Create(token, accountId);
