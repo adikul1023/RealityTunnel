@@ -40,12 +40,22 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         
-        <materialDesign:ColorZone Mode="PrimaryMid" Padding="16">
-            <StackPanel Orientation="Horizontal" Margin="8">
-                <Button Command="{Binding NavigateDashboardCommand}" Content="DASHBOARD" Style="{StaticResource MaterialDesignFlatButton}" Foreground="{DynamicResource PrimaryHueMidForegroundBrush}" Margin="0,0,16,0" />
-                <Button Command="{Binding NavigateLogsCommand}" Content="LOGS" Style="{StaticResource MaterialDesignFlatButton}" Foreground="{DynamicResource PrimaryHueMidForegroundBrush}" Margin="0,0,16,0" />
-                <Button Command="{Binding NavigateSettingsCommand}" Content="SETTINGS" Style="{StaticResource MaterialDesignFlatButton}" Foreground="{DynamicResource PrimaryHueMidForegroundBrush}" />
-            </StackPanel>
+        <materialDesign:ColorZone Mode="Standard" Padding="16" materialDesign:ElevationAssist.Elevation="Dp4">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <materialDesign:PackIcon Kind="IncognitoCircle" Width="32" Height="32" Foreground="{DynamicResource PrimaryHueMidBrush}" Margin="0,0,12,0"/>
+                    <TextBlock Text="Stealthy VPN" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource MaterialDesignBody}"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Command="{Binding NavigateDashboardCommand}" Content="DASHBOARD" Style="{StaticResource MaterialDesignFlatButton}" Margin="0,0,8,0" />
+                    <Button Command="{Binding NavigateLogsCommand}" Content="LOGS" Style="{StaticResource MaterialDesignFlatButton}" Margin="0,0,8,0" />
+                    <Button Command="{Binding NavigateSettingsCommand}" Content="SETTINGS" Style="{StaticResource MaterialDesignFlatButton}" />
+                </StackPanel>
+            </Grid>
         </materialDesign:ColorZone>
 
         <ContentControl Grid.Row="1" Content="{Binding Navigation.CurrentView}" Margin="16" />

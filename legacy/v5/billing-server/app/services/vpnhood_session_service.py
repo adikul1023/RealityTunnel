@@ -72,11 +72,15 @@ class VPNHoodSessionService:
             f"IsRestarted: {server_info.is_restarted}"
         )
         
+        import base64
+        server_secret_b64 = base64.b64encode(node.id.bytes).decode('ascii')
+        
         return ServerConfig(
             configCode=str(node.config_revision),
             certificates=certificates_payload,
             sync_interval="00:00:05",
-            dns_servers=["8.8.8.8"]
+            dns_servers=["8.8.8.8"],
+            server_secret=server_secret_b64
         )
 
     async def create_session(self, request: SessionRequestEx, node: 'AgentNode', db: 'AsyncSession') -> SessionResponseEx:
@@ -245,6 +249,9 @@ class VPNHoodSessionService:
                     session.status = SessionStatus.closed
                     session.closed_at = __import__('datetime').datetime.now(__import__('datetime').timezone.utc)
 
+        # Touch AgentNode.updated_at to record this heartbeat for orphan cleanup logic
+        node.updated_at = __import__('datetime').datetime.now(__import__('datetime').timezone.utc)
+
         # Two-phase certificate commit
         # If there's no config_error and we have a pending cert, promote it to active.
         if not status.config_error:
@@ -287,3 +294,43 @@ class VPNHoodSessionService:
                 session_responses[sid_str] = SessionResponse(errorCode=SessionErrorCode.AccessError)
 
         return ServerCommand(configCode=str(node.config_revision), sessionResponses=session_responses)
+
+    @classmethod
+    async def cleanup_orphaned_sessions(cls, db: 'AsyncSession') -> int:
+        """
+        Phase 5F-B: Conservative orphan cleanup policy.
+        Closes 'active' sessions belonging to nodes that have not heartbeated for 24 hours.
+        """
+        from app.models.agent_session import AgentSession, SessionStatus
+        from app.models.agent_node import AgentNode
+        from sqlalchemy import update, select
+        from datetime import datetime, timezone, timedelta
+        import logging
+        
+        log = logging.getLogger(__name__)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+        
+        # We find nodes that have not heartbeated (updated_at) in 24 hours
+        # and update their sessions to 'closed'.
+        stmt = (
+            update(AgentSession)
+            .where(AgentSession.status == SessionStatus.active)
+            .where(
+                AgentSession.node_id.in_(
+                    select(AgentNode.id).where(AgentNode.updated_at < cutoff)
+                )
+            )
+            .values(
+                status=SessionStatus.closed,
+                closed_at=datetime.now(timezone.utc)
+            )
+        )
+        
+        result = await db.execute(stmt)
+        await db.commit()
+        
+        count = result.rowcount
+        if count > 0:
+            log.info(f"Phase 5F-B: Cleaned up {count} orphaned sessions from inactive nodes.")
+            
+        return count

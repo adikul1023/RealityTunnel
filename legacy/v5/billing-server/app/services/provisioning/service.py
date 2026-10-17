@@ -177,9 +177,7 @@ class ProvisioningService:
                 if self.credential_service:
                     await self.credential_service.generate(account_id)
                 return profile
-
-            remote_username = account.marzban_username or f"user_{account.account_id.lower()}"
-
+            remote_username = account.marzban_username or f"user_{account.account_id.lower().replace('-', '_')}"
             try:
                 user_dto = await self.provider.create_user(
                     username=remote_username,

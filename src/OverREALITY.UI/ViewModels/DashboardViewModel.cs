@@ -17,6 +17,9 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private ConnectionPresentationState _presentationState = new();
 
+    [ObservableProperty]
+    private int _selectedServerIndex = 0;
+
     private readonly IUiDispatcher _dispatcher;
     public DashboardViewModel(IConnectionService connectionService, IConnectionStateManager stateManager, IUiDispatcher dispatcher)
     {
@@ -128,7 +131,7 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanConnect))]
     private async Task ConnectAsync()
     {
-        await _connectionService.ConnectAsync();
+        await _connectionService.ConnectAsync(SelectedServerIndex);
     }
 
     private bool CanConnect() => PresentationState.CanConnect;

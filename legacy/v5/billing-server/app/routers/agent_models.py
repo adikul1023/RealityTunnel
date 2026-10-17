@@ -227,3 +227,4 @@ class ServerConfig(BaseModel):
     udp_endpoints: Optional[List[str]] = Field(default=None, alias="udpEndPoints")
     update_status_interval: Optional[str] = Field(default=None, alias="updateStatusInterval")
     dns_servers: Optional[List[str]] = Field(default=None, alias="dnsServers")
+    server_secret: Optional[str] = Field(default=None, alias="ServerSecret")

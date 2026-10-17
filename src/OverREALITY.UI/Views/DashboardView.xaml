@@ -1,22 +1,63 @@
 <UserControl x:Class="OverREALITY.UI.Views.DashboardView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:viewmodels="clr-namespace:OverREALITY.UI.ViewModels">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
     </UserControl.Resources>
-    <Grid Margin="32">
-        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-            <materialDesign:PackIcon Kind="ShieldCheck" Width="100" Height="100" HorizontalAlignment="Center" Margin="0,0,0,16" Foreground="{Binding PresentationState.AccentColor}" />
-            <TextBlock Text="{Binding PresentationState.Title}" FontSize="32" FontWeight="Bold" HorizontalAlignment="Center" />
-            <TextBlock Text="{Binding PresentationState.Subtitle}" FontSize="16" Foreground="{DynamicResource MaterialDesignBody}" Opacity="0.7" HorizontalAlignment="Center" Margin="0,0,0,32" />
-            
-            <ProgressBar IsIndeterminate="True" Visibility="{Binding PresentationState.IsBusy, Converter={StaticResource BoolToVis}}" Margin="0,0,0,32" />
+    
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
 
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                <Button Command="{Binding ConnectCommand}" Content="CONNECT" Margin="0,0,16,0" Width="120" />
-                <Button Command="{Binding DisconnectCommand}" Content="DISCONNECT" Width="120" Style="{StaticResource MaterialDesignOutlinedButton}" />
+        <!-- Status Header -->
+        <materialDesign:Card Grid.Row="0" materialDesign:ElevationAssist.Elevation="Dp2" Padding="24" Margin="0,0,0,16" Background="{DynamicResource MaterialDesignPaper}" UniformCornerRadius="12">
+            <StackPanel HorizontalAlignment="Center">
+                <materialDesign:PackIcon Kind="ShieldCheck" Width="100" Height="100" HorizontalAlignment="Center" Margin="0,0,0,16" Foreground="{Binding PresentationState.AccentColor}" />
+                <TextBlock Text="{Binding PresentationState.Title}" FontSize="36" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{DynamicResource MaterialDesignBody}" />
+                <TextBlock Text="{Binding PresentationState.Subtitle}" FontSize="16" Foreground="{DynamicResource MaterialDesignBodyLight}" HorizontalAlignment="Center" Margin="0,8,0,0" />
+                <ProgressBar IsIndeterminate="True" Visibility="{Binding PresentationState.IsBusy, Converter={StaticResource BoolToVis}}" Margin="0,24,0,0" Height="4" />
             </StackPanel>
-        </StackPanel>
+        </materialDesign:Card>
+
+        <!-- Node Selection -->
+        <materialDesign:Card Grid.Row="1" materialDesign:ElevationAssist.Elevation="Dp2" Padding="24" Margin="0,0,0,16" Background="{DynamicResource MaterialDesignPaper}" UniformCornerRadius="12" VerticalAlignment="Center">
+            <StackPanel>
+                <TextBlock Text="Select Node" FontSize="18" FontWeight="Medium" Margin="0,0,0,16" Foreground="{DynamicResource MaterialDesignBody}" />
+                <ListBox SelectedIndex="{Binding SelectedServerIndex}" Style="{StaticResource MaterialDesignFilterChipPrimaryListBox}" HorizontalAlignment="Stretch">
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="2" />
+                        </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBoxItem Margin="4">
+                        <StackPanel Margin="8">
+                            <materialDesign:PackIcon Kind="ServerNetwork" Width="24" Height="24" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                            <TextBlock Text="Contabo" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                            <TextBlock Text="(Singbox)" FontSize="10" Opacity="0.6" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem Margin="4">
+                        <StackPanel Margin="8">
+                            <materialDesign:PackIcon Kind="Cloud" Width="24" Height="24" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                            <TextBlock Text="Oracle" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                            <TextBlock Text="(VPNHood)" FontSize="10" Opacity="0.6" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                </ListBox>
+            </StackPanel>
+        </materialDesign:Card>
+
+        <!-- Action Buttons -->
+        <materialDesign:Card Grid.Row="2" materialDesign:ElevationAssist.Elevation="Dp2" Padding="16" Background="{DynamicResource MaterialDesignPaper}" UniformCornerRadius="12">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <Button Command="{Binding ConnectCommand}" Content="CONNECT" Margin="0,0,16,0" Width="160" Height="48" Style="{StaticResource MaterialDesignRaisedButton}" materialDesign:ButtonAssist.CornerRadius="24" />
+                <Button Command="{Binding DisconnectCommand}" Content="DISCONNECT" Width="160" Height="48" Style="{StaticResource MaterialDesignOutlinedButton}" materialDesign:ButtonAssist.CornerRadius="24" />
+            </StackPanel>
+        </materialDesign:Card>
     </Grid>
 </UserControl>

@@ -244,7 +244,7 @@ class AdminAccountService:
             profile = await self.provisioning_service.provisioning_repo.get_by_account_id(account.id, for_update=True)
             
             if not profile:
-                remote_username = account.marzban_username or f"user_{account.account_id.lower()}"
+                remote_username = account.marzban_username or f"user_{account.account_id.lower().replace('-', '_')}"
                 profile = ProvisioningProfile(
                     account_id=account.id,
                     remote_user_id=remote_username,

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using OverREALITY.Shared.Api;
 using OverREALITY.Shared.Api.VpnRuntime;
 using OverREALITY.Shared.Interfaces;
+using System.Diagnostics;
 
 namespace OverREALITY.Core.Services;
 
@@ -15,10 +16,12 @@ public class ConnectionService : IConnectionService
     private readonly IHelperClient _helperClient;
     private readonly IOperationContext _operationContext;
     private readonly IAuthService _authService;
+    private readonly IApiClient _apiClient;
     private readonly ILogger<ConnectionService> _logger;
     private readonly SemaphoreSlim _connectionLock = new(1, 1);
     private CancellationTokenSource? _pollingCts;
     private Task? _pollingTask;
+    private Process? _vpnHoodProcess;
 
     public ConnectionService(
         IConnectionStateManager stateManager,
@@ -26,6 +29,7 @@ public class ConnectionService : IConnectionService
         IHelperClient helperClient,
         IOperationContext operationContext,
         IAuthService authService,
+        IApiClient apiClient,
         ILogger<ConnectionService> logger)
     {
         _stateManager = stateManager;
@@ -33,10 +37,11 @@ public class ConnectionService : IConnectionService
         _helperClient = helperClient;
         _operationContext = operationContext;
         _authService = authService;
+        _apiClient = apiClient;
         _logger = logger;
     }
 
-    public async Task ConnectAsync(CancellationToken cancellationToken = default)
+    public async Task ConnectAsync(int serverIndex = 0, CancellationToken cancellationToken = default)
     {
         if (!await _connectionLock.WaitAsync(0, cancellationToken))
         {
@@ -51,6 +56,48 @@ public class ConnectionService : IConnectionService
 
             try
             {
+                if (serverIndex == 1)
+                {
+                    _logger.LogInformation("Connecting to Oracle (VPNHood) via external client process.");
+                    _stateManager.SetState(ConnectionState.StartingHelper);
+                    
+                    var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                    var clientExePath = System.IO.Path.Combine(baseDir, "VpnHoodClient", "VpnHoodClient.exe");
+                    
+                    _logger.LogInformation("Requesting VPNHood token from backend...");
+                    var tokenResult = await _apiClient.PostAsync<object, OverREALITY.Shared.Api.VpnHoodTokenResponse>("/api/client/vpnhood/token", new { }, cancellationToken);
+                    if (!tokenResult.IsSuccess || tokenResult.Value == null)
+                    {
+                        _logger.LogError("Failed to provision VPNHood token. {Message}", tokenResult.Error?.Message);
+                        _stateManager.SetState(ConnectionState.Failed, "Failed to provision VPNHood connection.");
+                        return;
+                    }
+                    var accessKey = tokenResult.Value.AccessKey;
+                    if (!System.IO.File.Exists(clientExePath))
+                    {
+                        _logger.LogError($"VPNHood client EXE not found at {clientExePath}");
+                        _stateManager.SetState(ConnectionState.Failed, "VPNHood client not built/found.");
+                        return;
+                    }
+
+                    _vpnHoodProcess = new Process
+                    {
+                        StartInfo = new ProcessStartInfo
+                        {
+                            FileName = clientExePath,
+                            Arguments = $"-c \"{accessKey}\"",
+                            UseShellExecute = true,
+                            WindowStyle = ProcessWindowStyle.Normal // Let user see the VPNHood UI or console for testing
+                        }
+                    };
+
+                    _vpnHoodProcess.Start();
+
+                    _stateManager.SetState(ConnectionState.Connected);
+                    _logger.LogInformation("VPNHood process started successfully.");
+                    return;
+                }
+
                 _stateManager.SetState(ConnectionState.Provisioning);
                 var provisionResult = await _provisioningService.ConnectProvisionAsync(cancellationToken);
                 if (!provisionResult.IsSuccess)
@@ -109,18 +156,28 @@ public class ConnectionService : IConnectionService
         try
         {
             using var operation = _operationContext.BeginOperation("Disconnect");
-            _logger.LogInformation("Starting disconnection sequence.");
+            _logger.LogInformation("Starting disconnect sequence.");
             
             StopStatusPolling();
 
             try
             {
                 _stateManager.SetState(ConnectionState.Disconnecting);
-                var helperResult = await _helperClient.StopAsync(cancellationToken);
-
-                if (!helperResult.IsSuccess)
+                
+                if (_vpnHoodProcess != null && !_vpnHoodProcess.HasExited)
                 {
-                    _logger.LogWarning("Helper reported failure while stopping: {Message}", helperResult.Error?.Message);
+                    _logger.LogInformation("Disconnecting VPNHood client (killing process).");
+                    _vpnHoodProcess.Kill();
+                    _vpnHoodProcess.Dispose();
+                    _vpnHoodProcess = null;
+                }
+                else
+                {
+                    var helperResult = await _helperClient.StopAsync(cancellationToken);
+                    if (!helperResult.IsSuccess)
+                    {
+                        _logger.LogWarning("Helper reported failure while stopping: {Message}", helperResult.Error?.Message);
+                    }
                 }
 
                 _stateManager.SetState(ConnectionState.Disconnected);

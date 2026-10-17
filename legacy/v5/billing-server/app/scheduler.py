@@ -161,6 +161,7 @@ class JobScheduler:
             ("orphan_provisioning_cleanup", 3600, "run_orphan_provisioning_cleanup_job"),
             ("provisioning_reconciliation", 3600, "run_provisioning_reconciliation_job"),
             ("credential_rotation", 86400, "run_credential_rotation_job"),
+            ("agent_session_orphan_cleanup", 3600, "run_agent_session_orphan_cleanup_job"),
         ]
         for name, interval, method_name in jobs:
             if name not in self._job_stats:

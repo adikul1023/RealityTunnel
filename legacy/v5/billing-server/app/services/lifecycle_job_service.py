@@ -182,6 +182,20 @@ class LifecycleJobService:
                 await self.session.rollback()
         return count
 
+    async def run_agent_session_orphan_cleanup_job(self, now: datetime | None = None) -> int:
+        """
+        Job 10 (Phase 5F-B): Scan active agent sessions whose nodes have not heartbeated for 24h.
+        Marks them as closed to clean up stale metadata from ungraceful node restarts.
+        """
+        from app.services.vpnhood_session_service import VPNHoodSessionService
+        try:
+            count = await VPNHoodSessionService.cleanup_orphaned_sessions(self.session)
+            return count
+        except Exception as exc:
+            logger.error("Error in agent session orphan cleanup: %s", str(exc))
+            await self.session.rollback()
+            return 0
+
     async def run_system_health_monitoring_job(self, now: datetime | None = None) -> dict[str, bool]:
         """
         Job 5: Check health of remote providers (Marzban, Razorpay) and record status.
