@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using OverREALITY.Shared.Interfaces;
 using OverREALITY.Shared.Api.Authentication;
+using OverREALITY.Shared.Errors;
 
 namespace OverREALITY.Core.Services;
 
@@ -14,6 +15,7 @@ public class TokenProvider : ITokenProvider
     private readonly IAuthenticationApi _authApi;
     private readonly ISessionManager _sessionManager;
     private readonly ILogger<TokenProvider> _logger;
+    private readonly SemaphoreSlim _refreshLock = new(1, 1);
     private string? _cachedAccessToken;
 
     public TokenProvider(ISecureStorage secureStorage, IAuthenticationApi authApi, ISessionManager sessionManager, ILogger<TokenProvider> logger)
@@ -31,25 +33,59 @@ public class TokenProvider : ITokenProvider
             _cachedAccessToken = await _secureStorage.GetSecureAsync("AccessToken");
         }
 
-        if (string.IsNullOrEmpty(_cachedAccessToken))
-            return null;
-
-        var handler = new JwtSecurityTokenHandler();
-        if (handler.CanReadToken(_cachedAccessToken))
+        if (IsTokenValid(_cachedAccessToken))
         {
-            var jwtToken = handler.ReadJwtToken(_cachedAccessToken);
-            if (jwtToken.ValidTo > DateTime.UtcNow.AddMinutes(1))
+            return _cachedAccessToken;
+        }
+
+        await _refreshLock.WaitAsync(cancellationToken);
+        try
+        {
+            // Re-check after acquiring lock in case another concurrent operation just refreshed it
+            if (string.IsNullOrEmpty(_cachedAccessToken))
+            {
+                _cachedAccessToken = await _secureStorage.GetSecureAsync("AccessToken");
+            }
+
+            if (IsTokenValid(_cachedAccessToken))
             {
                 return _cachedAccessToken;
             }
-        }
 
-        return await RefreshTokenAsync(cancellationToken);
+            var refreshedToken = await RefreshTokenAsync(cancellationToken);
+            if (!string.IsNullOrEmpty(refreshedToken))
+            {
+                _cachedAccessToken = refreshedToken;
+            }
+            return refreshedToken;
+        }
+        finally
+        {
+            _refreshLock.Release();
+        }
     }
 
     public void InvalidateToken()
     {
         _cachedAccessToken = null;
+    }
+
+    private static bool IsTokenValid(string? token)
+    {
+        if (string.IsNullOrEmpty(token))
+            return false;
+
+        var handler = new JwtSecurityTokenHandler();
+        if (handler.CanReadToken(token))
+        {
+            var jwtToken = handler.ReadJwtToken(token);
+            if (jwtToken.ValidTo > DateTime.UtcNow.AddMinutes(1))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private async Task<string?> RefreshTokenAsync(CancellationToken cancellationToken)
@@ -69,13 +105,18 @@ public class TokenProvider : ITokenProvider
                 await _secureStorage.SaveSecureAsync("RefreshToken", response.Value.RefreshToken);
                 return response.Value.AccessToken;
             }
-            else if (!response.IsSuccess && (response.Error?.Code == "DEVICE_REVOKED" || response.Error?.Code == "REPLAY_DETECTED" || response.Error?.Code == "INVALID_TOKEN"))
+            else if (!response.IsSuccess && IsFatalRejection(response.Error))
             {
-                _logger.LogWarning("Fatal error during token refresh: {ErrorCode}. Clearing session.", response.Error?.Code);
+                _logger.LogWarning("Fatal error during token refresh: {ErrorCode} (Status {StatusCode}). Clearing session.", response.Error?.Code, response.Error?.StatusCode);
                 InvalidateToken();
                 await _secureStorage.DeleteSecureAsync("AccessToken");
                 await _secureStorage.DeleteSecureAsync("RefreshToken");
+                await _secureStorage.DeleteSecureAsync("account_id");
                 _sessionManager.ClearSession();
+            }
+            else
+            {
+                _logger.LogWarning("Transient or non-fatal error during token refresh: {ErrorCode} (Status {StatusCode}). Preserving stored session.", response.Error?.Code, response.Error?.StatusCode);
             }
         }
         catch (Exception ex)
@@ -84,5 +125,15 @@ public class TokenProvider : ITokenProvider
         }
         
         return null;
+    }
+
+    private static bool IsFatalRejection(AuthenticationError? error)
+    {
+        if (error == null) return false;
+
+        if (error.StatusCode == 401) return true;
+
+        var code = error.Code?.ToUpperInvariant();
+        return code is "DEVICE_REVOKED" or "DEVICE_DEACTIVATED" or "REPLAY_DETECTED" or "INVALID_TOKEN" or "AUTH_ERROR" or "ACCOUNT_DISABLED" or "UNAUTHORIZED";
     }
 }
