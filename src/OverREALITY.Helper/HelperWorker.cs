@@ -39,7 +39,7 @@ public class HelperWorker : BackgroundService
                 {
                     _stateMachine.TransitionTo(HelperStatus.Stopped);
                 }
-                return false;
+                throw;
             }
         };
 

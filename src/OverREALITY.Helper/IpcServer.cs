@@ -47,7 +47,7 @@ public class IpcServer
                 using var serverStream = System.IO.Pipes.NamedPipeServerStreamAcl.Create(
                     PipeName, 
                     System.IO.Pipes.PipeDirection.InOut, 
-                    1, 
+                    NamedPipeServerStream.MaxAllowedServerInstances, 
                     System.IO.Pipes.PipeTransmissionMode.Byte, 
                     System.IO.Pipes.PipeOptions.Asynchronous, 
                     0, 0, pipeSecurity);
@@ -56,24 +56,35 @@ public class IpcServer
                 await serverStream.WaitForConnectionAsync(cancellationToken);
                 _logger.LogInformation("IPC client connected.");
 
-                // Read length prefix
+                // Read length prefix (4 bytes)
                 var lengthBytes = new byte[4];
-                var read = await serverStream.ReadAsync(lengthBytes, cancellationToken);
-                if (read < 4) continue;
-
-                var requestLength = BitConverter.ToInt32(lengthBytes, 0);
-                if (requestLength <= 0 || requestLength > 10 * 1024 * 1024) continue;
-
-                var requestBytes = new byte[requestLength];
-                int totalRead = 0;
-                while (totalRead < requestLength)
+                try
                 {
-                    int bytesRead = await serverStream.ReadAsync(requestBytes.AsMemory(totalRead, requestLength - totalRead), cancellationToken);
-                    if (bytesRead == 0) break;
-                    totalRead += bytesRead;
+                    await serverStream.ReadExactlyAsync(lengthBytes, cancellationToken);
+                }
+                catch (EndOfStreamException)
+                {
+                    _logger.LogWarning("IPC client disconnected before sending request length prefix.");
+                    continue;
                 }
 
-                if (totalRead < requestLength) continue;
+                var requestLength = BitConverter.ToInt32(lengthBytes, 0);
+                if (requestLength <= 0 || requestLength > 10 * 1024 * 1024)
+                {
+                    _logger.LogWarning("Invalid request length received: {Length}", requestLength);
+                    continue;
+                }
+
+                var requestBytes = new byte[requestLength];
+                try
+                {
+                    await serverStream.ReadExactlyAsync(requestBytes, cancellationToken);
+                }
+                catch (EndOfStreamException)
+                {
+                    _logger.LogWarning("IPC client disconnected before sending full request payload.");
+                    continue;
+                }
 
                 var requestJson = Encoding.UTF8.GetString(requestBytes);
                 var request = JsonSerializer.Deserialize<IpcMessage>(requestJson, _jsonOptions);
@@ -152,6 +163,15 @@ public class IpcServer
         await stream.WriteAsync(lengthBytes, cancellationToken);
         await stream.WriteAsync(responseBytes, cancellationToken);
         await stream.FlushAsync(cancellationToken);
+
+        try
+        {
+            stream.WaitForPipeDrain();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "WaitForPipeDrain finished or client disconnected.");
+        }
     }
 
     private class IpcMessage

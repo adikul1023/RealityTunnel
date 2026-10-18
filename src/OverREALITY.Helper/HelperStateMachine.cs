@@ -47,6 +47,7 @@ public class HelperStateMachine
             (HelperStatus.Stopped, HelperStatus.Starting) => true,
             (HelperStatus.Starting, HelperStatus.Running) => true,
             (HelperStatus.Starting, HelperStatus.Stopped) => true, // Failed to start
+            (HelperStatus.Starting, HelperStatus.Crashed) => true, // Process crashed immediately during start
             (HelperStatus.Running, HelperStatus.Stopping) => true,
             (HelperStatus.Stopping, HelperStatus.Stopped) => true,
             (HelperStatus.Running, HelperStatus.Crashed) => true,

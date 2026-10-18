@@ -101,32 +101,31 @@ public class HelperClient : IHelperClient
             
             // Send payload
             await clientStream.WriteAsync(requestBytes, cancellationToken);
+            await clientStream.FlushAsync(cancellationToken);
 
             // Read response length
             var responseLengthBytes = new byte[4];
-            var read = await clientStream.ReadAsync(responseLengthBytes, cancellationToken);
-            if (read < 4)
+            try
             {
-                return Result<TResponse, HelperError>.Failure(new HelperError { Code = "IPC_ERROR", Message = "Failed to read response length from helper." });
+                await clientStream.ReadExactlyAsync(responseLengthBytes, cancellationToken);
+            }
+            catch (EndOfStreamException)
+            {
+                return Result<TResponse, HelperError>.Failure(new HelperError { Code = "IPC_ERROR", Message = "Helper closed pipe connection before responding." });
             }
 
             var responseLength = BitConverter.ToInt32(responseLengthBytes, 0);
             
             // Protect against massive allocations if length is bogus
-            if (responseLength > 10 * 1024 * 1024) 
-                return Result<TResponse, HelperError>.Failure(new HelperError { Code = "IPC_ERROR", Message = "Response from helper is too large." });
+            if (responseLength <= 0 || responseLength > 10 * 1024 * 1024) 
+                return Result<TResponse, HelperError>.Failure(new HelperError { Code = "IPC_ERROR", Message = "Response from helper has invalid length." });
 
             var responseBytes = new byte[responseLength];
-            int totalRead = 0;
-            while (totalRead < responseLength)
+            try
             {
-                int bytesRead = await clientStream.ReadAsync(responseBytes.AsMemory(totalRead, responseLength - totalRead), cancellationToken);
-                if (bytesRead == 0)
-                    break;
-                totalRead += bytesRead;
+                await clientStream.ReadExactlyAsync(responseBytes, cancellationToken);
             }
-
-            if (totalRead < responseLength)
+            catch (EndOfStreamException)
             {
                 return Result<TResponse, HelperError>.Failure(new HelperError { Code = "IPC_ERROR", Message = "Incomplete response from helper." });
             }

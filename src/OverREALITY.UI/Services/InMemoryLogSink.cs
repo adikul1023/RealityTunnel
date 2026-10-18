@@ -16,15 +16,26 @@ public interface IInMemoryLogSink
 {
     event EventHandler<LogEntry> LogReceived;
     void AddLog(LogEntry log);
+    System.Collections.Generic.IReadOnlyList<LogEntry> GetRecentLogs();
 }
 
 public class InMemoryLogSink : IInMemoryLogSink
 {
+    private readonly ConcurrentQueue<LogEntry> _logs = new();
+    private const int MaxLogs = 1000;
+
     public event EventHandler<LogEntry>? LogReceived;
 
     public void AddLog(LogEntry log)
     {
+        _logs.Enqueue(log);
+        while (_logs.Count > MaxLogs && _logs.TryDequeue(out _)) { }
         LogReceived?.Invoke(this, log);
+    }
+
+    public System.Collections.Generic.IReadOnlyList<LogEntry> GetRecentLogs()
+    {
+        return _logs.ToArray();
     }
 }
 

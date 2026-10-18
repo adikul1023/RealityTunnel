@@ -66,7 +66,7 @@ public class SingboxProcessManager : IDisposable
             StartInfo = new ProcessStartInfo
             {
                 FileName = exePath,
-                Arguments = "check -c config.json",
+                Arguments = $"check -c \"{configPath}\"",
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -93,7 +93,7 @@ public class SingboxProcessManager : IDisposable
             StartInfo = new ProcessStartInfo
             {
                 FileName = exePath,
-                Arguments = "run -c config.json",
+                Arguments = $"run -c \"{configPath}\"",
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,

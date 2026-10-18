@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel;
 using System.Windows;
 using Hardcodet.Wpf.TaskbarNotification;
@@ -7,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using OverREALITY.Configuration;
 using OverREALITY.Core;
 using OverREALITY.Infrastructure;
+using OverREALITY.Shared.Logging;
 using OverREALITY.UI.ViewModels;
 using OverREALITY.UI.Views;
 using OverREALITY.UI.Services;
@@ -26,6 +28,13 @@ public partial class App : Application
             {
                 logging.ClearProviders();
                 logging.AddConsole();
+                try
+                {
+                    var logDir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OverREALITY", "logs");
+                    var logFile = System.IO.Path.Combine(logDir, "ui.log");
+                    logging.AddProvider(new FileLoggerProvider(logFile));
+                }
+                catch { }
             })
             .ConfigureServices((context, services) =>
             {

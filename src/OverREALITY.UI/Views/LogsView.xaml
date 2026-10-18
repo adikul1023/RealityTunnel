@@ -1,14 +1,100 @@
-﻿<UserControl x:Class="OverREALITY.UI.Views.LogsView"
+<UserControl x:Class="OverREALITY.UI.Views.LogsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
     <Grid Margin="16">
-        <DataGrid ItemsSource="{Binding Logs}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Timestamp" Binding="{Binding Timestamp, StringFormat={}{0:HH:mm:ss.fff}}" Width="Auto" />
-                <DataGridTextColumn Header="Level" Binding="{Binding LogLevel}" Width="Auto" />
-                <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="Auto" />
-                <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*" />
-            </DataGrid.Columns>
-        </DataGrid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Top Header & Actions -->
+        <Grid Grid.Row="0" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <materialDesign:PackIcon Kind="TextSubject" Width="24" Height="24" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource PrimaryHueMidBrush}" />
+                <TextBlock Text="Application &amp; Tunnel Logs" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding StatusMessage}" Margin="16,0,0,0" VerticalAlignment="Center" Foreground="#76FF03" FontWeight="Medium" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Command="{Binding CopyLogsCommand}" Style="{StaticResource MaterialDesignOutlinedButton}" Height="32" Margin="0,0,8,0" ToolTip="Copy all logs to clipboard">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="ContentCopy" Width="16" Height="16" Margin="0,0,4,0" VerticalAlignment="Center" />
+                        <TextBlock Text="COPY" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Command="{Binding OpenLogsFolderCommand}" Style="{StaticResource MaterialDesignOutlinedButton}" Height="32" Margin="0,0,8,0" ToolTip="Open log files directory">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="FolderOpen" Width="16" Height="16" Margin="0,0,4,0" VerticalAlignment="Center" />
+                        <TextBlock Text="FILES" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Command="{Binding ClearLogsCommand}" Style="{StaticResource MaterialDesignFlatButton}" Height="32" ToolTip="Clear visible logs">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="DeleteSweep" Width="16" Height="16" Margin="0,0,4,0" VerticalAlignment="Center" />
+                        <TextBlock Text="CLEAR" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <!-- Logs DataGrid inside Material Card -->
+        <materialDesign:Card Grid.Row="1" UniformCornerRadius="6" VerticalAlignment="Stretch">
+            <DataGrid ItemsSource="{Binding Logs}" 
+                      AutoGenerateColumns="False" 
+                      IsReadOnly="True" 
+                      HeadersVisibility="Column"
+                      GridLinesVisibility="Horizontal"
+                      CanUserSortColumns="True"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto"
+                      BorderThickness="0">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Timestamp" 
+                                        Binding="{Binding Timestamp, StringFormat={}{0:HH:mm:ss.fff}}" 
+                                        Width="105" />
+                    <DataGridTemplateColumn Header="Level" Width="85">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding LogLevel}" FontWeight="SemiBold">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding LogLevel}" Value="Error">
+                                                    <Setter Property="Foreground" Value="#FF5252" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding LogLevel}" Value="Critical">
+                                                    <Setter Property="Foreground" Value="#FF1744" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding LogLevel}" Value="Warning">
+                                                    <Setter Property="Foreground" Value="#FFA726" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding LogLevel}" Value="Information">
+                                                    <Setter Property="Foreground" Value="#69F0AE" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding LogLevel}" Value="Debug">
+                                                    <Setter Property="Foreground" Value="#B0BEC5" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Category" 
+                                        Binding="{Binding Category}" 
+                                        Width="130" />
+                    <DataGridTextColumn Header="Message" 
+                                        Binding="{Binding Message}" 
+                                        Width="*" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </materialDesign:Card>
     </Grid>
 </UserControl>
