@@ -15,5 +15,9 @@ public class LoginRequest
 
     [JsonPropertyName("client_type")]
     public string ClientType { get; set; } = "desktop";
+
+    [JsonPropertyName("two_fa_code")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? TwoFaCode { get; set; }
 }
 

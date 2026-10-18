@@ -8,19 +8,55 @@
     <Grid Margin="32">
         <StackPanel VerticalAlignment="Center" MaxWidth="400">
             <TextBlock Text="Stealthy" FontSize="32" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,32" />
-            
-            <TextBox materialDesign:HintAssist.Hint="Account Key (e.g., ST-XXXX-XXXX:&lt;master-token&gt;)"
-                     Text="{Binding AccountKey, UpdateSourceTrigger=PropertyChanged}"
-                     Margin="0,0,0,16" />
-            
-            
 
-            <TextBlock Text="{Binding ErrorMessage}" Foreground="Red" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" Margin="0,0,0,16" />
+            <!-- INITIAL ACCOUNT KEY PANEL -->
+            <StackPanel>
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Is2FaRequired}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
 
-            <Button Command="{Binding LoginCommand}" Content="Authenticate" Margin="0,16,0,0" />
-            
+                <TextBox materialDesign:HintAssist.Hint="Account Key (e.g., ST-XXXX-XXXX:&lt;master-token&gt;)"
+                         Text="{Binding AccountKey, UpdateSourceTrigger=PropertyChanged}"
+                         Margin="0,0,0,16" />
+
+                <Button Command="{Binding LoginCommand}" Content="Authenticate" Margin="0,16,0,0" />
+            </StackPanel>
+
+            <!-- 2FA OTP ENTRY PANEL -->
+            <StackPanel>
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Is2FaRequired}" Value="True">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+
+                <TextBlock Text="Two-Factor Authentication" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,0,0,8" />
+                <TextBlock Text="Enter your 6-digit TOTP code or backup code to complete login."
+                           FontSize="12" Opacity="0.75" TextWrapping="Wrap" TextAlignment="Center" Margin="0,0,0,16" />
+
+                <TextBox materialDesign:HintAssist.Hint="6-digit code or backup code"
+                         Text="{Binding TwoFaCode, UpdateSourceTrigger=PropertyChanged}"
+                         Margin="0,0,0,16" />
+
+                <Button Command="{Binding Verify2FaCommand}" Content="Verify Code" Margin="0,8,0,0" />
+                <Button Command="{Binding Cancel2FaCommand}" Content="Cancel" Style="{StaticResource MaterialDesignFlatButton}" Margin="0,8,0,0" />
+            </StackPanel>
+
+            <TextBlock Text="{Binding ErrorMessage}" Foreground="Red" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" Margin="0,16,0,0" />
+
             <ProgressBar IsIndeterminate="True" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" Margin="0,16,0,0" />
         </StackPanel>
     </Grid>
 </UserControl>
-

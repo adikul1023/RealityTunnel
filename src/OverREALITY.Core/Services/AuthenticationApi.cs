@@ -57,11 +57,19 @@ public class AuthenticationApi : IAuthenticationApi
 
             var errorMessage = "API error";
             var errorCode = response.StatusCode.ToString();
+            bool requires2Fa = false;
             try 
             {
                 var errorObj = System.Text.Json.JsonDocument.Parse(responseContent);
                 var root = errorObj.RootElement;
                 
+                if (root.TryGetProperty("requires_2fa", out var req2FaProp) && 
+                    (req2FaProp.ValueKind == System.Text.Json.JsonValueKind.True || (req2FaProp.ValueKind == System.Text.Json.JsonValueKind.String && bool.TryParse(req2FaProp.GetString(), out var parsed) && parsed)))
+                {
+                    requires2Fa = true;
+                    errorCode = "REQUIRES_2FA";
+                }
+
                 if (root.TryGetProperty("message", out var msgProp) || root.TryGetProperty("detail", out msgProp))
                 {
                     if (msgProp.ValueKind == System.Text.Json.JsonValueKind.String)
@@ -81,7 +89,7 @@ public class AuthenticationApi : IAuthenticationApi
                     }
                 }
                 
-                if (root.TryGetProperty("code", out var codeProp) && codeProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                if (!requires2Fa && root.TryGetProperty("code", out var codeProp) && codeProp.ValueKind == System.Text.Json.JsonValueKind.String)
                 {
                     errorCode = codeProp.GetString() ?? errorCode;
                 }
@@ -95,7 +103,8 @@ public class AuthenticationApi : IAuthenticationApi
             { 
                 Message = errorMessage, 
                 StatusCode = (int)response.StatusCode,
-                Code = errorCode
+                Code = errorCode,
+                Requires2Fa = requires2Fa
             });
         }
         catch (TaskCanceledException ex)

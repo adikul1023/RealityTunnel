@@ -29,7 +29,7 @@ public class AuthenticationService : IAuthService
         _logger = logger;
     }
 
-    public async Task<Result<LoginResponse, AuthenticationError>> LoginAsync(string accountId, string masterToken, CancellationToken cancellationToken = default)
+    public async Task<Result<LoginResponse, AuthenticationError>> LoginAsync(string accountId, string masterToken, string? twoFaCode = null, CancellationToken cancellationToken = default)
     {
         var deviceGuid = await _secureStorage.GetSecureAsync("device_guid");
         if (string.IsNullOrEmpty(deviceGuid))
@@ -38,14 +38,14 @@ public class AuthenticationService : IAuthService
             await _secureStorage.SaveSecureAsync("device_guid", deviceGuid);
         }
 
-        var result = await _authApi.LoginAsync(new LoginRequest { AccountId = accountId, MasterToken = masterToken, DeviceGuid = deviceGuid, ClientType = "desktop" }, cancellationToken);
+        var result = await _authApi.LoginAsync(new LoginRequest { AccountId = accountId, MasterToken = masterToken, DeviceGuid = deviceGuid, ClientType = "desktop", TwoFaCode = twoFaCode }, cancellationToken);
         
         if (!result.IsSuccess && result.Error?.Code == "DEVICE_DEACTIVATED")
         {
             _logger.LogWarning("Device was deactivated. Generating a new Device GUID and retrying...");
             deviceGuid = Guid.NewGuid().ToString();
             await _secureStorage.SaveSecureAsync("device_guid", deviceGuid);
-            result = await _authApi.LoginAsync(new LoginRequest { AccountId = accountId, MasterToken = masterToken, DeviceGuid = deviceGuid, ClientType = "desktop" }, cancellationToken);
+            result = await _authApi.LoginAsync(new LoginRequest { AccountId = accountId, MasterToken = masterToken, DeviceGuid = deviceGuid, ClientType = "desktop", TwoFaCode = twoFaCode }, cancellationToken);
         }
         
         if (result.IsSuccess && result.Value != null)
@@ -71,7 +71,8 @@ public class AuthenticationService : IAuthService
         return Result<LoginResponse, AuthenticationError>.Failure(new AuthenticationError { 
             Message = result.Error?.Message ?? "Login failed",
             Code = result.Error?.Code ?? "LOGIN_FAILED",
-            StatusCode = result.Error?.StatusCode ?? 0
+            StatusCode = result.Error?.StatusCode ?? 0,
+            Requires2Fa = result.Error?.Requires2Fa ?? false
         });
     }
 
