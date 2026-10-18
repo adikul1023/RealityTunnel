@@ -34,8 +34,11 @@ public class IpcServer
 
     public async Task StartListeningAsync(CancellationToken cancellationToken)
     {
+        _logger.LogInformation("IPC Server listening on pipe '{PipeName}'.", PipeName);
+
         while (!cancellationToken.IsCancellationRequested)
         {
+            NamedPipeServerStream? serverStream = null;
             try
             {
                 var pipeSecurity = new System.IO.Pipes.PipeSecurity();
@@ -44,7 +47,7 @@ public class IpcServer
                     System.IO.Pipes.PipeAccessRights.ReadWrite,
                     System.Security.AccessControl.AccessControlType.Allow));
                 
-                using var serverStream = System.IO.Pipes.NamedPipeServerStreamAcl.Create(
+                serverStream = System.IO.Pipes.NamedPipeServerStreamAcl.Create(
                     PipeName, 
                     System.IO.Pipes.PipeDirection.InOut, 
                     NamedPipeServerStream.MaxAllowedServerInstances, 
@@ -52,57 +55,81 @@ public class IpcServer
                     System.IO.Pipes.PipeOptions.Asynchronous, 
                     0, 0, pipeSecurity);
                 
-                _logger.LogInformation("Waiting for IPC connection...");
                 await serverStream.WaitForConnectionAsync(cancellationToken);
-                _logger.LogInformation("IPC client connected.");
 
-                // Read length prefix (4 bytes)
-                var lengthBytes = new byte[4];
-                try
+                // Handle the connection asynchronously so the next server instance is listening immediately
+                var activeStream = serverStream;
+                _ = Task.Run(async () =>
                 {
-                    await serverStream.ReadExactlyAsync(lengthBytes, cancellationToken);
-                }
-                catch (EndOfStreamException)
-                {
-                    _logger.LogWarning("IPC client disconnected before sending request length prefix.");
-                    continue;
-                }
-
-                var requestLength = BitConverter.ToInt32(lengthBytes, 0);
-                if (requestLength <= 0 || requestLength > 10 * 1024 * 1024)
-                {
-                    _logger.LogWarning("Invalid request length received: {Length}", requestLength);
-                    continue;
-                }
-
-                var requestBytes = new byte[requestLength];
-                try
-                {
-                    await serverStream.ReadExactlyAsync(requestBytes, cancellationToken);
-                }
-                catch (EndOfStreamException)
-                {
-                    _logger.LogWarning("IPC client disconnected before sending full request payload.");
-                    continue;
-                }
-
-                var requestJson = Encoding.UTF8.GetString(requestBytes);
-                var request = JsonSerializer.Deserialize<IpcMessage>(requestJson, _jsonOptions);
-
-                if (request != null)
-                {
-                    await HandleRequestAsync(serverStream, request, cancellationToken);
-                }
+                    using (activeStream)
+                    {
+                        await ProcessClientConnectionAsync(activeStream, cancellationToken);
+                    }
+                }, cancellationToken);
             }
             catch (OperationCanceledException)
             {
+                serverStream?.Dispose();
                 break;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error handling IPC connection.");
-                await Task.Delay(1000, cancellationToken); // Backoff on error
+                serverStream?.Dispose();
+                _logger.LogError(ex, "Error accepting IPC connection.");
+                await Task.Delay(500, cancellationToken);
             }
+        }
+    }
+
+    private async Task ProcessClientConnectionAsync(NamedPipeServerStream stream, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Read length prefix (4 bytes)
+            var lengthBytes = new byte[4];
+            try
+            {
+                await stream.ReadExactlyAsync(lengthBytes, cancellationToken);
+            }
+            catch (EndOfStreamException)
+            {
+                _logger.LogDebug("IPC client disconnected without sending data.");
+                return;
+            }
+
+            var requestLength = BitConverter.ToInt32(lengthBytes, 0);
+            if (requestLength <= 0 || requestLength > 10 * 1024 * 1024)
+            {
+                _logger.LogWarning("Invalid request length received: {Length}", requestLength);
+                return;
+            }
+
+            var requestBytes = new byte[requestLength];
+            try
+            {
+                await stream.ReadExactlyAsync(requestBytes, cancellationToken);
+            }
+            catch (EndOfStreamException)
+            {
+                _logger.LogWarning("IPC client disconnected before sending full request payload.");
+                return;
+            }
+
+            var requestJson = Encoding.UTF8.GetString(requestBytes);
+            var request = JsonSerializer.Deserialize<IpcMessage>(requestJson, _jsonOptions);
+
+            if (request != null)
+            {
+                await HandleRequestAsync(stream, request, cancellationToken);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Normal cancellation
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling IPC request.");
         }
     }
 
@@ -124,6 +151,10 @@ public class IpcServer
                             resultData = await OnStartRequested(startReq);
                         else
                             throw new Exception("Invalid Start payload.");
+                    }
+                    else
+                    {
+                        throw new Exception("Start requested without payload or handler.");
                     }
                     break;
                 case "Stop":
@@ -147,30 +178,38 @@ public class IpcServer
         {
             success = false;
             error = ex.Message;
+            _logger.LogError(ex, "Handler error for action '{Action}'", request.Action);
         }
-
-        var response = new IpcResponse<object>
-        {
-            Success = success,
-            Data = resultData,
-            ErrorMessage = error
-        };
-
-        var responseJson = JsonSerializer.Serialize(response, _jsonOptions);
-        var responseBytes = Encoding.UTF8.GetBytes(responseJson);
-
-        var lengthBytes = BitConverter.GetBytes(responseBytes.Length);
-        await stream.WriteAsync(lengthBytes, cancellationToken);
-        await stream.WriteAsync(responseBytes, cancellationToken);
-        await stream.FlushAsync(cancellationToken);
 
         try
         {
-            stream.WaitForPipeDrain();
+            var response = new IpcResponse<object>
+            {
+                Success = success,
+                Data = resultData,
+                ErrorMessage = error
+            };
+
+            var responseJson = JsonSerializer.Serialize(response, _jsonOptions);
+            var responseBytes = Encoding.UTF8.GetBytes(responseJson);
+
+            var lengthBytes = BitConverter.GetBytes(responseBytes.Length);
+            await stream.WriteAsync(lengthBytes, cancellationToken);
+            await stream.WriteAsync(responseBytes, cancellationToken);
+            await stream.FlushAsync(cancellationToken);
+
+            try
+            {
+                stream.WaitForPipeDrain();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "WaitForPipeDrain completed or client closed pipe.");
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "WaitForPipeDrain finished or client disconnected.");
+            _logger.LogError(ex, "Failed to write IPC response to client.");
         }
     }
 

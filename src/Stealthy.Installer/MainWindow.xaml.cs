@@ -59,17 +59,32 @@ namespace Stealthy.Installer
             {
                 string targetDir = @"C:\Program Files\Stealthy VPN";
 
+                // Step 0: Terminate running instances to avoid locked files
+                SetStatus("Closing running instances...", "Step 1 of 5");
+                string[] runningNames = new[] { "OverREALITY.UI", "OverREALITY.Helper", "sing-box" };
+                foreach (var name in runningNames)
+                {
+                    try
+                    {
+                        foreach (var p in Process.GetProcessesByName(name))
+                        {
+                            p.Kill();
+                            p.WaitForExit(3000);
+                        }
+                    }
+                    catch { }
+                }
+
                 // Step 1: Create target directory
-                SetStatus("Creating installation directory...", "Step 1 of 4");
+                SetStatus("Creating installation directory...", "Step 2 of 5");
                 if (!Directory.Exists(targetDir))
                     Directory.CreateDirectory(targetDir);
 
                 // Step 2: Extract embedded payload
-                SetStatus("Extracting files...", "Step 2 of 4");
+                SetStatus("Extracting files...", "Step 3 of 5");
                 string tempZip = Path.Combine(Path.GetTempPath(), $"stealthy_payload_{Guid.NewGuid()}.zip");
 
                 var asm = Assembly.GetExecutingAssembly();
-                // List all embedded resources for debugging
                 var resources = asm.GetManifestResourceNames();
                 string? resourceName = null;
                 foreach (var r in resources)
@@ -93,12 +108,12 @@ namespace Stealthy.Installer
                 }
 
                 // Step 3: Extract ZIP
-                SetStatus("Installing Stealthy VPN...", "Step 3 of 4");
+                SetStatus("Installing Stealthy VPN...", "Step 4 of 5");
                 ZipFile.ExtractToDirectory(tempZip, targetDir, overwriteFiles: true);
                 File.Delete(tempZip);
 
                 // Step 4: Create shortcuts
-                SetStatus("Creating shortcuts...", "Step 4 of 4");
+                SetStatus("Creating shortcuts...", "Step 5 of 5");
                 string exePath = Path.Combine(targetDir, "OverREALITY.UI.exe");
                 string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
                 string programsPath = Environment.GetFolderPath(Environment.SpecialFolder.Programs);
@@ -127,7 +142,6 @@ namespace Stealthy.Installer
                     StatusText.Foreground = new SolidColorBrush(Colors.OrangeRed);
                     InstallButton.Visibility = Visibility.Visible;
                     
-                    // Show full error details
                     MessageBox.Show($"Installation failed.\n\nError: {ex.Message}\n\nDetails:\n{ex.StackTrace}",
                         "Installation Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 });
@@ -136,7 +150,6 @@ namespace Stealthy.Installer
 
         private void CreateShortcut(string targetPath, string workingDir, string shortcutPath)
         {
-            // Use a PowerShell command to create the .lnk shortcut
             string psScript = $@"
 $ws = New-Object -ComObject WScript.Shell
 $s = $ws.CreateShortcut('{shortcutPath.Replace("'", "''")}')
@@ -144,7 +157,6 @@ $s.TargetPath = '{targetPath.Replace("'", "''")}'
 $s.WorkingDirectory = '{workingDir.Replace("'", "''")}' 
 $s.Save()
 ";
-            // Write script to temp file to avoid any argument escaping issues
             string scriptFile = Path.Combine(Path.GetTempPath(), $"stealthy_shortcut_{Guid.NewGuid()}.ps1");
             File.WriteAllText(scriptFile, psScript);
 

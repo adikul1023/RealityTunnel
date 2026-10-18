@@ -31,6 +31,10 @@ public partial class App : Application
                 try
                 {
                     var logDir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OverREALITY", "logs");
+                    if (!System.IO.Directory.Exists(logDir))
+                    {
+                        System.IO.Directory.CreateDirectory(logDir);
+                    }
                     var logFile = System.IO.Path.Combine(logDir, "ui.log");
                     logging.AddProvider(new FileLoggerProvider(logFile));
                 }
@@ -110,29 +114,34 @@ public partial class App : Application
     private void EnsureHelperIsRunning()
     {
         var helperProcesses = System.Diagnostics.Process.GetProcessesByName("OverREALITY.Helper");
-        if (helperProcesses.Length == 0)
+        if (helperProcesses.Length > 0)
         {
-            try
+            return;
+        }
+
+        try
+        {
+            var baseDir = System.IO.Path.GetDirectoryName(Environment.ProcessPath) ?? System.AppDomain.CurrentDomain.BaseDirectory;
+            var helperPath = System.IO.Path.Combine(baseDir, "OverREALITY.Helper.exe");
+            if (!System.IO.File.Exists(helperPath))
             {
-                var baseDir = System.IO.Path.GetDirectoryName(Environment.ProcessPath) ?? System.AppDomain.CurrentDomain.BaseDirectory;
-                var helperPath = System.IO.Path.Combine(baseDir, "OverREALITY.Helper.exe");
-                if (System.IO.File.Exists(helperPath))
-                {
-                    var startInfo = new System.Diagnostics.ProcessStartInfo
-                    {
-                        FileName = helperPath,
-                        UseShellExecute = true,
-                        Verb = "runas",
-                        WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
-                        CreateNoWindow = true
-                    };
-                    System.Diagnostics.Process.Start(startInfo);
-                }
+                System.Diagnostics.Debug.WriteLine($"Helper not found at: {helperPath}");
+                return;
             }
-            catch (System.Exception ex)
+
+            var startInfo = new System.Diagnostics.ProcessStartInfo
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to start helper: {ex.Message}");
-            }
+                FileName = helperPath,
+                UseShellExecute = true,
+                Verb = "runas",
+                WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
+                CreateNoWindow = true
+            };
+            System.Diagnostics.Process.Start(startInfo);
+        }
+        catch (System.Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Failed to start helper: {ex.Message}");
         }
     }
 

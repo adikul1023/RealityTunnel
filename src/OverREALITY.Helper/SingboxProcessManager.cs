@@ -11,7 +11,6 @@ public class SingboxProcessManager : IDisposable
 {
     private readonly ILogger<SingboxProcessManager> _logger;
     private Process? _process;
-    
 
     public event EventHandler<ProcessExitedEventArgs>? ProcessExited;
 
@@ -53,12 +52,19 @@ public class SingboxProcessManager : IDisposable
             _logger.LogInformation("Success: sing-box.exe found.");
         }
         
-        var configPath = Path.Combine(baseDir, "config.json");
-        _logger.LogInformation("Attempting: {Path} (WriteAllText)", configPath);
+        // Store mutable config in ProgramData instead of protected Program Files
+        var dataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "OverREALITY", "singbox");
+        if (!Directory.Exists(dataDir))
+        {
+            Directory.CreateDirectory(dataDir);
+        }
+
+        var configPath = Path.Combine(dataDir, "config.json");
+        _logger.LogInformation("Writing config to: {Path}", configPath);
         await File.WriteAllTextAsync(configPath, configJson, cancellationToken);
         _logger.LogInformation("Success: wrote config.json.");
 
-        _logger.LogInformation("Executable: {ExePath}\nConfig file: {ConfigPath}\nWorking directory: {WorkDir}", exePath, configPath, baseDir);
+        _logger.LogInformation("Executable: {ExePath}\nConfig file: {ConfigPath}\nWorking directory: {WorkDir}", exePath, configPath, dataDir);
 
         // Run validation check before launching
         var checkProcess = new Process
@@ -71,7 +77,7 @@ public class SingboxProcessManager : IDisposable
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true,
-                WorkingDirectory = baseDir
+                WorkingDirectory = dataDir
             }
         };
         
@@ -83,7 +89,7 @@ public class SingboxProcessManager : IDisposable
         if (checkProcess.ExitCode != 0)
         {
             _logger.LogError("sing-box config validation failed.\nOutput: {Output}\nError: {Error}", checkOutput, checkError);
-            throw new Exception($"Configuration validation failed:\n{checkError}");
+            throw new Exception($"Configuration validation failed: {checkError} {checkOutput}".Trim());
         }
 
         _logger.LogInformation("Config validation passed.");
@@ -98,18 +104,26 @@ public class SingboxProcessManager : IDisposable
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true,
-                WorkingDirectory = baseDir
+                WorkingDirectory = dataDir
             },
             EnableRaisingEvents = true
         };
 
+        string lastErrorOutput = string.Empty;
         _process.OutputDataReceived += (s, e) => { if (e.Data != null) _logger.LogInformation("[sing-box] {Output}", e.Data); };
-        _process.ErrorDataReceived += (s, e) => { if (e.Data != null) _logger.LogError("[sing-box] {Error}", e.Data); };
+        _process.ErrorDataReceived += (s, e) => 
+        { 
+            if (e.Data != null) 
+            {
+                _logger.LogError("[sing-box] {Error}", e.Data); 
+                lastErrorOutput = e.Data;
+            }
+        };
         _process.Exited += (s, e) => 
         {
             var exitCode = _process.ExitCode;
             var runtime = DateTime.Now - _process.StartTime;
-            var unexpected = exitCode != 0 && exitCode != 1; // Depending on what sing-box returns on normal kill
+            var unexpected = exitCode != 0 && exitCode != 1;
             ProcessExited?.Invoke(this, new ProcessExitedEventArgs(exitCode, runtime, unexpected));
         };
 
@@ -122,6 +136,19 @@ public class SingboxProcessManager : IDisposable
         _process.BeginErrorReadLine();
 
         _logger.LogInformation("Sing-box process started with ID {ProcessId}", _process.Id);
+
+        // Verification delay to detect immediate crashes (e.g. TUN creation failure or permission denial)
+        var exitTask = _process.WaitForExitAsync(cancellationToken);
+        var delayTask = Task.Delay(1000, cancellationToken);
+        var completed = await Task.WhenAny(exitTask, delayTask);
+        if (completed == exitTask)
+        {
+            var errMsg = string.IsNullOrWhiteSpace(lastErrorOutput) 
+                ? $"sing-box exited immediately with code {_process.ExitCode}." 
+                : $"sing-box startup failed: {lastErrorOutput}";
+            _logger.LogError(errMsg);
+            throw new Exception(errMsg);
+        }
     }
 
     public void Stop()
@@ -138,6 +165,5 @@ public class SingboxProcessManager : IDisposable
     {
         Stop();
         _process?.Dispose();
-        
     }
 }
