@@ -1,5 +1,8 @@
 using System;
 using System.ComponentModel;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using Hardcodet.Wpf.TaskbarNotification;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using OverREALITY.Configuration;
 using OverREALITY.Core;
 using OverREALITY.Infrastructure;
+using OverREALITY.Shared.Interfaces;
 using OverREALITY.Shared.Logging;
 using OverREALITY.UI.ViewModels;
 using OverREALITY.UI.Views;
@@ -70,9 +74,9 @@ public partial class App : Application
 
     protected override async void OnStartup(StartupEventArgs e)
     {
-        EnsureHelperIsRunning();
-
         await _host.StartAsync();
+
+        await EnsureHelperIsRunningAsync();
 
         // Fire and forget update checker
         _ = CheckForUpdatesAsync();
@@ -111,37 +115,125 @@ public partial class App : Application
         base.OnExit(e);
     }
 
-    private void EnsureHelperIsRunning()
+    private async Task EnsureHelperIsRunningAsync()
     {
-        var helperProcesses = System.Diagnostics.Process.GetProcessesByName("OverREALITY.Helper");
-        if (helperProcesses.Length > 0)
+        var logger = _host.Services.GetService<ILogger<App>>();
+        var helperClient = _host.Services.GetService<IHelperClient>();
+
+        // 1. Check if an existing helper is already running and responsive
+        if (helperClient != null)
         {
+            try
+            {
+                using var cts = new CancellationTokenSource(1500);
+                var pingRes = await helperClient.PingAsync(cts.Token);
+                if (pingRes.IsSuccess && pingRes.Value)
+                {
+                    logger?.LogInformation("Existing Helper process is alive and responding to IPC.");
+                    return;
+                }
+            }
+            catch { }
+        }
+
+        // 2. Clean up any stale or unresponsive helper processes
+        var existingHelpers = System.Diagnostics.Process.GetProcessesByName("OverREALITY.Helper");
+        foreach (var proc in existingHelpers)
+        {
+            try
+            {
+                logger?.LogWarning("Found existing unresponsive Helper process (PID {Pid}). Terminating.", proc.Id);
+                proc.Kill();
+                proc.WaitForExit(2000);
+            }
+            catch (Exception ex)
+            {
+                logger?.LogWarning(ex, "Failed to terminate unresponsive Helper process {Pid}.", proc.Id);
+            }
+        }
+
+        // 3. Locate the Helper executable
+        var baseDir = Path.GetDirectoryName(Environment.ProcessPath) ?? AppDomain.CurrentDomain.BaseDirectory;
+        var candidatePaths = new[]
+        {
+            Path.Combine(baseDir, "OverREALITY.Helper.exe"),
+            Path.Combine(baseDir, "..", "helper", "OverREALITY.Helper.exe"),
+            Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", "publish_build", "helper", "OverREALITY.Helper.exe")),
+            @"C:\Program Files\Stealthy VPN\OverREALITY.Helper.exe"
+        };
+
+        string? helperPath = candidatePaths.FirstOrDefault(File.Exists);
+
+        if (string.IsNullOrEmpty(helperPath) || !File.Exists(helperPath))
+        {
+            logger?.LogError("OverREALITY.Helper.exe not found. Searched: {Paths}", string.Join(", ", candidatePaths));
             return;
         }
 
+        // 4. Launch Helper with elevation
+        var helperDir = Path.GetDirectoryName(helperPath)!;
+        var startInfo = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = helperPath,
+            WorkingDirectory = helperDir,
+            UseShellExecute = true,
+            Verb = "runas"
+        };
+
         try
         {
-            var baseDir = System.IO.Path.GetDirectoryName(Environment.ProcessPath) ?? System.AppDomain.CurrentDomain.BaseDirectory;
-            var helperPath = System.IO.Path.Combine(baseDir, "OverREALITY.Helper.exe");
-            if (!System.IO.File.Exists(helperPath))
+            logger?.LogInformation("Starting elevated helper: {Path} (WorkingDir: {Dir})", helperPath, helperDir);
+            var proc = System.Diagnostics.Process.Start(startInfo);
+            if (proc == null)
             {
-                System.Diagnostics.Debug.WriteLine($"Helper not found at: {helperPath}");
+                logger?.LogError("Process.Start returned null for helper.");
                 return;
             }
-
-            var startInfo = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = helperPath,
-                UseShellExecute = true,
-                Verb = "runas",
-                WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
-                CreateNoWindow = true
-            };
-            System.Diagnostics.Process.Start(startInfo);
         }
-        catch (System.Exception ex)
+        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223) // ERROR_CANCELLED (user clicked No on UAC)
         {
-            System.Diagnostics.Debug.WriteLine($"Failed to start helper: {ex.Message}");
+            logger?.LogWarning("User declined UAC elevation prompt for OverREALITY.Helper.");
+            return;
+        }
+        catch (Exception ex)
+        {
+            logger?.LogError(ex, "Failed to launch elevated helper process.");
+            return;
+        }
+
+        // 5. Wait for IPC readiness
+        if (helperClient != null)
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            const int maxWaitMs = 15000;
+            string lastPingError = "No ping attempt made yet";
+
+            while (sw.ElapsedMilliseconds < maxWaitMs)
+            {
+                try
+                {
+                    using var pingCts = new CancellationTokenSource(1000);
+                    var pingResult = await helperClient.PingAsync(pingCts.Token);
+                    if (pingResult.IsSuccess && pingResult.Value)
+                    {
+                        logger?.LogInformation("Helper process verified responsive via IPC in {Elapsed}ms.", sw.ElapsedMilliseconds);
+                        return;
+                    }
+                    else if (!pingResult.IsSuccess)
+                    {
+                        lastPingError = $"{pingResult.Error?.Code}: {pingResult.Error?.Message}";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    lastPingError = ex.Message;
+                    logger?.LogDebug(ex, "Ping attempt failed after {Elapsed}ms.", sw.ElapsedMilliseconds);
+                }
+
+                await Task.Delay(300);
+            }
+
+            logger?.LogWarning("Helper process was started but did not respond to IPC ping within {Timeout}ms. Last error: {LastError}", maxWaitMs, lastPingError);
         }
     }
 
@@ -158,7 +250,7 @@ public partial class App : Application
                 var match = System.Text.RegularExpressions.Regex.Match(json, @"""tag_name"":\s*""([^""]+)""");
                 if (match.Success)
                 {
-                    var latestTag = match.Groups[1].Value; // e.g. "v1.1.4"
+                    var latestTag = match.Groups[1].Value;
                     var currentVersion = "v" + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3);
                     if (!string.IsNullOrEmpty(latestTag) && latestTag != currentVersion)
                     {

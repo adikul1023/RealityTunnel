@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
@@ -64,7 +65,11 @@ public class HelperWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("HelperWorker running.");
+        _logger.LogInformation("[Helper Startup] HelperWorker running. PID: {Pid}, Process: {Name}, Elevated: {Elevated}, OS: {OS}", 
+            Environment.ProcessId, 
+            Process.GetCurrentProcess().ProcessName, 
+            IpcServer.IsProcessElevated(), 
+            Environment.OSVersion);
 
         try
         {

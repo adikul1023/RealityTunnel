@@ -22,9 +22,15 @@ public class Program
             })
             .ConfigureLogging((hostContext, logging) =>
             {
+                logging.ClearProviders();
+                logging.AddConsole();
                 try
                 {
                     var logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "OverREALITY");
+                    if (!Directory.Exists(logDir))
+                    {
+                        Directory.CreateDirectory(logDir);
+                    }
                     var logFile = Path.Combine(logDir, "helper.log");
                     logging.AddProvider(new FileLoggerProvider(logFile));
                 }

@@ -110,13 +110,27 @@ public class SingboxProcessManager : IDisposable
         };
 
         string lastErrorOutput = string.Empty;
-        _process.OutputDataReceived += (s, e) => { if (e.Data != null) _logger.LogInformation("[sing-box] {Output}", e.Data); };
+        var errorLock = new object();
+        _process.OutputDataReceived += (s, e) => 
+        { 
+            if (e.Data != null) 
+            {
+                _logger.LogInformation("[sing-box] {Output}", e.Data); 
+                if (e.Data.Contains("FATAL", StringComparison.OrdinalIgnoreCase) || 
+                    e.Data.Contains("ERROR", StringComparison.OrdinalIgnoreCase) || 
+                    e.Data.Contains("Access is denied", StringComparison.OrdinalIgnoreCase) || 
+                    e.Data.Contains("panic", StringComparison.OrdinalIgnoreCase))
+                {
+                    lock (errorLock) { lastErrorOutput = e.Data; }
+                }
+            }
+        };
         _process.ErrorDataReceived += (s, e) => 
         { 
             if (e.Data != null) 
             {
                 _logger.LogError("[sing-box] {Error}", e.Data); 
-                lastErrorOutput = e.Data;
+                lock (errorLock) { lastErrorOutput = e.Data; }
             }
         };
         _process.Exited += (s, e) => 
@@ -167,3 +181,4 @@ public class SingboxProcessManager : IDisposable
         _process?.Dispose();
     }
 }
+

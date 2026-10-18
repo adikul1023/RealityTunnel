@@ -26,17 +26,34 @@ public class HelperStateMachine
         }
     }
 
-    public void TransitionTo(HelperStatus newStatus)
+    public bool TryTransitionTo(HelperStatus newStatus, out HelperStatus previousStatus)
     {
         lock (_lock)
         {
+            previousStatus = _status;
+
+            if (_status == newStatus)
+            {
+                return true;
+            }
+
             if (!IsValidTransition(_status, newStatus))
             {
-                throw new InvalidOperationException($"Invalid state transition from {_status} to {newStatus}.");
+                _logger.LogWarning("Invalid state transition attempted: {OldStatus} -> {NewStatus}", _status, newStatus);
+                return false;
             }
 
             _logger.LogInformation("Transitioning helper state: {OldStatus} -> {NewStatus}", _status, newStatus);
             _status = newStatus;
+            return true;
+        }
+    }
+
+    public void TransitionTo(HelperStatus newStatus)
+    {
+        if (!TryTransitionTo(newStatus, out var previousStatus))
+        {
+            throw new InvalidOperationException($"Invalid state transition from {previousStatus} to {newStatus}.");
         }
     }
 
@@ -46,15 +63,14 @@ public class HelperStateMachine
         {
             (HelperStatus.Stopped, HelperStatus.Starting) => true,
             (HelperStatus.Starting, HelperStatus.Running) => true,
-            (HelperStatus.Starting, HelperStatus.Stopped) => true, // Failed to start
-            (HelperStatus.Starting, HelperStatus.Crashed) => true, // Process crashed immediately during start
+            (HelperStatus.Starting, HelperStatus.Stopped) => true,
             (HelperStatus.Running, HelperStatus.Stopping) => true,
             (HelperStatus.Stopping, HelperStatus.Stopped) => true,
             (HelperStatus.Running, HelperStatus.Crashed) => true,
             (HelperStatus.Crashed, HelperStatus.Restarting) => true,
-            (HelperStatus.Crashed, HelperStatus.Stopped) => true, // Given up restarting before transitioning to Restarting
+            (HelperStatus.Crashed, HelperStatus.Stopped) => true,
             (HelperStatus.Restarting, HelperStatus.Starting) => true,
-            (HelperStatus.Restarting, HelperStatus.Stopped) => true, // Give up restarting
+            (HelperStatus.Restarting, HelperStatus.Stopped) => true,
             _ => false
         };
     }
