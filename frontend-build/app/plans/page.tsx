@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { CheckCircle2, Zap } from 'lucide-react'
+import { CheckCircle2, Zap, AlertCircle } from 'lucide-react'
 import { Nav } from '@/components/nav'
 import { Footer } from '@/components/footer'
 import { PlanCta } from '@/components/plan-cta'
@@ -33,7 +33,7 @@ export default function PlansPage() {
       <main className="flex-1 pt-24 pb-20 px-4 sm:px-6">
         <div className="mx-auto max-w-5xl">
           {/* Header */}
-          <div className="text-center mb-12">
+          <div className="text-center mb-10">
             <h1 className="text-4xl font-bold tracking-tight text-foreground mb-3 text-balance">
               Simple, honest pricing
             </h1>
@@ -41,6 +41,14 @@ export default function PlansPage() {
               All prices are in Indian Rupees. GST is included in the listed price — no surprises
               at checkout.
             </p>
+          </div>
+
+          {/* Subscriptions Paused Banner */}
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 mb-10 text-sm text-foreground flex items-center justify-center gap-3 text-center">
+            <AlertCircle className="h-5 w-5 text-amber-500 flex-shrink-0" />
+            <span>
+              <strong className="font-semibold text-amber-500">Notice:</strong> We are not currently accepting new subscriptions. Server operations are temporarily paused.
+            </span>
           </div>
 
           {/* Pricing cards */}

@@ -165,11 +165,11 @@ function CreditsTab({ profile }: { profile: AccountMeResponse | null }) {
 
   return (
     <div className="space-y-5">
-      {/* Read-Only Billing Mode Notice */}
-      <div className="rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm text-foreground flex items-center gap-3">
-        <Shield className="h-5 w-5 text-primary flex-shrink-0" />
+      {/* Subscriptions Paused Notice */}
+      <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-foreground flex items-center gap-3">
+        <AlertCircle className="h-5 w-5 text-amber-500 flex-shrink-0" />
         <div>
-          <strong className="font-semibold">Manual Payment Active:</strong> Pay via UPI QR code, then submit your Transaction ID for approval.
+          <strong className="font-semibold text-amber-500">Subscriptions Paused:</strong> We are not currently accepting new subscriptions.
         </div>
       </div>
 
@@ -198,18 +198,22 @@ function CreditsTab({ profile }: { profile: AccountMeResponse | null }) {
             </p>
           </div>
         </div>
-        <div className="mt-5">
+        <div className="mt-5 flex items-center gap-3 flex-wrap">
           <Link href="/plans" className="inline-block rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted hover:border-primary transition-colors">
             View Plans &amp; Pricing
           </Link>
+          <span className="inline-flex items-center gap-1.5 text-xs text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full font-medium">
+            <AlertCircle className="h-3.5 w-3.5" />
+            New subscriptions paused
+          </span>
         </div>
       </div>
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-xl">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-lg font-semibold text-foreground">Pay via UPI</h2>
+          <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-xl text-center">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold text-foreground">Subscriptions Paused</h2>
               <button
                 onClick={handleCloseModal}
                 className="rounded-full p-1 hover:bg-muted text-muted-foreground transition-colors"
@@ -218,58 +222,24 @@ function CreditsTab({ profile }: { profile: AccountMeResponse | null }) {
               </button>
             </div>
 
-            <p className="text-sm text-muted-foreground mb-1">
-              <span className="font-medium text-foreground">{planInfo.label}</span> — {planInfo.price}
-            </p>
-            <p className="text-xs text-muted-foreground mb-4">
-              Scan the QR code with any UPI app (GPay, PhonePe, Paytm, etc.), then paste your Transaction ID below.
-            </p>
-
-            {/* QR Code */}
-            <div className="flex justify-center mb-5 bg-white p-3 rounded-xl border border-border">
-              <img
-                key={selectedPlan}
-                src={planInfo.qr}
-                alt={`${planInfo.label} UPI QR Code`}
-                className="w-52 h-52 object-contain"
-                onError={(e) => {
-                  // Fallback to default if specific QR not found
-                  e.currentTarget.onerror = null
-                  e.currentTarget.src = '/payment-qr-default.jpg'
-                }}
-              />
+            <div className="mx-auto my-3 flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+              <AlertCircle className="h-7 w-7" />
             </div>
 
-            <form onSubmit={handleSubmitTx} className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
-                  Transaction ID / UTR Number
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={transactionId}
-                  onChange={(e) => setTransactionId(e.target.value)}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
-                  placeholder="e.g. 123456789012"
-                  autoFocus
-                />
-              </div>
+            <p className="text-base font-semibold text-foreground mb-2">
+              We are not currently accepting new subscriptions.
+            </p>
+            <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+              Server operations and new subscription purchases are temporarily paused. If you already have an active subscription, your details remain accessible above.
+            </p>
 
-              {txMessage && (
-                <p className={`text-sm ${txMessage.includes('submitted') ? 'text-primary' : 'text-destructive'}`}>
-                  {txMessage}
-                </p>
-              )}
-
-              <button
-                type="submit"
-                disabled={submittingTx || !transactionId.trim()}
-                className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {submittingTx ? 'Submitting…' : 'Submit Transaction'}
-              </button>
-            </form>
+            <button
+              type="button"
+              onClick={handleCloseModal}
+              className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              Understood
+            </button>
           </div>
         </div>
       )}
